@@ -1,0 +1,85 @@
+version: "3.9"
+
+########################  SERVICES  ########################
+services:
+  # ---------- Database ----------
+  db:
+    image: postgres:16-alpine
+    env_file: .env
+    environment:
+      POSTGRES_USER:     ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB:       postgres
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME}"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+    networks: [ backnet ]
+
+  # ---------- REST API ----------
+  api:
+    build:
+      context: ./api
+      target: runtime
+    env_file: .env
+    environment:
+      - API_PORT
+      - DB_URL
+      - APP_SECRET
+      - SERVER_SECRET
+      - USE_SSL
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    networks: [ backnet ]
+
+  # ---------- WebSocket Game Server ----------
+  server:
+    build:
+      context: ./server
+      target: runtime
+    env_file: .env
+    environment:
+      - SERVER_PORT
+      - API_ENDPOINT
+      - SERVER_SECRET
+      - DEBUG
+      - RECAPTCHA_SECRET_KEY
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    networks: [ backnet ]
+
+  # ---------- Frontend (Static Client) ----------
+  client:
+    build:
+      context: ./client
+      target: runtime
+    env_file: .env
+    environment:
+      - REACT_APP_ENDPOINT_DEV
+      - REACT_APP_ENDPOINT_TEST
+      - REACT_APP_API
+    ports:
+      - "3000:80"       # 默认映射 3000 端口访问网页
+    depends_on:
+      - server
+    restart: unless-stopped
+    networks: [ backnet ]
+
+########################  VOLUMES & NETWORKS  ########################
+volumes:
+  db_data:
+
+networks:
+  backnet:
+    driver: bridge

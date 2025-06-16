@@ -1,46 +1,69 @@
 # Swordbattle.io – NovaCrafterLab Fork (Web3 Edition)
 
-> **This repository is a personal fork of the original game by [@codergautam](https://github.com/codergautam/swordbattle.io).**
-> It adds experimental **Web3 / on‑chain assets** while **respecting the original gameplay and licence**.
-> Please read the notes below before cloning, building or sending pull‑requests.
+> **Personal fork of the original game by [@codergautam](https://github.com/codergautam/swordbattle.io).** Adds experimental **Web3 / on‑chain assets** while honoring upstream gameplay and licence.
 
 ---
 
-## 🗺️ Repository Map & Branch Policy
+## Branch roles (no tables, quick view)
 
-| Branch                  | Role                                 | What goes in                                                                                          | Protection                                               |
-| ----------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `web3-main` *(default)* | **Web3 Feature Line**                | All new gameplay, wallet & NFT code, CI/CD for web3 build                                             | Free push; PR review optional                            |
-| `main`                  | **Upstream Sync + Security Patches** | Clean mirror of upstream plus cherry‑picked vulnerability fixes                                       | Protected, PR review ✔, CI gate blocks any `web3/` paths |
-| `upstream-main`         | **Local Tracking Branch**            | *Never pushed*. Fast‑forward mirror of `codergautam/swordbattle.io/main` used for merges & comparison |  —                                                       |
+* **`web3-main` – default**
+  Web3 gameplay & release line. Free push / typical feature branches.
+* **`main` – upstream sync + patches**
+  Mirrors `codergautam/main` & holds cherry‑picked security fixes. *No Web3 code.* Protected branch.
+* **`upstream-main` – local mirror**
+  Fast‑forward copy of upstream. Never pushed.
 
-> **TL;DR** If you’re contributing Web3 gameplay, target **`web3-main`**.
-> If you’re helping back‑port a security fix, open your PR against **`main`**.
-
----
-
-## 🤝 Respecting the Upstream Author
-
-* All original code & assets remain © their respective authors under the GPL licence.
-* Security or stability fixes developed here will be **cherry‑picked and submitted upstream**.
-* Web3‑specific logic **will *not* be sent upstream** unless explicitly requested by the original maintainer.
+> **PR guide**
+> ‑ New Web3 features → target **`web3-main`**
+> ‑ Security / bug fix for upstream → fix on `web3-main`, cherry‑pick to **`main`**, then open PR to upstream.
 
 ---
 
-## 🔄 Daily Workflow (maintainers cheat‑sheet)
+## Quick start (clone & layout in one line)
 
-1. **Sync upstream**
-   `scripts/sync-upstream.sh` – pulls `upstream/main`, fast‑forwards `main`, merges into `web3-main`.
-2. **Feature work**
-   `git checkout -b feat/<name>` from `web3-main` → code → PR → merge.
-3. **Security Patch**
-   Fix on `web3-main` → cherry‑pick onto `main` → open PR to upstream.
-4. **Release**
-   Tag on `web3-main` using `vX.Y.Z-web3.N`, CI publishes to Netlify + IPFS.
+```bash
+# Linux / WSL2 / MSYS2 Bash
+bash <(curl -fsSL https://raw.githubusercontent.com/NovaCrafterLab/swordbattle.io/web3-main/scripts/init-web3.sh)
+# – or –
+wget -qO- https://raw.githubusercontent.com/NovaCrafterLab/swordbattle.io/web3-main/scripts/init-web3.sh | bash
+```
+
+> Requires **`curl` or `wget`**.
+> On Windows, run inside **WSL2** or **MSYS2 MinGW64** for a POSIX shell.
+
+The script will:
+
+1. Clone `NovaCrafterLab/swordbattle.io`
+2. Add `codergautam/swordbattle.io` as `upstream`
+3. Create branches `web3-main`, `main`, `upstream-main`
+4. Set `gh` default repo to the fork
+
+After it prints *✔ Ready* you can:
+
+```bash
+git checkout -b feat/my-awesome-feature   # start coding on web3-main
+```
 
 ---
 
-*(The original README continues below for completeness.)*
+## Daily workflow (maintainers)
+
+1. **Sync upstream** – run `scripts/sync-upstream.sh` (pull → merge into `main` & `web3-main`).
+2. **Develop** – branch from `web3-main`, PR back when ready.
+3. **Security patch** – fix on `web3-main`, cherry‑pick to `main`, PR to upstream.
+4. **Release** – tag on `web3-main` (`vX.Y.Z-web3.N`), CI deploys.
+
+---
+
+## Respecting upstream
+
+* Original code © upstream authors, GPL v3.
+* Only clean security fixes are sent upstream; Web3 logic stays here unless requested.
+
+---
+
+*(Original upstream README below for reference)*
+
 
 <details>
 <summary>Original upstream README</summary>
