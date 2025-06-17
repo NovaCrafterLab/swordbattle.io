@@ -4,16 +4,17 @@
 FROM node:22-slim AS builder
 WORKDIR /app
 
-# native toolchain (only needed while building native addons)
+# native toolchain (needed only to build native addons)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# production deps (uWebSockets.js etc.)
-COPY package.json yarn.lock ./
-RUN yarn install --production --frozen-lockfile --network-timeout 600000
+# install runtime deps without lockfile
+COPY package.json ./
+RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
+    yarn install --network-timeout 600000
 
-# game source (plain JS)
+# copy plain-JS game source
 COPY src ./src
 
 ########################  runtime  ########################
@@ -23,7 +24,7 @@ WORKDIR /app
 # non-root user for safety
 RUN addgroup --system app && adduser --system --ingroup app app
 
-# copy deps + code from builder
+# bring deps + code from builder
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/src          ./src
 

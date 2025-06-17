@@ -65,7 +65,6 @@ services:
       context: ./client
       target: runtime
       args:
-        PUBLIC_URL:               ${PUBLIC_URL}
         REACT_APP_API:            ${REACT_APP_API}
         REACT_APP_ENDPOINT_DEV:   ${REACT_APP_ENDPOINT_DEV}
         REACT_APP_ENDPOINT_TEST:  ${REACT_APP_ENDPOINT_TEST}

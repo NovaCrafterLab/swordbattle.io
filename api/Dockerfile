@@ -9,9 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# install all deps once
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile --network-timeout 600000
+# install dependencies without lockfile
+COPY package.json ./
+RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
+    yarn install --network-timeout 600000
 
 # copy source & compile (NestJS -> dist/)
 COPY . .

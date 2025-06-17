@@ -7,19 +7,16 @@ WORKDIR /app
 # ---------- build-time public args ----------
 ARG PUBLIC_URL
 ARG REACT_APP_API
-ARG REACT_APP_ENDPOINT_DEV
 ARG REACT_APP_ENDPOINT_TEST
 
-# 导出为 ENV，供 yarn build 时读取
 ENV PUBLIC_URL=$PUBLIC_URL \
     REACT_APP_API=$REACT_APP_API \
-    REACT_APP_ENDPOINT_DEV=$REACT_APP_ENDPOINT_DEV \
     REACT_APP_ENDPOINT_TEST=$REACT_APP_ENDPOINT_TEST
 
 # ---------- install & build ----------
-COPY package.json yarn.lock ./
+COPY package.json ./
 RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
-    yarn install --frozen-lockfile --network-timeout 600000
+    yarn install --network-timeout 600000
 
 COPY . .
 RUN yarn build
