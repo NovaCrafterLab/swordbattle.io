@@ -1,0 +1,49 @@
+root = true
+
+# default
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# markdown
+[*.md]
+trim_trailing_whitespace = false
+indent_size = 2
+
+# json / yaml
+[*.{json,yml,yaml}]
+indent_size = 2
+
+# web files
+[*.{js,jsx,ts,tsx,vue,html,htm,css,scss,sass,less}]
+indent_size = 2
+
+# python
+[*.py]
+indent_size = 4
+
+# go
+[*.go]
+indent_style = tab
+indent_size = 4
+
+# shell
+[*.sh]
+indent_size = 2
+
+# docker
+[Dockerfile]
+indent_size = 2
+
+# makefile
+[Makefile]
+indent_style = tab
+indent_size = 4
+
+# sql
+[*.sql]
+indent_size = 4

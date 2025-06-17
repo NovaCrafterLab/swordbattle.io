@@ -1,0 +1,13 @@
+# lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# yarn cache
+.yarn/cache
+
+# build output
+build
+dist
+.next
+coverage
