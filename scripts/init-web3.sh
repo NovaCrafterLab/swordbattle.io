@@ -1,64 +1,73 @@
 #!/usr/bin/env bash
-# init-web3.sh — bootstrap NovaCrafterLab/swordbattle.io (Web3 edition)
+# init-web3.sh — bootstrap swordbattle.io (Web3)
 
 ##############################################################################
-# Prerequisites check
+# deps
 ##############################################################################
-
 need() {
   command -v "$1" >/dev/null 2>&1 && return
-  echo "❌  '$1' not found."
+  echo "❌ $1 missing."
   case "$OSTYPE" in
-    linux*)  echo "    sudo apt install $1   # Debian/Ubuntu"
-             echo "    sudo dnf install $1   # Fedora"
-             ;;
-    msys*)   echo "    pacman -S $1          # MSYS2"
-             ;;
+    linux*) echo "   sudo apt install $1";;
+    msys*)  echo "   pacman -S $1";;
   esac
   MISSING=1
 }
 
 MISSING=0
 need git
-need gh
 need curl
-need wget
-[ "$MISSING" = 1 ] && { echo "Install missing tools and re-run."; exit 1; }
+need wget               # for later scripts
+command -v gh >/dev/null && GH=1 || GH=0   # gh is optional
+[ "$MISSING" -eq 1 ] && { echo "fix deps first."; exit 1; }
 
 ##############################################################################
-# Variables
+# vars
 ##############################################################################
-
 set -euo pipefail
 
-FORK="NovaCrafterLab/swordbattle.io"      # our repo
-UP="codergautam/swordbattle.io"           # upstream
+FORK="NovaCrafterLab/swordbattle.io"
+UP="codergautam/swordbattle.io"
 DIR="swordbattle.io"
 
 ##############################################################################
-# Clone & setup
+# clone
 ##############################################################################
-
-echo "🔄 Clone fork ..."
-gh repo clone "$FORK" "$DIR"
+echo "→ clone repo"
+if [ "$GH" -eq 1 ]; then
+  gh repo clone "$FORK" "$DIR"
+else
+  git clone "https://github.com/$FORK.git" "$DIR"
+fi
 cd "$DIR"
 
-echo "🔗 Add upstream remote ..."
+##############################################################################
+# remotes
+##############################################################################
+echo "→ add upstream"
 git remote add upstream "https://github.com/$UP.git" 2>/dev/null || true
-git fetch upstream --quiet
+git fetch upstream -q
+[ "$GH" -eq 1 ] && gh repo set-default "$FORK"
 
-echo "⚙  Set gh default -> fork ..."
-gh repo set-default "$FORK"
+##############################################################################
+# branches
+##############################################################################
+echo "→ branch setup"
+git checkout -B web3-main
+git branch --track main origin/main 2>/dev/null || true
+git branch --track upstream-main upstream/main || true
 
-echo "🌳 Create branch layout ..."
-git checkout -B web3-main                                # dev branch
-git branch --track main origin/main     2>/dev/null || : # clean line
-git branch --track upstream-main upstream/main || :
+##############################################################################
+# first sync
+##############################################################################
+echo "→ sync upstream"
+git checkout main
+git merge --ff-only upstream/main && git push -u origin main
+git checkout web3-main
+git merge --no-edit upstream/main
 
-echo "⬇  Initial upstream sync ..."
-git checkout upstream-main && git pull --quiet
-git checkout main          && git merge --ff-only upstream-main && git push -u origin main
-git checkout web3-main     && git merge upstream-main
-
-echo -e "\n✅ Ready!  Start coding on 'web3-main'. Current branches:"
+##############################################################################
+# done
+##############################################################################
+echo "✅ ready. branches:"
 git branch -vv
