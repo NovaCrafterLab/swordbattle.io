@@ -261,7 +261,8 @@ function App() {
   }
 
   const openLeaderboard = () => {
-    window.location.href = "https://swordbattle.io/leaderboard";
+    // TODO
+    // window.location.href = "https://swordbattle.io/leaderboard";
   };
 
   useEffect(() => {
