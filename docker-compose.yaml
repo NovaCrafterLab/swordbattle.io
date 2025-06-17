@@ -35,7 +35,7 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - "8090:8080"
     restart: unless-stopped
     networks: [ backnet ]
 
@@ -64,13 +64,14 @@ services:
     build:
       context: ./client
       target: runtime
+      args:
+        PUBLIC_URL:               ${PUBLIC_URL}
+        REACT_APP_API:            ${REACT_APP_API}
+        REACT_APP_ENDPOINT_DEV:   ${REACT_APP_ENDPOINT_DEV}
+        REACT_APP_ENDPOINT_TEST:  ${REACT_APP_ENDPOINT_TEST}
     env_file: .env
-    environment:
-      - REACT_APP_ENDPOINT_DEV
-      - REACT_APP_ENDPOINT_TEST
-      - REACT_APP_API
     ports:
-      - "3000:80"       # 默认映射 3000 端口访问网页
+      - "3000:80"
     depends_on:
       - server
     restart: unless-stopped
