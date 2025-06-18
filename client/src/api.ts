@@ -1,3 +1,4 @@
+// client/src/api.ts
 import { config } from './config';
 
 const endpoint = `${window.location.protocol}//${config.apiEndpoint}`;

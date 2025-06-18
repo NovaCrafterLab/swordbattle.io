@@ -1,12 +1,13 @@
+// client/src/ui/GlobalLeaderboard.tsx
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // add useNavigate
 import clsx from 'clsx';
 import { numberWithCommas, secondsToTime } from '../helpers';
 import api from '../api';
 
 import 'bootstrap/dist/js/bootstrap.bundle.min';
 import './GlobalLeaderboard.scss';
-import cosmetics from '../game/cosmetics.json';
+// import cosmetics from '../game/cosmetics.json';
 
 const types: Record<string, string> = {
   'kills': 'Kills',
@@ -29,6 +30,8 @@ export function GlobalLeaderboard() {
   const [type, setType] = useState<string>('coins');
   const [range, setRange] = useState<string>('all');
   const [data, setData] = useState<any[]>([]);
+
+  const navigate = useNavigate();              // router navigation helper
 
   const fetchData = () => {
     const isGames = type === 'coins' || type === 'kills' || type === 'playtime';
@@ -57,10 +60,10 @@ export function GlobalLeaderboard() {
 
   return (
     <section className="main-content">
-      <button className="back-button" onClick={() =>{
-        // ../index.html
-        window.location.href = '../index.html';
-      }}>Back to Game</button>
+      {/* back to main game without full-page reload */}
+      <button className="back-button" onClick={() => navigate('/')}>
+        Back to Game
+      </button>
       <div className="container">
         <h1>{types[type]} Leaderboard</h1>
         <br />
@@ -129,14 +132,14 @@ export function GlobalLeaderboard() {
                     <div className="d-flex align-items-center">
                       <div className="user-info__basic">
                         <h5 className="mb-0">
-                            <Link
+                          <Link
                             to={`/profile?username=${encodeURIComponent(row.username)}`}
                             rel="noreferrer"
                             style={{ color: 'black' }}
-                            >
+                          >
                             {row.clan && <span style={{ color: '#b0b000' }} className='clan'>[{row.clan}] </span>}
                             {row.username}
-                            </Link>
+                          </Link>
                         </h5>
                       </div>
                     </div>
@@ -183,13 +186,13 @@ function LeaderboardCard({ type, row, index }: { type: string, row: any, index: 
         <div className="leaderboard-card__top">
           <h3 className="text-center">
             #{index + 1} - <Link
-                            to={`/profile?username=${encodeURIComponent(row.username)}`}
-                            rel="noreferrer"
-                            style={{ color: isFirst ? 'white' : 'black' }}
-                            >
-                            {row.clan && <span style={{ color: isFirst ? '#ffff00' : '#b0b000' }} className='clan'>[{row.clan}] </span>}
-                            {row.username}
-                            </Link>
+              to={`/profile?username=${encodeURIComponent(row.username)}`}
+              rel="noreferrer"
+              style={{ color: isFirst ? 'white' : 'black' }}
+            >
+              {row.clan && <span style={{ color: isFirst ? '#ffff00' : '#b0b000' }} className='clan'>[{row.clan}] </span>}
+              {row.username}
+            </Link>
           </h3>
         </div>
         <div className="leaderboard-card__body">

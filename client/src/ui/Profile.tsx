@@ -1,6 +1,6 @@
-
+// client/src/ui/Profile.tsx
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';  // add
 import { secondsToTime, sinceFrom, numberWithCommas, lastSeen, fixDate } from '../helpers';
 import api from '../api';
 import { Line } from 'react-chartjs-2';
@@ -38,6 +38,8 @@ export default function Profile() {
   const clan = query.get('clan');
   const [data, setAccountData] = useState<ProfileData | null>(null);
   const [isLoading, setLoading] = useState(true);
+
+  const navigate = useNavigate(); // hook
 
   const fetchAccount = () => {
     api.post(`${api.endpoint}/profile/getPublicUserInfo/${username}`, {}, (data) => {
@@ -106,90 +108,92 @@ export default function Profile() {
     <section className="main-content">
       <div className="container">
         <div className='statsContent'>
-      <button className="back-button" onClick={() =>{
-        // ../index.html
-        window.location.href = '../leaderboard';
-      }}>X</button>
+          <button
+            className="back-button"
+            onClick={() => navigate('/')}  // SPA hash-router jump
+          >
+            X
+          </button>
           <center>
-        {data.account.clan ? (
-          <h1>
-            <img
-              src={
-                'assets/game/player/' +
-                Object.values(cosmetics.skins).find(
-                  (skin: any) => skin.id === data.account.skins.equipped
-                )?.bodyFileName
-              }
-              alt="Equipped skin"
-              className="equipped-skin"
-            />
-            <span style={{color: 'yellow'}}>[{data.account.clan}]</span> {data.account.username}
-          </h1>
-        ) : (
-          <h1>
-            <img
-              src={
-                'assets/game/player/' +
-                Object.values(cosmetics.skins).find(
-                  (skin: any) => skin.id === data.account.skins.equipped
-                )?.bodyFileName
-              }
-              alt="Equipped skin"
-              className="equipped-skin"
-            />
-            {data.account.username}
-          </h1>
-        )}</center>
-        <br />
-        <div className='cluster'>
-          <center>
-        <h4 className="stat">Joined {sinceFrom(data.account.created_at)} ago</h4>
-        <h4 className="stat">{data.dailyStats && data.dailyStats.length ? `Last seen ${lastSeen(data.dailyStats[0].date)}` : ''}</h4>
-        <br />
+            {data.account.clan ? (
+              <h1>
+                <img
+                  src={
+                    'assets/game/player/' +
+                    Object.values(cosmetics.skins).find(
+                      (skin: any) => skin.id === data.account.skins.equipped
+                    )?.bodyFileName
+                  }
+                  alt="Equipped skin"
+                  className="equipped-skin"
+                />
+                <span style={{ color: 'yellow' }}>[{data.account.clan}]</span> {data.account.username}
+              </h1>
+            ) : (
+              <h1>
+                <img
+                  src={
+                    'assets/game/player/' +
+                    Object.values(cosmetics.skins).find(
+                      (skin: any) => skin.id === data.account.skins.equipped
+                    )?.bodyFileName
+                  }
+                  alt="Equipped skin"
+                  className="equipped-skin"
+                />
+                {data.account.username}
+              </h1>
+            )}</center>
+          <br />
+          <div className='cluster'>
+            <center>
+              <h4 className="stat">Joined {sinceFrom(data.account.created_at)} ago</h4>
+              <h4 className="stat">{data.dailyStats && data.dailyStats.length ? `Last seen ${lastSeen(data.dailyStats[0].date)}` : ''}</h4>
+              <br />
 
-        {data.rank && <h4 className="stat">#{data.rank} all time</h4>}
-        <h4 className="stat">{numberWithCommas(data.account.profile_views)} profile views</h4>
-        </center>
-        </div>
+              {data.rank && <h4 className="stat">#{data.rank} all time</h4>}
+              <h4 className="stat">{numberWithCommas(data.account.profile_views)} profile views</h4>
+            </center>
+          </div>
 
-        <br />
-        <div className="row">
-          <Card title="Games Played" text={data.totalStats ? numberWithCommas(data.totalStats.games) : 0} />
-          <Card title="XP" text={data.totalStats ? numberWithCommas(data.totalStats.xp) : 0} />
-          <Card title="Total Playtime" text={data.totalStats ? secondsToTime(data.totalStats.playtime) : 0} />
-          <Card title="Stabs" text={data.totalStats ? numberWithCommas(data.totalStats.kills) : 0} />
-          <Card title="Skins Owned" text={data.account.skins.owned.length} />
-          <Card title="Mastery" text={data.totalStats ? numberWithCommas(data.totalStats.ultimacy) : 0} />
-        </div>
+          <br />
+          <div className="row">
+            <Card title="Games Played" text={data.totalStats ? numberWithCommas(data.totalStats.games) : 0} />
+            <Card title="XP" text={data.totalStats ? numberWithCommas(data.totalStats.xp) : 0} />
+            <Card title="Total Playtime" text={data.totalStats ? secondsToTime(data.totalStats.playtime) : 0} />
+            <Card title="Stabs" text={data.totalStats ? numberWithCommas(data.totalStats.kills) : 0} />
+            <Card title="Skins Owned" text={data.account.skins.owned.length} />
+            <Card title="Mastery" text={data.totalStats ? numberWithCommas(data.totalStats.ultimacy) : 0} />
+          </div>
 
-        {data.dailyStats && data.dailyStats.length &&
-          <div className="xp-graph">
-            <Line data={prepareGraphData(data.dailyStats)} options={{
-              responsive: true,
-              maintainAspectRatio: false,
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  ticks: {
-                    color: 'white',
+          {data.dailyStats && data.dailyStats.length &&
+            <div className="xp-graph">
+              <Line data={prepareGraphData(data.dailyStats)} options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    ticks: {
+                      color: 'white',
+                    }
+                  },
+                  x: {
+                    ticks: {
+                      color: 'white',
+                    }
                   }
                 },
-                x: {
-                  ticks: {
-                    color: 'white',
-                  }
-                }
-              },
-              plugins: {
-                legend: {
-                  labels: {
-                    color: 'white'
+                plugins: {
+                  legend: {
+                    labels: {
+                      color: 'white'
+                    },
                   },
                 },
-              },
-            }} />
-          </div>
-        }
+              }} />
+            </div>
+          }
         </div>
       </div>
     </section>
