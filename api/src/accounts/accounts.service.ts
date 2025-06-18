@@ -366,7 +366,8 @@ export class AccountsService {
     return this.accountsRepository.save(account);
   }
 
-  sanitizeAccount(account: Account) {
+  sanitizeAccount(account: Account | null) {
+    if (!account) return null;
     delete account.password;
     delete account.secret;
     delete account.email;

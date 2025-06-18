@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { AccountsService } from '../accounts/accounts.service';
 import { SecretLoginDTO, LoginDTO, RegisterDTO } from './auth.dto';
 import { Account } from 'src/accounts/account.entity';
@@ -10,15 +10,15 @@ import { v4 as uuidv4 } from 'uuid';
 export class AuthService {
   constructor(
     private readonly accountsService: AccountsService,
-  ) {}
+  ) { }
 
   async register(data: RegisterDTO) {
     // validate username
-    if(validateUsername(data.username)) {
+    if (validateUsername(data.username)) {
       throw new UnauthorizedException(validateUsername(data.username));
     }
     // validate email
-    if(data.email && /[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+/.test(data.email) === false) {
+    if (data.email && /[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+/.test(data.email) === false) {
       throw new UnauthorizedException('Invalid email');
     }
 
@@ -29,17 +29,22 @@ export class AuthService {
       throw new UnauthorizedException('Email already exists');
     }
     const secret = uuidv4();
-    const account = await this.accountsService.create({secret, ...data});
+    const account = await this.accountsService.create({ secret, ...data });
     return { account: this.accountsService.sanitizeAccount(account), secret };
   }
 
 
   async secretLogin(data: SecretLoginDTO) {
-    let account;
+    let account: Account | null;
+
     try {
       account = await this.accountsService.findOne({ where: { secret: data.secret } });
     } catch (e) {
-      throw new UnauthorizedException('User does not exist');
+      throw new InternalServerErrorException('Database error');
+    }
+
+    if (!account) {
+      throw new UnauthorizedException('Invalid secret');
     }
 
     return { account: this.accountsService.sanitizeAccount(account), secret: data.secret };
@@ -48,9 +53,9 @@ export class AuthService {
   async login(data: LoginDTO) {
     let account;
     try {
-        account = await this.accountsService.findOneWithLowercase({ where: { username: data.username } });
+      account = await this.accountsService.findOneWithLowercase({ where: { username: data.username } });
     } catch (e) {
-        account = await this.accountsService.findOneWithLowercase({ where: { email: data.username } });
+      account = await this.accountsService.findOneWithLowercase({ where: { email: data.username } });
     }
 
     if (!account) {
@@ -89,26 +94,26 @@ export class AuthService {
   async changeUsername(account: Account, newUsername: string) {
     try {
       let result = await this.accountsService.changeUsername(account.id, newUsername);
-      if(result.success) {
+      if (result.success) {
         (result as any).secret = account.secret;
       }
-    return result;
+      return result;
     } catch (e) {
       console.log(e);
-      return {error: e.message};
+      return { error: e.message };
     }
   }
 
   async changeClantag(account: Account, newClantag: string) {
     try {
       let result = await this.accountsService.changeClantag(account.id, newClantag);
-      if(result.success) {
+      if (result.success) {
         (result as any).secret = account.secret;
       }
-    return result;
+      return result;
     } catch (e) {
       console.log(e);
-      return {error: e.message};
+      return { error: e.message };
     }
   }
 
