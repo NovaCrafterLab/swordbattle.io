@@ -15,7 +15,7 @@ function ChangelogModal() {
     <ul style={{fontSize: 16, color: '#cccccc'}}>- New Mobs: <span style={{color: '#77aaff'}}>Blue Fish</span> and <span style={{color: '#ffaa00'}}>Orange Fish</span></ul>
     <ul style={{fontSize: 14, color: '#ffccff'}}>- Blue fish will run away when hit, but orange fish will attack you! Both are found in the river biome.</ul>
     <br></br>
-    <p style={{fontSize: 16, color: 'lightblue'}}>Join the <a href="https://discord.com/invite/9A9dNTGWb9" className="primary-link" target="_blank" rel="nofollow">Swordbattle.io Discord Server</a> to learn more about these updates on the full changelog!</p>
+    {/* <p style={{fontSize: 16, color: 'lightblue'}}>Join the <a href="https://discord.com/invite/9A9dNTGWb9" className="primary-link" target="_blank" rel="nofollow">Swordbattle.io Discord Server</a> to learn more about these updates on the full changelog!</p> */}
 </div>
 
   );

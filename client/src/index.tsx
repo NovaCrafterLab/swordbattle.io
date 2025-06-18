@@ -1,12 +1,15 @@
+// client/src/index.tsx
+
 import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
 import { RouterProvider, createHashRouter } from 'react-router-dom';
+import { load } from 'recaptcha-v3';
+
 import App from './ui/App';
 import { GlobalLeaderboard } from './ui/GlobalLeaderboard';
 import Profile from './ui/Profile';
 import { store } from './redux/store';
 import { config } from './config';
-import { load } from 'recaptcha-v3'
 
 import './global.scss';
 

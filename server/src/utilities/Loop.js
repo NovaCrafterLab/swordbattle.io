@@ -1,3 +1,25 @@
+const logSevereLag = (() => {
+  let last = 0;                   // last log timestamp
+  const PERIOD = 180_000;         // 3 min in ms
+
+  return (ctx /* this */) => {
+    const now = Date.now();
+    if (now - last < PERIOD) return; // skip if inside throttle window
+    last = now;
+
+    const realPlayersCnt = [...ctx.game.players.values()]
+      .filter(p => !p.isBot).length;
+
+    console.log(
+      `Server lagging severely... tick took ${ctx.tickTimeElapsed} ms. `
+      + `Expecting <${ctx.interval} ms.\n`
+      + `Real player count: ${realPlayersCnt}; `
+      + `Entities: ${ctx.entityCnt}; `
+      + `Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`
+    );
+  };
+})();
+
 class Loop {
   constructor(interval = 50, game) {
     this.entityCnt = 0;
@@ -51,8 +73,7 @@ class Loop {
       this.tickTimeElapsed = Date.now() - now;
 
       if(this.tickTimeElapsed > this.interval * 2) {
-        const realPlayersCnt = [...this.game.players.values()].filter(p => !p.isBot).length;
-        console.log(`Server lagging severely... tick took ${this.tickTimeElapsed} ms. Expecting <${this.interval}, ms.\nReal player count: ${realPlayersCnt}; Entities: ${this.entityCnt}; Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
+        logSevereLag(this);
       }
     this.ticksThisSecond++;
     const delay = this.interval - this.tickTimeElapsed;

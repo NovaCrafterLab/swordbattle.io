@@ -12,6 +12,9 @@
   "scripts": {
     "heroku-postbuild": "sh herokuinit.sh",
     "dev": "yarn run dev:core",
+    "dev:client": "yarn workspace @swordbattle/client run dev",
+    "dev:server": "yarn workspace @swordbattle/server run dev",
+    "dev:api": "yarn workspace @swordbattle/api run dev",
     "dev:core": "yarn workspaces foreach -A -p -i -j unlimited --include \"{server,client}\" run dev",
     "dev:full": "yarn workspaces foreach -A -p -i -j unlimited --include \"{server,client,api}\" run dev",
     "build": "yarn workspaces foreach --all --topological-dev run build",

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUser, faSignOut, faICursor,faGear, faX } from '@fortawesome/free-solid-svg-icons';
+import { faUser, faSignOut, faICursor, faGear, faX } from '@fortawesome/free-solid-svg-icons';
 
 import clsx from 'clsx';
 import { useScale } from './Scale';
@@ -43,7 +43,7 @@ import Leaderboard from './game/Leaderboard';
 let debugMode = false;
 try {
   debugMode = window.location.search.includes("debugAlertMode");
-  } catch(e) {}
+} catch (e) { }
 
 function App() {
   const dispatch = useDispatch();
@@ -63,6 +63,8 @@ function App() {
 
   const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight });
 
+  const navigate = useNavigate();
+
   useEffect(() => {
 
     // debounce resize
@@ -78,8 +80,8 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if(gameStarted && firstGame) setFirstGame(false);
-    if(gameStarted) return;
+    if (gameStarted && firstGame) setFirstGame(false);
+    if (gameStarted) return;
     setTimeout(() => {
       // if(!getCookies().hasOwnProperty('auth-token') || !getCookies()['auth-token']) {
       //   console.log('No auth token found, skipping account check');
@@ -93,59 +95,59 @@ function App() {
       // } catch(e) {
       //   console.log('Error getting secret', e);
       // }
-    // api.get(`${api.endpoint}/auth/account?now=${Date.now()}`, (data) => {
-    //   console.log('Account data', data);
-    //   setAccountReady(true);
-    //   if (data.account) {
-    //     data.account.token = data.token;
-    //     // if(data.account.secret) {
-    //     //   try {
-    //     //     window.localStorage.setItem('secret', data.account.secret);
-    //     //   } catch(e) {
-    //     //     console.log('Error setting secret', e);
-    //     //   }
-    //     // }
-    //     dispatch(setAccount(data.account));
-    //   } else {
-    //     if(typeof secret === 'string' && secret.length > 0) {
-    //       // attempt legacy login with secret
-    //       console.log('Attempting legacy login with secret');
-    //       api.post(`${api.endpoint}/auth/legacyLogin`, { secret }, (data) => {
-    //         if (data.account) {
-    //           data.account.token = data.token;
-    //           dispatch(setAccount(data.account));
-    //         } else {
-    //           console.log('Error logging in with secret', data);
-    //           dispatch(clearAccount());
-    //         }
-    //       });
-    //     }
-    //     dispatch(clearAccount());
-    //   }
-    // });
+      // api.get(`${api.endpoint}/auth/account?now=${Date.now()}`, (data) => {
+      //   console.log('Account data', data);
+      //   setAccountReady(true);
+      //   if (data.account) {
+      //     data.account.token = data.token;
+      //     // if(data.account.secret) {
+      //     //   try {
+      //     //     window.localStorage.setItem('secret', data.account.secret);
+      //     //   } catch(e) {
+      //     //     console.log('Error setting secret', e);
+      //     //   }
+      //     // }
+      //     dispatch(setAccount(data.account));
+      //   } else {
+      //     if(typeof secret === 'string' && secret.length > 0) {
+      //       // attempt legacy login with secret
+      //       console.log('Attempting legacy login with secret');
+      //       api.post(`${api.endpoint}/auth/legacyLogin`, { secret }, (data) => {
+      //         if (data.account) {
+      //           data.account.token = data.token;
+      //           dispatch(setAccount(data.account));
+      //         } else {
+      //           console.log('Error logging in with secret', data);
+      //           dispatch(clearAccount());
+      //         }
+      //       });
+      //     }
+      //     dispatch(clearAccount());
+      //   }
+      // });
       let secret: string | null = null;
       try {
-       secret = window.localStorage.getItem('secret');
-      } catch(e) {
+        secret = window.localStorage.getItem('secret');
+      } catch (e) {
         console.log('Error getting secret', e);
       }
-    if(!secret) {
-      dispatch(clearAccount());
-      setAccountReady(true);
-    } else {
-      api.post(`${api.endpoint}/auth/loginWithSecret`, null, (data) => {
+      if (!secret) {
+        dispatch(clearAccount());
         setAccountReady(true);
-        if (data.account) {
-          data.account.secret = data.secret;
-          dispatch(setAccount(data.account));
-        } else {
-          dispatch(clearAccount());
-        }
-      });
-    }
-  }, 10);
+      } else {
+        api.post(`${api.endpoint}/auth/loginWithSecret`, null, (data) => {
+          setAccountReady(true);
+          if (data.account) {
+            data.account.secret = data.secret;
+            dispatch(setAccount(data.account));
+          } else {
+            dispatch(clearAccount());
+          }
+        });
+      }
+    }, 10);
 
-  if(!firstGame) return;
+    if (!firstGame) return;
     setModal(<ChangelogModal />);
   }, [gameStarted]);
 
@@ -164,13 +166,13 @@ function App() {
     // const gameState = (game?.scene.scenes[0] as Game).gameState;
     // TODO: change server without reloading
 
-      window.location.reload();
+    window.location.reload();
   }
 
   useEffect(() => {
     window.addEventListener('assetsLoadProgress', (e: any) => {
       setLoadingProgress(Math.floor(e.detail * 98));
-      if(e.detail === 1) setAssetsLoaded(true);
+      if (e.detail === 1) setAssetsLoaded(true);
     });
   }, []);
 
@@ -178,11 +180,10 @@ function App() {
   useEffect(() => {
     if (gameStarted) {
       // prevent accidental exit
-      window.onbeforeunload = function(e)
-        {
-          e.preventDefault();
-          return "Are you sure you want to exit";
-        }
+      window.onbeforeunload = function (e) {
+        e.preventDefault();
+        return "Are you sure you want to exit";
+      }
 
     } else {
       window.onbeforeunload = null;
@@ -194,21 +195,21 @@ function App() {
 
   useEffect(() => {
     console.log('Checking if everything is ready. Connected:', isConnected, 'Assets:', assetsLoaded);
-    if(debugMode) {
+    if (debugMode) {
       alert('check. Connected: ' + isConnected + ' Assets: ' + assetsLoaded);
     }
-    if(isConnected && assetsLoaded) {
+    if (isConnected && assetsLoaded) {
       setLoadingProgress(100);
     }
   }, [isConnected, assetsLoaded]);
 
   const onStart = () => {
     console.log('Starting game');
-    if(!isConnected) {
+    if (!isConnected) {
       alert('Not connected yet');
       return;
     }
-    else  {
+    else {
       const go = () => {
         setGameStarted(true);
         window.phaser_game?.events.emit('startGame', name);
@@ -263,19 +264,20 @@ function App() {
   const openLeaderboard = () => {
     // TODO
     // window.location.href = "https://swordbattle.io/leaderboard";
+    navigate('leaderboard');
   };
 
   useEffect(() => {
     if (modal?.type?.displayName === 'ShopModal') {
       setModal(<ShopModal account={account} />);
     }
-    if(account.is_v1) {
+    if (account.is_v1) {
       setModal(<MigrationModal account={account} />);
     }
   }, [account]);
 
   useEffect(() => {
-    if(loadingProgress === 100 && (window as any).instantStart) {
+    if (loadingProgress === 100 && (window as any).instantStart) {
       (window as any).instantStart = false;
       onStart();
     }
@@ -295,191 +297,196 @@ function App() {
       />
       {connectionError && (
         <Modal
-          child={<ConnectionError reason={connectionError}/>}
+          child={<ConnectionError reason={connectionError} />}
           className="connectionErrorModal"
         />
       )}
 
       {!gameStarted && (
         <>
-        <div className={`${isConnected ? 'loaded mainMenu' : 'mainMenu'}`}>
-        <ShopButton account={account} scale={scale.factor} openShop={openShop} />
-        <LeaderboardButton scale={scale.factor} openLeaderboard={openLeaderboard} />
+          <div className={`${isConnected ? 'loaded mainMenu' : 'mainMenu'}`}>
+            <ShopButton account={account} scale={scale.factor} openShop={openShop} />
+            <LeaderboardButton scale={scale.factor} openLeaderboard={openLeaderboard} />
             <div id="contentt" style={scale.styles}>
 
-          <div id="menuContainer" >
+              <div id="menuContainer" >
 
-            {/* <!-- GAME NAME --> */}
-            <div id="gameName"><img src={titleImg} alt="Swordbattle.io" width={750} height={250} style={{
-    position: 'fixed',
-    top: '-50%',
-    left: '50%',
-    transform: 'translate(-50%, -125%)'
-  }} />
-</div>
-
-            {/* <!-- LOADING TEXT --> */}
-            {/* <!-- MENU CARDS --> */}
-            <div id="menuCardHolder" style={{ display: 'inline-block', height: 'auto !important', position: 'fixed',
-    top: '-50%',
-    left: '50%',
-    transform: 'translate(-50%, -5%)' }} >
-              <div className="menu">
-                <div className="accountCard menuCard panel">
-                  <AccountCard account={account} onLogin={onLogin} onSignup={onSignup} />
+                {/* <!-- GAME NAME --> */}
+                <div id="gameName"><img src={titleImg} alt="Swordbattle.io" width={750} height={250} style={{
+                  position: 'fixed',
+                  top: '-50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -125%)'
+                }} />
                 </div>
 
-                <div className="announcementCard menuCard panel">
-                    <div style={{fontSize: '15px'}}>
-                    Tip: If someone's nametag is <span style={{ color: 'yellow' }}>yellow</span>, it means they are using an <span style={{color: '#ffffaa'}}>exclusive version</span> of a skin! (Obtained before the beginning of 2024)
+                {/* <!-- LOADING TEXT --> */}
+                {/* <!-- MENU CARDS --> */}
+                <div id="menuCardHolder" style={{
+                  display: 'inline-block', height: 'auto !important', position: 'fixed',
+                  top: '-50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -5%)'
+                }} >
+                  <div className="menu">
+                    <div className="accountCard menuCard panel">
+                      <AccountCard account={account} onLogin={onLogin} onSignup={onSignup} />
+                    </div>
+
+                    {/* TODO */}
+                    {/* <div className="announcementCard menuCard panel">
+                      <div style={{ fontSize: '15px' }}>
+                        Tip: If someone's nametag is <span style={{ color: 'yellow' }}>yellow</span>, it means they are using an <span style={{ color: '#ffffaa' }}>exclusive version</span> of a skin!
+                      </div>
+                    </div> */}
+                    {/* <!-- Play --> */}
+                    <div className="joinCard menuCard panel" style={{ position: 'relative' }}>
+                      <div className="joinCardInput">
+                        <input
+                          type="text"
+                          id="nameInput"
+                          placeholder="Enter Name"
+                          maxLength={20}
+                          value={account.isLoggedIn ? account.username : name}
+                          onChange={(e) => setName(e.target.value)}
+                          style={{ cursor: account.isLoggedIn ? 'not-allowed' : 'text' }}
+                          disabled={account.isLoggedIn}
+                          autoComplete="none"
+                        />
+                        <select id="serverBrowser"
+                          value={servers.length === 0 ? 'loading' : server}
+                          onChange={(e) => updateServer(e.target.value)}
+                        >
+                          {servers.length === 0 && <option value="loading" disabled>Loading...</option>}
+                          {servers.map((server) => <option key={server.value} value={server.value} disabled={server.offline}>
+                            {server.name} ({server.offline ? 'OFFLINE' : `${server.playerCnt} players - ${server.ping}ms`})
+                          </option>)}
+                        </select>
+
+                        <div id="enterGame" className="menuButton" onClick={() => accountReady && isConnected && onStart()}>
+                          {(accountReady && isConnected) ? 'Play!' : 'Connecting...'}
+                        </div>
+
+
+                      </div>
                     </div>
                   </div>
-                {/* <!-- Play --> */}
-                <div className="joinCard menuCard panel" style={{ position: 'relative' }}>
-                  <div className="joinCardInput">
-                    <input
-                      type="text"
-                      id="nameInput"
-                      placeholder="Enter Name"
-                      maxLength={20}
-                      value={account.isLoggedIn ? account.username : name}
-                      onChange={(e) => setName(e.target.value)}
-                      style={{ cursor: account.isLoggedIn ? 'not-allowed' : 'text'}}
-                      disabled={account.isLoggedIn}
-                      autoComplete="none"
-                    />
-                    <select id="serverBrowser"
-                    value={servers.length === 0 ? 'loading' : server}
-                    onChange={(e) => updateServer(e.target.value)}
-                    >
-                    {servers.length === 0 && <option value="loading" disabled>Loading...</option>}
-        {servers.map((server) => <option key={server.value} value={server.value} disabled={server.offline}>
-          {server.name} ({server.offline ? 'OFFLINE' : `${server.playerCnt} players - ${server.ping}ms`})
-        </option>)}
-                    </select>
-
-                    <div id="enterGame" className="menuButton" onClick={()=>accountReady && isConnected && onStart()}>
-                    {(accountReady && isConnected)? 'Play!' : 'Connecting...'}
-            </div>
-
-
-                  </div>
-                </div>
-              </div>
-              <div className='fullWidth'>
+                  {/* <div className='fullWidth'>
                 <div id="adBelow">
                  <Ad screenW={dimensions.width} screenH={dimensions.height} types={[[728, 90], [970, 90], [970, 250]]} />
                 </div>
+              </div> */}
+                </div>
+
               </div>
             </div>
 
-</div>
-          </div>
-
-          {/* <!-- SETTINGS --> */}
-          <div id="settingsButton" className="altLink panel"  onClick={openSettings}>
-            {/* <i className="material-icons ui-icon">&#xE8B8;</i> */}
-            <FontAwesomeIcon icon={faGear} className='ui-icon'/>
-          </div>
-          {modal && <Modal child={modal} close={closeModal} scaleDisabled={modal.type.name === 'ShopModal'} />}
-          {/* <div id="topRight1" className="inParty">
+            {/* <!-- SETTINGS --> */}
+            <div id="settingsButton" className="altLink panel" onClick={openSettings}>
+              {/* <i className="material-icons ui-icon">&#xE8B8;</i> */}
+              <FontAwesomeIcon icon={faGear} className='ui-icon' />
+            </div>
+            {modal && <Modal child={modal} close={closeModal} scaleDisabled={modal.type.name === 'ShopModal'} />}
+            {/* <div id="topRight1" className="inParty">
             <span>top right stuff</span>
           </div> */}
 
-           {/* <div id="topRight2" className="altLink">
+            {/* <div id="topRight2" className="altLink">
             <span>more top right stuff</span>
           </div> */}
 
-<div className="auth-buttons" style={scale.styles}>
-             {account.isLoggedIn ? (
-               <div className="dropdown">
-                {account.clan ? (
-                  <div className="auth-username">
-                    <FontAwesomeIcon icon={faUser} /> <span style={{color: 'yellow'}}>[{account.clan?.toUpperCase()}]</span> {account.username}
-                  </div>
-                ) : (
-                  <div className="auth-username">
-                    <FontAwesomeIcon icon={faUser} /> {account.username}
-                  </div>
-                )}
-                 <ul className="dropdown-menu">
-                   <li>
-                   <a className="dropdown-item" href="#" onClick={onChangeName}>
-                     <FontAwesomeIcon icon={faICursor} /> Change Name
-                   </a>
+            <div className="auth-buttons" style={scale.styles}>
+              {account.isLoggedIn ? (
+                <div className="dropdown">
+                  {account.clan ? (
+                    <div className="auth-username">
+                      <FontAwesomeIcon icon={faUser} /> <span style={{ color: 'yellow' }}>[{account.clan?.toUpperCase()}]</span> {account.username}
+                    </div>
+                  ) : (
+                    <div className="auth-username">
+                      <FontAwesomeIcon icon={faUser} /> {account.username}
+                    </div>
+                  )}
+                  <ul className="dropdown-menu">
+                    <li>
+                      <a className="dropdown-item" href="#" onClick={onChangeName}>
+                        <FontAwesomeIcon icon={faICursor} /> Change Name
+                      </a>
                     </li>
                     <li>
-                   <a className="dropdown-item" href="#" onClick={onChangeClan}>
-                     <FontAwesomeIcon icon={faICursor} /> Change Clan
-                   </a>
-                   </li>
-                   <li><a className="dropdown-item" href="#" onClick={onLogout}>
-                     <FontAwesomeIcon icon={faSignOut} /> Logout
-                   </a></li>
-                 </ul>
-               </div>
-             ) : (
-               <>
-               <img src={LoginImg} alt="Login" role="button" className="auth-btn" onClick={onLogin} />
-               <img src={SignupImg} alt="Signup" role="button" className="auth-btn" onClick={onSignup} />
-               </>
-             )}
-           </div>
+                      <a className="dropdown-item" href="#" onClick={onChangeClan}>
+                        <FontAwesomeIcon icon={faICursor} /> Change Clan
+                      </a>
+                    </li>
+                    <li><a className="dropdown-item" href="#" onClick={onLogout}>
+                      <FontAwesomeIcon icon={faSignOut} /> Logout
+                    </a></li>
+                  </ul>
+                </div>
+              ) : (
+                <>
+                  <img src={LoginImg} alt="Login" role="button" className="auth-btn" onClick={onLogin} />
+                  <img src={SignupImg} alt="Signup" role="button" className="auth-btn" onClick={onSignup} />
+                </>
+              )}
+            </div>
 
 
-          {/* <!-- LINKS CONTAINERS --> */}
-          {/* <div id="linksContainer" className='panel'>
+            {/* <!-- LINKS CONTAINERS --> */}
+            {/* <div id="linksContainer" className='panel'>
             <a href="./docs/terms.txt" target="_blank">Policy</a> |
             <a href="./docs/privacy.txt" target="_blank">Privacy</a>
           </div> */}
-                 <footer className={clsx('links', isLoaded && 'animation')} style={scale.styles}>
-             <div>
-               <a href="https://github.com/codergautam/swordbattle.io" target="_blank" rel="nofollow">About</a>
-             </div>
-             <div>
-               <a href="https://discord.com/invite/9A9dNTGWb9" target="_blank" className='discord' rel="nofollow">
-                 Discord
-               </a>
-             </div>
 
-             <div>
-               <a href="#"
-                onClick={() => {
-                  try {
+            {/* TODO footer */}
+            <footer className={clsx('links', isLoaded && 'animation')} style={scale.styles}>
+              {/* <div>
+                <a href="https://github.com/codergautam/swordbattle.io" target="_blank" rel="nofollow">About</a>
+              </div> */}
+              {/* <div>
+                <a href="https://discord.com/invite/9A9dNTGWb9" target="_blank" className='discord' rel="nofollow">
+                  Discord
+                </a>
+              </div> */}
+
+              {/* <div>
+                <a href="#"
+                  onClick={() => {
+                    try {
                       (window as any)?.showPlaylight()
-                  } catch(e) {
+                    } catch (e) {
                       console.log('Error showing playlight', e);
-                  }
-                }}
-               rel="nofollow">
-                 More Games
-               </a>
-             </div>
-             <div>
-               <a href="https://worldguessr.com/" target="_blank"
-                style={{
-                  position: 'fixed',
-                  right: '95%',
-                  bottom: '150%',
-                  fontSize: '0.1em',
-                  color: 'white',
-                }}
-               rel="dofollow">
-                 Free GeoGuessr!
-               </a>
-             </div>
+                    }
+                  }}
+                  rel="nofollow">
+                  More Games
+                </a>
+              </div> */}
+              {/* <div>
+                <a href="https://worldguessr.com/" target="_blank"
+                  style={{
+                    position: 'fixed',
+                    right: '95%',
+                    bottom: '150%',
+                    fontSize: '0.1em',
+                    color: 'white',
+                  }}
+                  rel="dofollow">
+                  Free GeoGuessr!
+                </a>
+              </div> */}
               {/* <div>
                <a href="https://swordbattle.io/partners" target="_blank" className='partners' rel="nofollow">
                  Partners
                </a>
              </div> */}
-             <div>
-               {/* <a href="https://iogames.forum/t/official-swordbattle-changelog/17400/last" target="_blank" className='changelog' style={{color: 'yellow'}} rel="nofollow">
+              <div>
+                {/* <a href="https://iogames.forum/t/official-swordbattle-changelog/17400/last" target="_blank" className='changelog' style={{color: 'yellow'}} rel="nofollow">
                 Changelog
               </a> */}
-             </div>
-           </footer>
-        </div>
+              </div>
+            </footer>
+          </div>
 
         </>
       )}
