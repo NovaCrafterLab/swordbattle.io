@@ -5,6 +5,6 @@ export const store = configureStore({
   reducer: {
     account,
   },
-})
+});
 
 export type RootState = ReturnType<typeof store.getState>;

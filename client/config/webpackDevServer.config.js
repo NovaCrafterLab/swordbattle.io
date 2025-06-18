@@ -21,7 +21,11 @@ module.exports = (proxy, allowedHost) => {
   return {
     /* security */
     allowedHosts: disableFirewall ? 'all' : [allowedHost],
-    headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': '*', 'Access-Control-Allow-Headers': '*' },
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': '*',
+      'Access-Control-Allow-Headers': '*',
+    },
 
     /* static assets */
     compress: true,

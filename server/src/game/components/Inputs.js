@@ -44,16 +44,20 @@ class Inputs {
   difference(other) {
     const difference = [];
 
-    const newlyDown = this.downInputs.filter(i => other.downInputs.indexOf(i) < 0);
-    newlyDown.forEach(input => {
+    const newlyDown = this.downInputs.filter(
+      (i) => other.downInputs.indexOf(i) < 0,
+    );
+    newlyDown.forEach((input) => {
       difference.push({
         inputType: input,
         inputDown: true,
       });
     });
 
-    const newlyUp = other.downInputs.filter(i => this.downInputs.indexOf(i) < 0);
-    newlyUp.forEach(input => {
+    const newlyUp = other.downInputs.filter(
+      (i) => this.downInputs.indexOf(i) < 0,
+    );
+    newlyUp.forEach((input) => {
       difference.push({
         inputType: input,
         inputDown: false,
@@ -62,6 +66,6 @@ class Inputs {
 
     return difference;
   }
-};
+}
 
 module.exports = Inputs;

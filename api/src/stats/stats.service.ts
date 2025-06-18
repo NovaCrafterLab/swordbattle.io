@@ -11,26 +11,31 @@ import CacheObj from 'src/Cache';
 
 @Injectable()
 export class StatsService {
-  private top100RankCache = new CacheObj<{ [key: number]: number }>(3600000) // 1 hour in milliseconds
+  private top100RankCache = new CacheObj<{ [key: number]: number }>(3600000); // 1 hour in milliseconds
   constructor(
     private readonly accountsService: AccountsService,
-    @InjectRepository(DailyStats) private readonly dailyStatsRepository: Repository<DailyStats>,
-    @InjectRepository(TotalStats) private readonly totalStatsRepository: Repository<TotalStats>,
+    @InjectRepository(DailyStats)
+    private readonly dailyStatsRepository: Repository<DailyStats>,
+    @InjectRepository(TotalStats)
+    private readonly totalStatsRepository: Repository<TotalStats>,
   ) {}
 
   async update(data: SaveGameDTO) {
-    const account = await this.accountsService.findOne({
-      where: { id: data.account_id },
-      relations: ['total_stats'],
-    }, true);
+    const account = await this.accountsService.findOne(
+      {
+        where: { id: data.account_id },
+        relations: ['total_stats'],
+      },
+      true,
+    );
     await this.updateTotalStats(account, data);
     await this.updateDailyStats(account, data);
 
     // Update gems
     let gems = data.gems;
     let ultimacy = data.ultimacy;
-    await this.accountsService.addGems(account, gems, "game");
-    await this.accountsService.addUltimacy(account, ultimacy, "game");
+    await this.accountsService.addGems(account, gems, 'game');
+    await this.accountsService.addUltimacy(account, ultimacy, 'game');
     await this.accountsService.addXp(account, data.xp);
 
     return true;
@@ -43,7 +48,9 @@ export class StatsService {
     let dailyStats = await this.dailyStatsRepository
       .createQueryBuilder('daily_stats')
       .where('DATE(daily_stats.date) = DATE(:date)', { date: currentDate })
-      .andWhere('daily_stats.account_id = :account_id', { account_id: account.id })
+      .andWhere('daily_stats.account_id = :account_id', {
+        account_id: account.id,
+      })
       .getOne();
 
     if (dailyStats) {
@@ -111,14 +118,17 @@ export class StatsService {
 
   async getTop100RankedUser(account: Account) {
     // faster ranking for top 100
-    if(this.top100RankCache.isStale()) {
+    if (this.top100RankCache.isStale()) {
       await this.updateTop100RankCache();
     }
     return this.top100RankCache.getData()[account.id];
   }
 
   async getAccountRankByXp(account: Account) {
-    if(!this.top100RankCache.isStale() && this.top100RankCache.getData()[account.id]) {
+    if (
+      !this.top100RankCache.isStale() &&
+      this.top100RankCache.getData()[account.id]
+    ) {
       return this.top100RankCache.getData()[account.id];
     }
 
@@ -135,14 +145,13 @@ export class StatsService {
       .where('sub.id = :id')
       .getRawOne();
 
-
     return result ? parseInt(result.rank, 10) : undefined;
   }
 
   async fetch(fetchData: FetchStatsDTO) {
     let { sortBy, timeRange, limit } = fetchData;
 
-    if(limit > 100) {
+    if (limit > 100) {
       limit = 100;
     }
     let where = {};
@@ -160,7 +169,11 @@ export class StatsService {
     if (timeRange === TimeRange.AllTime) {
       return this.totalStatsRepository
         .createQueryBuilder('total_stats')
-        .leftJoinAndSelect('total_stats.account', 'account', 'account.id = total_stats.id')
+        .leftJoinAndSelect(
+          'total_stats.account',
+          'account',
+          'account.id = total_stats.id',
+        )
         .select([
           'account.username as username',
           'account.clan as clan',
@@ -176,7 +189,11 @@ export class StatsService {
     } else {
       return this.dailyStatsRepository
         .createQueryBuilder('daily_stats')
-        .leftJoinAndSelect('daily_stats.account', 'account', 'account.id = daily_stats.account_id')
+        .leftJoinAndSelect(
+          'daily_stats.account',
+          'account',
+          'account.id = daily_stats.account_id',
+        )
         .select([
           'account.username as username',
           'account.clan as clan',

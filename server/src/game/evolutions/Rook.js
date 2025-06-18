@@ -13,7 +13,7 @@ module.exports = class Rook extends Evolution {
 
     let angle = Math.PI / 2; // dwn
 
-    if(downInputs && downInputs.length > 0) {
+    if (downInputs && downInputs.length > 0) {
       switch (downInputs[0]) {
         case 1:
           angle = -Math.PI / 2;
@@ -30,8 +30,8 @@ module.exports = class Rook extends Evolution {
       }
     }
 
-    this.player.shape.x = this.player.shape.x + (375 * Math.cos(angle));
-    this.player.shape.y = this.player.shape.y + (375 * Math.sin(angle));
+    this.player.shape.x = this.player.shape.x + 375 * Math.cos(angle);
+    this.player.shape.y = this.player.shape.y + 375 * Math.sin(angle);
   }
 
   update(dt) {
@@ -48,4 +48,4 @@ module.exports = class Rook extends Evolution {
     this.player.health.regenWait.multiplier *= 1.5;
     super.update(dt);
   }
-}
+};

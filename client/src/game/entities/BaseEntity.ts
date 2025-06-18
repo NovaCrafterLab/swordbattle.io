@@ -6,7 +6,13 @@ import { Health } from '../components/Health';
 import Game from '../scenes/Game';
 
 export class BaseEntity {
-  static stateFields: string[] = ['id', 'type', 'shapeData', 'depth', 'healthPercent'];
+  static stateFields: string[] = [
+    'id',
+    'type',
+    'shapeData',
+    'depth',
+    'healthPercent',
+  ];
   static removeTransition = 0;
 
   [key: string]: any;
@@ -73,8 +79,16 @@ export class BaseEntity {
   update(dt: number) {
     if (!this.container) return;
     const lerpRate = this.game.gameState.tps / this.game.game.loop.actualFps;
-    this.container.x = Phaser.Math.Linear(this.container.x, this.shape.x, lerpRate);
-    this.container.y = Phaser.Math.Linear(this.container.y, this.shape.y, lerpRate);
+    this.container.x = Phaser.Math.Linear(
+      this.container.x,
+      this.shape.x,
+      lerpRate,
+    );
+    this.container.y = Phaser.Math.Linear(
+      this.container.y,
+      this.shape.y,
+      lerpRate,
+    );
     if (this.shape.type === ShapeTypes.Polygon) {
       this.container.setRotation(this.shape.angle);
     }
@@ -87,8 +101,11 @@ export class BaseEntity {
     if (!this.body) return;
 
     const targetAngle = (this.constructor as any).basicAngle + this.angle;
-    const angleDifference = Phaser.Math.Angle.Wrap(targetAngle - this.body.rotation);
-    const lerpRate = this.game.gameState.tps / this.game.game.loop.actualFps / 10;
+    const angleDifference = Phaser.Math.Angle.Wrap(
+      targetAngle - this.body.rotation,
+    );
+    const lerpRate =
+      this.game.gameState.tps / this.game.game.loop.actualFps / 10;
     const angleStep = angleDifference * lerpRate;
     this.body.setRotation(this.body.rotation + angleStep);
   }

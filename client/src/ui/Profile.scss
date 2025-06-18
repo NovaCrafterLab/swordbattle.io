@@ -1,11 +1,11 @@
 .profile-body {
   @import '~bootstrap/scss/bootstrap';
 
-	background: darkgreen;
-	font-family: "Roboto", sans-serif;;
+  background: darkgreen;
+  font-family: 'Roboto', sans-serif;
   overflow-y: auto;
 
-.back-button {
+  .back-button {
     top: 10px;
     right: 10px;
     z-index: 100;
@@ -21,8 +21,12 @@
   }
 
   .main-content {
-
-    h1, h2, h3, h4, h5, h6 {
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
       color: #fff;
     }
 
@@ -65,7 +69,6 @@
     }
 
     .statsContent {
-
     }
     .xp-graph {
       height: calc(100vh - 800px); // Adjust the value as needed
@@ -104,8 +107,8 @@
 .profile-blue {
   @import '~bootstrap/scss/bootstrap';
 
-	background: blue;
-	font-family: "Roboto", sans-serif;;
+  background: blue;
+  font-family: 'Roboto', sans-serif;
   overflow-y: auto;
 
   .back-button {
@@ -124,8 +127,12 @@
   }
 
   .main-content {
-
-    h1, h2, h3, h4, h5, h6 {
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
       color: #fff;
     }
 
@@ -168,7 +175,6 @@
     }
 
     .statsContent {
-
     }
     .xp-graph {
       height: calc(100vh - 800px); // Adjust the value as needed

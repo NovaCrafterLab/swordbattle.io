@@ -25,48 +25,77 @@ class QuadTree {
 
     this.items.push(collisionRect);
 
-    if (this.items.length > this.capacity
-      && this.level < this.maxLevel
-      && this.nodes.length === 0
+    if (
+      this.items.length > this.capacity &&
+      this.level < this.maxLevel &&
+      this.nodes.length === 0
     ) {
       this.subdivide();
     }
   }
 
   subdivide() {
-    const {x, y} = this.boundary;
+    const { x, y } = this.boundary;
     const subWidth = this.boundary.width / 2;
     const subHeight = this.boundary.height / 2;
     const nextLevel = this.level + 1;
 
     // Top-right
-    this.nodes.push(new QuadTree({
-      x: x + subWidth,
-      y,
-      width: subWidth,
-      height: subHeight,
-    }, this.capacity, this.maxLevel, nextLevel));
+    this.nodes.push(
+      new QuadTree(
+        {
+          x: x + subWidth,
+          y,
+          width: subWidth,
+          height: subHeight,
+        },
+        this.capacity,
+        this.maxLevel,
+        nextLevel,
+      ),
+    );
     // Top-left
-    this.nodes.push(new QuadTree({
-      x,
-      y,
-      width: subWidth,
-      height: subHeight,
-    }, this.capacity, this.maxLevel, nextLevel));
+    this.nodes.push(
+      new QuadTree(
+        {
+          x,
+          y,
+          width: subWidth,
+          height: subHeight,
+        },
+        this.capacity,
+        this.maxLevel,
+        nextLevel,
+      ),
+    );
     // Bottom-left
-    this.nodes.push(new QuadTree({
-      x,
-      y: y + subHeight,
-      width: subWidth,
-      height: subHeight,
-    }, this.capacity, this.maxLevel, nextLevel));
+    this.nodes.push(
+      new QuadTree(
+        {
+          x,
+          y: y + subHeight,
+          width: subWidth,
+          height: subHeight,
+        },
+        this.capacity,
+        this.maxLevel,
+        nextLevel,
+      ),
+    );
     // Bottom-right
-    this.nodes.push(new QuadTree({
-      x: x + subWidth,
-      y: y + subHeight,
-      width: subWidth,
-      height: subHeight,
-    }, this.capacity, this.maxLevel, nextLevel));
+    this.nodes.push(
+      new QuadTree(
+        {
+          x: x + subWidth,
+          y: y + subHeight,
+          width: subWidth,
+          height: subHeight,
+        },
+        this.capacity,
+        this.maxLevel,
+        nextLevel,
+      ),
+    );
 
     // Move all items in subnodes
     for (const item of this.items) {
@@ -104,6 +133,6 @@ class QuadTree {
     this.items = [];
     this.nodes = [];
   }
-};
+}
 
 module.exports = QuadTree;

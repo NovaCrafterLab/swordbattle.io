@@ -2,7 +2,13 @@ import { BaseEntity } from './BaseEntity';
 import { GetEntityClass } from '.';
 
 class GlobalEntity extends BaseEntity {
-  static stateFields = [...BaseEntity.stateFields, 'name', 'coins', 'angle', 'account'];
+  static stateFields = [
+    ...BaseEntity.stateFields,
+    'name',
+    'coins',
+    'angle',
+    'account',
+  ];
   minimapEntity?: BaseEntity;
 
   createSprite() {

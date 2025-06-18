@@ -24,7 +24,6 @@
   align-content: flex-start;
   overflow: hidden;
   /* White text color for modal */
-
 }
 
 .label {
@@ -38,7 +37,7 @@
 }
 
 .label p {
-  margin-top: -7px; 
+  margin-top: -7px;
   font-size: 13px;
   color: lightgray;
 }
@@ -179,10 +178,8 @@
 
 // low height
 @media screen and (max-height: 600px) {
-
   .skin-card {
     margin: 5px;
-
 
     .skin-img {
       width: 50px;
@@ -217,8 +214,6 @@
       font-size: 12px;
       margin: 0;
     }
-
-
   }
 
   .shop-title {
@@ -292,27 +287,26 @@ h1 {
   border: 3px solid #000;
 }
 
-.badges button[data-selected-badge="og"]:not(.active) {
+.badges button[data-selected-badge='og']:not(.active) {
   background-color: #ff0000;
 }
 
-.badges button[data-selected-badge="event"]:not(.active) {
+.badges button[data-selected-badge='event']:not(.active) {
   background-color: #00ffff;
 }
 
-.badges button[data-selected-badge="player"]:not(.active) {
+.badges button[data-selected-badge='player']:not(.active) {
   background-color: #0000ff;
 }
 
-.badges button[data-selected-badge="own"]:not(.active) {
+.badges button[data-selected-badge='own']:not(.active) {
   background-color: #00ff00;
 }
 
-
-.badges button[data-selected-badge="sale"]:not(.active) {
+.badges button[data-selected-badge='sale']:not(.active) {
   background-color: #ffff00;
 }
 
-.badges button[data-selected-badge="ultimate"]:not(.active) {
+.badges button[data-selected-badge='ultimate']:not(.active) {
   background-color: #ff00ff;
 }

@@ -25,4 +25,4 @@ module.exports = class Vampire extends Evolution {
     this.player.health.max.multiplier *= 0.975;
     super.update(dt);
   }
-}
+};

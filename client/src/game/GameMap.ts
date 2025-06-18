@@ -30,7 +30,9 @@ class GameMap {
     this.scene.physics.world.setBounds(this.x, this.y, this.width, this.height);
     mapData.biomes.forEach((biomeData: any) => this.addBiome(biomeData));
     if (mapData.staticObjects) {
-      mapData.staticObjects.forEach(((objectData: any) => this.addStaticObject(objectData)));
+      mapData.staticObjects.forEach((objectData: any) =>
+        this.addStaticObject(objectData),
+      );
     }
     this.sortBiomes();
     this.scene.hud.minimap.updateMapData();
@@ -49,11 +51,21 @@ class GameMap {
   addBiome(biomeData: any) {
     let BiomeClass;
     switch (biomeData.type) {
-      case BiomeTypes.Fire: BiomeClass = Biome; break;
-      case BiomeTypes.Ice: BiomeClass = Biome; break;
-      case BiomeTypes.Earth: BiomeClass = Biome; break;
-      case BiomeTypes.River: BiomeClass = River; break;
-      case BiomeTypes.Safezone: BiomeClass = Safezone; break;
+      case BiomeTypes.Fire:
+        BiomeClass = Biome;
+        break;
+      case BiomeTypes.Ice:
+        BiomeClass = Biome;
+        break;
+      case BiomeTypes.Earth:
+        BiomeClass = Biome;
+        break;
+      case BiomeTypes.River:
+        BiomeClass = River;
+        break;
+      case BiomeTypes.Safezone:
+        BiomeClass = Safezone;
+        break;
     }
     if (!BiomeClass) return console.log('Unknown biome type: ', biomeData.type);
 

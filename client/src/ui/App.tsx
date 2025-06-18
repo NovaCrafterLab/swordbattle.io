@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUser, faSignOut, faICursor, faGear, faX } from '@fortawesome/free-solid-svg-icons';
+import {
+  faUser,
+  faSignOut,
+  faICursor,
+  faGear,
+  faX,
+} from '@fortawesome/free-solid-svg-icons';
 
 import clsx from 'clsx';
 import { useScale } from './Scale';
@@ -16,7 +22,13 @@ import LoginModal from './modals/LoginModal';
 import SignupModal from './modals/SignupModal';
 import ConnectionError from './modals/ConnectionError';
 
-import { clearAccount, setAccount, logoutAsync, changeNameAsync, changeClanAsync } from '../redux/account/slice';
+import {
+  clearAccount,
+  setAccount,
+  logoutAsync,
+  changeNameAsync,
+  changeClanAsync,
+} from '../redux/account/slice';
 import { selectAccount } from '../redux/account/selector';
 import api from '../api';
 
@@ -48,8 +60,8 @@ import Leaderboard from './game/Leaderboard';
 
 let debugMode = false;
 try {
-  debugMode = window.location.search.includes("debugAlertMode");
-} catch (e) { }
+  debugMode = window.location.search.includes('debugAlertMode');
+} catch (e) {}
 
 function App() {
   const dispatch = useDispatch();
@@ -67,12 +79,14 @@ function App() {
   const [assetsLoaded, setAssetsLoaded] = useState(false);
   const [game, setGame] = useState<Phaser.Game | undefined>(window.phaser_game);
 
-  const [dimensions, setDimensions] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [dimensions, setDimensions] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
 
   const navigate = useNavigate();
 
   useEffect(() => {
-
     // debounce resize
     let timeout: any;
     const onResize = () => {
@@ -173,7 +187,7 @@ function App() {
     // TODO: change server without reloading
 
     window.location.reload();
-  }
+  };
 
   useEffect(() => {
     window.addEventListener('assetsLoadProgress', (e: any) => {
@@ -182,15 +196,13 @@ function App() {
     });
   }, []);
 
-
   useEffect(() => {
     if (gameStarted) {
       // prevent accidental exit
       window.onbeforeunload = function (e) {
         e.preventDefault();
-        return "Are you sure you want to exit";
-      }
-
+        return 'Are you sure you want to exit';
+      };
     } else {
       window.onbeforeunload = null;
     }
@@ -200,7 +212,12 @@ function App() {
   };
 
   useEffect(() => {
-    console.log('Checking if everything is ready. Connected:', isConnected, 'Assets:', assetsLoaded);
+    console.log(
+      'Checking if everything is ready. Connected:',
+      isConnected,
+      'Assets:',
+      assetsLoaded,
+    );
     if (debugMode) {
       alert('check. Connected: ' + isConnected + ' Assets: ' + assetsLoaded);
     }
@@ -214,12 +231,11 @@ function App() {
     if (!isConnected) {
       alert('Not connected yet');
       return;
-    }
-    else {
+    } else {
       const go = () => {
         setGameStarted(true);
         window.phaser_game?.events.emit('startGame', name);
-      }
+      };
       // playVideoAd().then(() => {
       //   go();
       // }).catch((e) => {
@@ -235,24 +251,28 @@ function App() {
   const onConnectionClosed = (reason: string) => {
     console.log('Connection closed', reason);
     setConnectionError(reason);
-  }
+  };
 
   const onSucessAuth = () => setModal(null);
   const onLogin = () => setModal(<LoginModal onSuccess={onSucessAuth} />);
   const onSignup = () => setModal(<SignupModal onSuccess={onSucessAuth} />);
   const onLogout = () => dispatch(logoutAsync() as any);
   const onChangeName = () => {
-    const newName = prompt('What do you want to change your name to? Please note that you can only change your name once every 7 days.');
+    const newName = prompt(
+      'What do you want to change your name to? Please note that you can only change your name once every 7 days.',
+    );
     if (!newName) return;
 
     dispatch(changeNameAsync(newName) as any);
-  }
+  };
   const onChangeClan = () => {
-    const newClan = prompt('What do you want your clan tag to be? Clans can only be 1-4 characters long, and you can only change your clan once every 7 days.');
+    const newClan = prompt(
+      'What do you want your clan tag to be? Clans can only be 1-4 characters long, and you can only change your clan once every 7 days.',
+    );
     if (!newClan) return;
 
     dispatch(changeClanAsync(newClan) as any);
-  }
+  };
   /*
 
   Doesn't work find an alternative
@@ -265,7 +285,7 @@ function App() {
     */
   const openShop = () => {
     setModal(<ShopModal account={account} />);
-  }
+  };
 
   const openLeaderboard = () => {
     // TODO
@@ -310,32 +330,53 @@ function App() {
       {!gameStarted && (
         <>
           <div className={`${isConnected ? 'loaded mainMenu' : 'mainMenu'}`}>
-            <ShopButton account={account} scale={scale.factor} openShop={openShop} />
-            <LeaderboardButton scale={scale.factor} openLeaderboard={openLeaderboard} />
+            <ShopButton
+              account={account}
+              scale={scale.factor}
+              openShop={openShop}
+            />
+            <LeaderboardButton
+              scale={scale.factor}
+              openLeaderboard={openLeaderboard}
+            />
             <div id="contentt" style={scale.styles}>
-
-              <div id="menuContainer" >
-
+              <div id="menuContainer">
                 {/* <!-- GAME NAME --> */}
-                <div id="gameName"><img src={titleImg} alt="Swordbattle.io" width={750} height={250} style={{
-                  position: 'fixed',
-                  top: '-50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -125%)'
-                }} />
+                <div id="gameName">
+                  <img
+                    src={titleImg}
+                    alt="Swordbattle.io"
+                    width={750}
+                    height={250}
+                    style={{
+                      position: 'fixed',
+                      top: '-50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -125%)',
+                    }}
+                  />
                 </div>
 
                 {/* <!-- LOADING TEXT --> */}
                 {/* <!-- MENU CARDS --> */}
-                <div id="menuCardHolder" style={{
-                  display: 'inline-block', height: 'auto !important', position: 'fixed',
-                  top: '-50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -5%)'
-                }} >
+                <div
+                  id="menuCardHolder"
+                  style={{
+                    display: 'inline-block',
+                    height: 'auto !important',
+                    position: 'fixed',
+                    top: '-50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -5%)',
+                  }}
+                >
                   <div className="menu">
                     <div className="accountCard menuCard panel">
-                      <AccountCard account={account} onLogin={onLogin} onSignup={onSignup} />
+                      <AccountCard
+                        account={account}
+                        onLogin={onLogin}
+                        onSignup={onSignup}
+                      />
                     </div>
 
                     {/* TODO */}
@@ -345,7 +386,10 @@ function App() {
                       </div>
                     </div> */}
                     {/* <!-- Play --> */}
-                    <div className="joinCard menuCard panel" style={{ position: 'relative' }}>
+                    <div
+                      className="joinCard menuCard panel"
+                      style={{ position: 'relative' }}
+                    >
                       <div className="joinCardInput">
                         <input
                           type="text"
@@ -354,25 +398,48 @@ function App() {
                           maxLength={20}
                           value={account.isLoggedIn ? account.username : name}
                           onChange={(e) => setName(e.target.value)}
-                          style={{ cursor: account.isLoggedIn ? 'not-allowed' : 'text' }}
+                          style={{
+                            cursor: account.isLoggedIn ? 'not-allowed' : 'text',
+                          }}
                           disabled={account.isLoggedIn}
                           autoComplete="none"
                         />
-                        <select id="serverBrowser"
+                        <select
+                          id="serverBrowser"
                           value={servers.length === 0 ? 'loading' : server}
                           onChange={(e) => updateServer(e.target.value)}
                         >
-                          {servers.length === 0 && <option value="loading" disabled>Loading...</option>}
-                          {servers.map((server) => <option key={server.value} value={server.value} disabled={server.offline}>
-                            {server.name} ({server.offline ? 'OFFLINE' : `${server.playerCnt} players - ${server.ping}ms`})
-                          </option>)}
+                          {servers.length === 0 && (
+                            <option value="loading" disabled>
+                              Loading...
+                            </option>
+                          )}
+                          {servers.map((server) => (
+                            <option
+                              key={server.value}
+                              value={server.value}
+                              disabled={server.offline}
+                            >
+                              {server.name} (
+                              {server.offline
+                                ? 'OFFLINE'
+                                : `${server.playerCnt} players - ${server.ping}ms`}
+                              )
+                            </option>
+                          ))}
                         </select>
 
-                        <div id="enterGame" className="menuButton" onClick={() => accountReady && isConnected && onStart()}>
-                          {(accountReady && isConnected) ? 'Play!' : 'Connecting...'}
+                        <div
+                          id="enterGame"
+                          className="menuButton"
+                          onClick={() =>
+                            accountReady && isConnected && onStart()
+                          }
+                        >
+                          {accountReady && isConnected
+                            ? 'Play!'
+                            : 'Connecting...'}
                         </div>
-
-
                       </div>
                     </div>
                   </div>
@@ -382,16 +449,25 @@ function App() {
                 </div>
               </div> */}
                 </div>
-
               </div>
             </div>
 
             {/* <!-- SETTINGS --> */}
-            <div id="settingsButton" className="altLink panel" onClick={openSettings}>
+            <div
+              id="settingsButton"
+              className="altLink panel"
+              onClick={openSettings}
+            >
               {/* <i className="material-icons ui-icon">&#xE8B8;</i> */}
-              <FontAwesomeIcon icon={faGear} className='ui-icon' />
+              <FontAwesomeIcon icon={faGear} className="ui-icon" />
             </div>
-            {modal && <Modal child={modal} close={closeModal} scaleDisabled={modal.type.name === 'ShopModal'} />}
+            {modal && (
+              <Modal
+                child={modal}
+                close={closeModal}
+                scaleDisabled={modal.type.name === 'ShopModal'}
+              />
+            )}
             {/* <div id="topRight1" className="inParty">
             <span>top right stuff</span>
           </div> */}
@@ -405,7 +481,11 @@ function App() {
                 <div className="dropdown">
                   {account.clan ? (
                     <div className="auth-username">
-                      <FontAwesomeIcon icon={faUser} /> <span style={{ color: 'yellow' }}>[{account.clan?.toUpperCase()}]</span> {account.username}
+                      <FontAwesomeIcon icon={faUser} />{' '}
+                      <span style={{ color: 'yellow' }}>
+                        [{account.clan?.toUpperCase()}]
+                      </span>{' '}
+                      {account.username}
                     </div>
                   ) : (
                     <div className="auth-username">
@@ -414,28 +494,49 @@ function App() {
                   )}
                   <ul className="dropdown-menu">
                     <li>
-                      <a className="dropdown-item" href="#" onClick={onChangeName}>
+                      <a
+                        className="dropdown-item"
+                        href="#"
+                        onClick={onChangeName}
+                      >
                         <FontAwesomeIcon icon={faICursor} /> Change Name
                       </a>
                     </li>
                     <li>
-                      <a className="dropdown-item" href="#" onClick={onChangeClan}>
+                      <a
+                        className="dropdown-item"
+                        href="#"
+                        onClick={onChangeClan}
+                      >
                         <FontAwesomeIcon icon={faICursor} /> Change Clan
                       </a>
                     </li>
-                    <li><a className="dropdown-item" href="#" onClick={onLogout}>
-                      <FontAwesomeIcon icon={faSignOut} /> Logout
-                    </a></li>
+                    <li>
+                      <a className="dropdown-item" href="#" onClick={onLogout}>
+                        <FontAwesomeIcon icon={faSignOut} /> Logout
+                      </a>
+                    </li>
                   </ul>
                 </div>
               ) : (
                 <>
-                  <img src={LoginImg} alt="Login" role="button" className="auth-btn" onClick={onLogin} />
-                  <img src={SignupImg} alt="Signup" role="button" className="auth-btn" onClick={onSignup} />
+                  <img
+                    src={LoginImg}
+                    alt="Login"
+                    role="button"
+                    className="auth-btn"
+                    onClick={onLogin}
+                  />
+                  <img
+                    src={SignupImg}
+                    alt="Signup"
+                    role="button"
+                    className="auth-btn"
+                    onClick={onSignup}
+                  />
                 </>
               )}
             </div>
-
 
             {/* <!-- LINKS CONTAINERS --> */}
             {/* <div id="linksContainer" className='panel'>
@@ -444,7 +545,10 @@ function App() {
           </div> */}
 
             {/* TODO footer */}
-            <footer className={clsx('links', isLoaded && 'animation')} style={scale.styles}>
+            <footer
+              className={clsx('links', isLoaded && 'animation')}
+              style={scale.styles}
+            >
               {/* <div>
                 <a href="https://github.com/codergautam/swordbattle.io" target="_blank" rel="nofollow">About</a>
               </div> */}
@@ -492,7 +596,6 @@ function App() {
               </div>
             </footer>
           </div>
-
         </>
       )}
     </div>

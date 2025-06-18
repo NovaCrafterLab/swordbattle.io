@@ -9,8 +9,8 @@ function Leaderboard({ game }: any) {
 
   const processPlayers = (players: any[], selfId: number) => {
     const sortedPlayers = players.sort((a, b) => b.coins - a.coins);
-    sortedPlayers.forEach((player, i) => player.place = i + 1);
-    const selfPlayer = sortedPlayers.find(player => player.id === selfId);
+    sortedPlayers.forEach((player, i) => (player.place = i + 1));
+    const selfPlayer = sortedPlayers.find((player) => player.id === selfId);
     sortedPlayers.splice(10, sortedPlayers.length - 10);
 
     setSelfPlayer(sortedPlayers.includes(selfPlayer) ? null : selfPlayer);
@@ -29,13 +29,19 @@ function Leaderboard({ game }: any) {
 
   return (
     <div className="leaderboard" style={useScale(false).styles}>
-      <div className="leaderboard-title" role="button" onClick={toggleVisibility}>
+      <div
+        className="leaderboard-title"
+        role="button"
+        onClick={toggleVisibility}
+      >
         Leaderboard
       </div>
 
       <div className={`leaderboard-content ${show ? '' : 'hidden'}`}>
-        {players.map((player: any) => <LeaderboardLine key={player.id} player={player} />)}
-        {selfPlayer && (<div>...</div>)}
+        {players.map((player: any) => (
+          <LeaderboardLine key={player.id} player={player} />
+        ))}
+        {selfPlayer && <div>...</div>}
         {selfPlayer && <LeaderboardLine player={selfPlayer} />}
       </div>
     </div>
@@ -57,13 +63,16 @@ function getRankColor(rank: number) {
 }
 
 function LeaderboardLine({ player }: any) {
-  const balance = player.coins >= 1000 ? `${(player.coins / 1000).toFixed(1)}k` : player.coins;
+  const balance =
+    player.coins >= 1000
+      ? `${(player.coins / 1000).toFixed(1)}k`
+      : player.coins;
   const specialColors: { [key: string]: string } = {
-    "[apc] codergautam": '#ff0000',
+    '[apc] codergautam': '#ff0000',
     angel: '#acfffc',
-    "cool guy 53": '#0099ff',
-    "update testing account": '#00ff00'
-  }
+    'cool guy 53': '#0099ff',
+    'update testing account': '#00ff00',
+  };
   return (
     <div className="leaderboard-line">
       <span className="leaderboard-place">#{player.place}: </span>
@@ -72,9 +81,27 @@ function LeaderboardLine({ player }: any) {
           [{player.account.clan}]{' '}
         </span>
       )}
-      <span className="leaderboard-name" style={player.account ? { color: specialColors[player.name.toLowerCase() as any] ? specialColors[player.name.toLowerCase() as any] : '#3333ff' } : {}}>{player.name}
-      {player.account?.rank && <span style={{color: getRankColor(player.account.rank)}}> (#{player.account.rank})</span>}
-       <span style={{color: 'white'}}>- </span></span>
+      <span
+        className="leaderboard-name"
+        style={
+          player.account
+            ? {
+                color: specialColors[player.name.toLowerCase() as any]
+                  ? specialColors[player.name.toLowerCase() as any]
+                  : '#3333ff',
+              }
+            : {}
+        }
+      >
+        {player.name}
+        {player.account?.rank && (
+          <span style={{ color: getRankColor(player.account.rank) }}>
+            {' '}
+            (#{player.account.rank})
+          </span>
+        )}
+        <span style={{ color: 'white' }}>- </span>
+      </span>
       <span className="leaderboard-score">{balance}</span>
     </div>
   );

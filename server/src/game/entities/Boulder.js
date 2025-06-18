@@ -13,7 +13,7 @@ class Boulder extends Entity {
     duration: [5, 10],
     position: [0, 0],
     forbiddenBiomes: [Types.Biome.River],
-    knockbackMultiplier: 16
+    knockbackMultiplier: 16,
   };
 
   constructor(game, definition) {
@@ -22,10 +22,16 @@ class Boulder extends Entity {
     this.shape = Circle.create(0, 0, this.size);
     this.speed = new Property(this.definition.speed);
     this.damage = new Property(this.definition.damage);
-    this.duration = new Timer(0, this.definition.duration[0], this.definition.duration[1]);
+    this.duration = new Timer(
+      0,
+      this.definition.duration[0],
+      this.definition.duration[1],
+    );
     this.angle = this.definition.angle;
     this.targets.push(Types.Entity.Player);
-    this.knockbackMultiplier = new Property(this.definition.knockbackMultiplier);
+    this.knockbackMultiplier = new Property(
+      this.definition.knockbackMultiplier,
+    );
 
     this.spawn();
     this.duration.renew();
@@ -48,8 +54,16 @@ class Boulder extends Entity {
     entity.velocity.sub(mtv.scale(0.1));
     entity.damaged(this.damage.value, this);
 
-    entity.velocity.x += this.speed.value * Math.cos(this.angle) * this.knockbackMultiplier.value / (entity.knockbackResistance.value || 1);
-    entity.velocity.y += this.speed.value * Math.sin(this.angle) * this.knockbackMultiplier.value / (entity.knockbackResistance.value || 1);
+    entity.velocity.x +=
+      (this.speed.value *
+        Math.cos(this.angle) *
+        this.knockbackMultiplier.value) /
+      (entity.knockbackResistance.value || 1);
+    entity.velocity.y +=
+      (this.speed.value *
+        Math.sin(this.angle) *
+        this.knockbackMultiplier.value) /
+      (entity.knockbackResistance.value || 1);
 
     this.remove();
   }

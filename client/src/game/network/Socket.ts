@@ -13,8 +13,8 @@ class Socket {
     this.queue = [];
 
     try {
-      this.debugMode = window.location.search.includes("debugAlertMode");
-      } catch(e) {}
+      this.debugMode = window.location.search.includes('debugAlertMode');
+    } catch (e) {}
   }
 
   connect(address: string, onOpen: any, onMessage: any, onClose: any) {
@@ -33,7 +33,7 @@ class Socket {
       onOpen();
     });
     this.socket.addEventListener('close', (event: CloseEvent) => {
-      if(this.debugMode) {
+      if (this.debugMode) {
         alert('Connection closed: ' + event.code + ' ' + event.reason);
       }
       onClose(event, endpoint);
@@ -43,7 +43,9 @@ class Socket {
       if (typeof message.data === 'string') return;
 
       try {
-        const payload = Protocol.decodeServerMessage(new Uint8Array(message.data));
+        const payload = Protocol.decodeServerMessage(
+          new Uint8Array(message.data),
+        );
         onMessage(payload);
       } catch (err) {
         console.error('Decoding message error: ', err);

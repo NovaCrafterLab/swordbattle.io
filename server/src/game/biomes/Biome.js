@@ -21,8 +21,16 @@ class Biome {
       shape = Circle.create(x, y, definition.radius);
     } else if (definition.points !== undefined) {
       shape = Polygon.createFromPoints(x, y, definition.points);
-    } else if (definition.width !== undefined && definition.height !== undefined) {
-      shape = Polygon.createFromRectangle(x, y, definition.width, definition.height);
+    } else if (
+      definition.width !== undefined &&
+      definition.height !== undefined
+    ) {
+      shape = Polygon.createFromRectangle(
+        x,
+        y,
+        definition.width,
+        definition.height,
+      );
     } else {
       throw new Error('Unknown biome shape: ' + JSON.stringify(definition));
     }

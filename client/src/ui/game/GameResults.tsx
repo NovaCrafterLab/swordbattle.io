@@ -12,14 +12,13 @@ import {
 
 function GameResults({ onHome, results, game, isLoggedIn, adElement }: any) {
   const onHomeClick = () => {
-
     function go() {
       onHome();
       game.events.emit('setGameResults', null);
       game.events.emit('startSpectate');
-      }
+    }
 
-      go();
+    go();
 
     // if((window as any).adBreak) {
     //   console.log('adBreak');
@@ -31,8 +30,6 @@ function GameResults({ onHome, results, game, isLoggedIn, adElement }: any) {
     //     },  // always called, unblocks the game logic
     //   });
     // }
-
-
   };
   const onRestartClick = () => {
     // playVideoAd().then(() => {
@@ -41,8 +38,8 @@ function GameResults({ onHome, results, game, isLoggedIn, adElement }: any) {
     // });
 
     function go() {
-    game.events.emit('setGameResults', null);
-    game.events.emit('restartGame');
+      game.events.emit('setGameResults', null);
+      game.events.emit('restartGame');
     }
     go();
 
@@ -59,102 +56,101 @@ function GameResults({ onHome, results, game, isLoggedIn, adElement }: any) {
 
   return (
     <div className="results" style={useScale(true).styles}>
-      <div className='results-main'>
-      <div className="results-title">
-        {results.disconnectReason?.code === DisconnectTypes.Player ? 'You got stabbed' : results.disconnectReason?.code === DisconnectTypes.Mob ? 'You were destroyed' : 'You were disconnected'}
-        <br />
-      </div>
-
-      <div className="results-container">
-        <div className="info">
-          <div className="title">{results.disconnectReason?.code === DisconnectTypes.Player ? 'Stabbed by' : results.disconnectReason?.code === DisconnectTypes.Mob ? 'By' : 'Disconnect reason:'}</div>
-          {results.disconnectReason?.reason}
+      <div className="results-main">
+        <div className="results-title">
+          {results.disconnectReason?.code === DisconnectTypes.Player
+            ? 'You got stabbed'
+            : results.disconnectReason?.code === DisconnectTypes.Mob
+              ? 'You were destroyed'
+              : 'You were disconnected'}
+          <br />
         </div>
 
-        <div className="info">
-          <div className="title">Coins:</div>
-          <CountUp
-            duration={3}
-            end={results.coins}
-          />
-        </div>
-
-        <div className="info">
-          <div className="title">Stabs:</div>
-          <CountUp
-            duration={3}
-            end={results.kills}
-          />
-        </div>
-
-        <div className="info">
-          <div className="title">Survived:</div>
-          <CountUp
-            end={results.survivalTime}
-            duration={3}
-            formattingFn={(s) => `${((s % 3600) / 60).toFixed(0)}m ${(s % 60).toFixed(0)}s`}
-          />
-        </div>
-        { isLoggedIn && (
-          <>
-        <div className="info">
-          <div className="title">Gems Gained</div>
-          <CountUp
-            end={calculateGemsXP(results.coins, results.kills).gems}
-            duration={3}
-          />
-        </div>
-        <div className="info">
-          <div className="title">XP Gained</div>
-          <CountUp
-            end={calculateGemsXP(results.coins, results.kills).xp}
-            duration={3}
-          />
-        </div>
-        <div className="info">
-          <div className="title">Mastery Earned</div>
-          <CountUp
-            end={calculateGemsXP(results.coins, results.kills).ultimacy}
-            duration={3}
-          />
-        </div>
-        </>
-        )}
-      </div>
-
-
-
-      <div className="results-buttons">
-        <div
-          className="to-home"
-          role="button"
-          onClick={onHomeClick}
-          onKeyDown={event => event.key === 'Enter' && onHomeClick()}
-          tabIndex={0}
-        >
-          <img src={HomeImg} alt="Home" />
-        </div>
-        { results.disconnectReason?.type !== DisconnectTypes.Server && (
-        <div
-          className="play-again"
-          role="button"
-          onClick={onRestartClick}
-          onKeyDown={event => event.key === 'Enter' && onRestartClick()}
-          tabIndex={0}
-        >
-          <img src={PlayAgainImg} alt="Play again" />
-        </div>
-        )}
-</div>
-
-      </div>
-      { adElement ? (
-          <div className="ad">
-            {adElement}
+        <div className="results-container">
+          <div className="info">
+            <div className="title">
+              {results.disconnectReason?.code === DisconnectTypes.Player
+                ? 'Stabbed by'
+                : results.disconnectReason?.code === DisconnectTypes.Mob
+                  ? 'By'
+                  : 'Disconnect reason:'}
+            </div>
+            {results.disconnectReason?.reason}
           </div>
-        ) : null}
+
+          <div className="info">
+            <div className="title">Coins:</div>
+            <CountUp duration={3} end={results.coins} />
+          </div>
+
+          <div className="info">
+            <div className="title">Stabs:</div>
+            <CountUp duration={3} end={results.kills} />
+          </div>
+
+          <div className="info">
+            <div className="title">Survived:</div>
+            <CountUp
+              end={results.survivalTime}
+              duration={3}
+              formattingFn={(s) =>
+                `${((s % 3600) / 60).toFixed(0)}m ${(s % 60).toFixed(0)}s`
+              }
+            />
+          </div>
+          {isLoggedIn && (
+            <>
+              <div className="info">
+                <div className="title">Gems Gained</div>
+                <CountUp
+                  end={calculateGemsXP(results.coins, results.kills).gems}
+                  duration={3}
+                />
+              </div>
+              <div className="info">
+                <div className="title">XP Gained</div>
+                <CountUp
+                  end={calculateGemsXP(results.coins, results.kills).xp}
+                  duration={3}
+                />
+              </div>
+              <div className="info">
+                <div className="title">Mastery Earned</div>
+                <CountUp
+                  end={calculateGemsXP(results.coins, results.kills).ultimacy}
+                  duration={3}
+                />
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="results-buttons">
+          <div
+            className="to-home"
+            role="button"
+            onClick={onHomeClick}
+            onKeyDown={(event) => event.key === 'Enter' && onHomeClick()}
+            tabIndex={0}
+          >
+            <img src={HomeImg} alt="Home" />
+          </div>
+          {results.disconnectReason?.type !== DisconnectTypes.Server && (
+            <div
+              className="play-again"
+              role="button"
+              onClick={onRestartClick}
+              onKeyDown={(event) => event.key === 'Enter' && onRestartClick()}
+              tabIndex={0}
+            >
+              <img src={PlayAgainImg} alt="Play again" />
+            </div>
+          )}
+        </div>
+      </div>
+      {adElement ? <div className="ad">{adElement}</div> : null}
     </div>
-  )
+  );
 }
 
 export default GameResults;

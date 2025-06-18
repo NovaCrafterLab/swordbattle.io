@@ -39,9 +39,17 @@ class AncientMob extends Entity {
     this.angle = helpers.random(-Math.PI, Math.PI);
     this.coinsDrop = 20000;
 
-    this.jumpTimer = new Timer(0, this.definition.jumpCooldown[0], this.definition.jumpCooldown[1]);
+    this.jumpTimer = new Timer(
+      0,
+      this.definition.jumpCooldown[0],
+      this.definition.jumpCooldown[1],
+    );
     this.angryTimer = new Timer(0, 7, 10);
-    this.swordTimer = new Timer(0, this.definition.swordCooldown[0], this.definition.swordCooldown[1]);
+    this.swordTimer = new Timer(
+      0,
+      this.definition.swordCooldown[0],
+      this.definition.swordCooldown[1],
+    );
 
     this.health = new Health(this.definition.health, this.definition.regen);
     this.speed = new Property(this.definition.speed);
@@ -65,12 +73,26 @@ class AncientMob extends Entity {
     this.jumpTimer.update(dt);
 
     if (this.target) {
-      const targetAngle = helpers.angle(this.shape.x, this.shape.y, this.target.shape.x, this.target.shape.y);
-      const distance = helpers.distance(this.shape.x, this.shape.y, this.target.shape.x, this.target.shape.y);
+      const targetAngle = helpers.angle(
+        this.shape.x,
+        this.shape.y,
+        this.target.shape.x,
+        this.target.shape.y,
+      );
+      const distance = helpers.distance(
+        this.shape.x,
+        this.shape.y,
+        this.target.shape.x,
+        this.target.shape.y,
+      );
 
       this.speed.multiplier *= 1.5;
 
-      this.angle = helpers.angleLerp(this.angle, targetAngle, dt * this.definition.rotationSpeed);
+      this.angle = helpers.angleLerp(
+        this.angle,
+        targetAngle,
+        dt * this.definition.rotationSpeed,
+      );
       if (this.swordTimer.finished) {
         this.swordTimer.renew();
 
@@ -82,9 +104,12 @@ class AncientMob extends Entity {
               type: Types.Entity.SwordProj,
               size: this.definition.swordSize,
               speed: this.definition.swordSpeed,
-              angle: this.angle - ((i - (swords - 1) / 2) * spread),
+              angle: this.angle - (i - (swords - 1) / 2) * spread,
               damage: this.damage.value,
-              duration: [this.definition.swordDuration[0], this.definition.swordDuration[1]],
+              duration: [
+                this.definition.swordDuration[0],
+                this.definition.swordDuration[1],
+              ],
               position: [this.shape.x, this.shape.y],
             });
           }
@@ -95,7 +120,10 @@ class AncientMob extends Entity {
             speed: this.definition.boulderSpeed,
             angle: this.angle,
             damage: this.damage.value * 0.25,
-            duration: [this.definition.boulderDuration[0], this.definition.boulderDuration[1]],
+            duration: [
+              this.definition.boulderDuration[0],
+              this.definition.boulderDuration[1],
+            ],
             position: [this.shape.x, this.shape.y],
           });
         }
@@ -108,9 +136,12 @@ class AncientMob extends Entity {
         this.angle += helpers.random(-Math.PI, Math.PI) / 2;
       }
 
-      this.velocity.add(new SAT.Vector(
-        this.speed.value * Math.cos(this.angle),
-        this.speed.value * Math.sin(this.angle)));
+      this.velocity.add(
+        new SAT.Vector(
+          this.speed.value * Math.cos(this.angle),
+          this.speed.value * Math.sin(this.angle),
+        ),
+      );
     }
 
     this.velocity.scale(0.9);
@@ -127,12 +158,17 @@ class AncientMob extends Entity {
 
     const mtv = this.shape.getCollisionOverlap(response);
     const selfMtv = mtv.clone().scale(targetWeight / totalWeight);
-    const targetMtv = mtv.clone().scale(selfWeight / totalWeight * -1);
+    const targetMtv = mtv.clone().scale((selfWeight / totalWeight) * -1);
 
     entity.shape.applyCollision(targetMtv);
     this.shape.applyCollision(selfMtv);
 
-    const angle = helpers.angle(this.shape.x, this.shape.y, entity.shape.x, entity.shape.y);
+    const angle = helpers.angle(
+      this.shape.x,
+      this.shape.y,
+      entity.shape.x,
+      entity.shape.y,
+    );
     if (this.target && entity.id === this.target.id) {
       entity.damaged(this.damage.value, this);
 

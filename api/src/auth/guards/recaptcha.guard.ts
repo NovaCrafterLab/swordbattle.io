@@ -10,7 +10,7 @@ export class RecaptchaGuard implements CanActivate {
     const recaptchaToken = body.recaptchaToken;
     const secret = process.env.RECAPTCHA_SECRET_KEY;
 
-    if(!secret) {
+    if (!secret) {
       return true;
     }
 
@@ -27,7 +27,7 @@ export class RecaptchaGuard implements CanActivate {
             secret: secret,
             response: recaptchaToken,
           },
-        }
+        },
       );
 
       return response.data.success;

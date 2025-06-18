@@ -77,7 +77,9 @@ class PlayerAI extends Player {
   changeStage(stage) {
     if (stage === undefined) {
       stage = helpers.randomChoice(
-        Object.values(BehaviourStages).filter(type => type !== BehaviourStages.RunAway),
+        Object.values(BehaviourStages).filter(
+          (type) => type !== BehaviourStages.RunAway,
+        ),
       );
     }
     this.stage = stage;
@@ -102,35 +104,42 @@ class PlayerAI extends Player {
       this.target = null;
     }
 
-        // Update and check the target timer
-        if (this.target) {
-          if (!this.targetTimer.active) {
-            this.targetTimer.active = true;
-            this.targetTimer.renew();
-          }
-          this.targetTimer.update(dt);
-          if (this.targetTimer.finished) {
-            this.target = null; // Give up on the target
-            // random movement after giving up on the target
-            this.changeStage(BehaviourStages.RandomMovement);
-            this.changeDirectionTimer.finished = true;
+    // Update and check the target timer
+    if (this.target) {
+      if (!this.targetTimer.active) {
+        this.targetTimer.active = true;
+        this.targetTimer.renew();
+      }
+      this.targetTimer.update(dt);
+      if (this.targetTimer.finished) {
+        this.target = null; // Give up on the target
+        // random movement after giving up on the target
+        this.changeStage(BehaviourStages.RandomMovement);
+        this.changeDirectionTimer.finished = true;
 
-            this.resetTargetTimer();
-          }
-        }
+        this.resetTargetTimer();
+      }
+    }
 
     if (!this.target) {
       if (this.stage === BehaviourStages.TargetLeader) {
         // this.target = this.game.leaderPlayer;
         console.log('Targeting leader is not implemented yet');
       } else {
-        const targets = this.getEntitiesInViewport().map(id => this.game.entities.get(id)).filter(e => e);
+        const targets = this.getEntitiesInViewport()
+          .map((id) => this.game.entities.get(id))
+          .filter((e) => e);
         let minDistance = Infinity;
         for (const target of targets) {
           if (target === this) continue;
           if (!this.stageConfig.targets.includes(target.type)) continue;
 
-          const distance = helpers.distance(this.shape.x, this.shape.y, target.shape.x, target.shape.y);
+          const distance = helpers.distance(
+            this.shape.x,
+            this.shape.y,
+            target.shape.x,
+            target.shape.y,
+          );
           if (distance < minDistance) {
             this.target = target;
             minDistance = distance;
@@ -145,7 +154,11 @@ class PlayerAI extends Player {
           this.randomMovement();
           break;
         case 'target':
-          this.targetEntity(dt, this.stageConfig.actions.includes('attack'), this.stageConfig.force);
+          this.targetEntity(
+            dt,
+            this.stageConfig.actions.includes('attack'),
+            this.stageConfig.force,
+          );
           break;
         case 'runAway':
           this.runAway(dt, this.stageConfig.actions.includes('attack'));
@@ -165,7 +178,9 @@ class PlayerAI extends Player {
     }
     if (this.smartness > 0.6) {
       if (this.evolutions.possibleEvols.size > 0) {
-        const evol = helpers.randomChoice(Array.from(this.evolutions.possibleEvols));
+        const evol = helpers.randomChoice(
+          Array.from(this.evolutions.possibleEvols),
+        );
         this.evolutions.upgrade(evol);
       }
     }
@@ -190,13 +205,27 @@ class PlayerAI extends Player {
     }
 
     const targetPos = this.target.shape.center;
-    const angle = helpers.angle(this.shape.x, this.shape.y, targetPos.x, targetPos.y);
-    const distance = helpers.distance(this.shape.x, this.shape.y, targetPos.x, targetPos.y);
+    const angle = helpers.angle(
+      this.shape.x,
+      this.shape.y,
+      targetPos.x,
+      targetPos.y,
+    );
+    const distance = helpers.distance(
+      this.shape.x,
+      this.shape.y,
+      targetPos.x,
+      targetPos.y,
+    );
 
     if (attack) this.attack(distance);
 
     this.angle = helpers.angleLerp(this.angle, angle, dt / 0.2);
-    this.movementDirection = helpers.angleLerp(this.movementDirection, angle, dt / 0.2);
+    this.movementDirection = helpers.angleLerp(
+      this.movementDirection,
+      angle,
+      dt / 0.2,
+    );
     this.mouse = {
       angle: this.movementDirection,
       force: helpers.random(force[0], force[1]),
@@ -204,18 +233,37 @@ class PlayerAI extends Player {
   }
 
   runAway(dt, attack = false) {
-    if (!this.target || (this.health.percent > 0.5)) {
+    if (!this.target || this.health.percent > 0.5) {
       return this.changeStage();
     }
 
-    const angle = helpers.angle(this.shape.x, this.shape.y, this.target.shape.x, this.target.shape.y);
-    const movementAngle = helpers.angle(this.target.shape.x, this.target.shape.y, this.shape.x, this.shape.y);
-    const distance = helpers.distance(this.shape.x, this.shape.y, this.target.shape.x, this.target.shape.y);
+    const angle = helpers.angle(
+      this.shape.x,
+      this.shape.y,
+      this.target.shape.x,
+      this.target.shape.y,
+    );
+    const movementAngle = helpers.angle(
+      this.target.shape.x,
+      this.target.shape.y,
+      this.shape.x,
+      this.shape.y,
+    );
+    const distance = helpers.distance(
+      this.shape.x,
+      this.shape.y,
+      this.target.shape.x,
+      this.target.shape.y,
+    );
 
     if (attack) this.attack(distance);
 
     this.angle = helpers.angleLerp(this.angle, angle, dt / 0.2);
-    this.movementDirection = helpers.angleLerp(this.movementDirection, movementAngle, dt / 0.2);
+    this.movementDirection = helpers.angleLerp(
+      this.movementDirection,
+      movementAngle,
+      dt / 0.2,
+    );
     this.mouse = {
       angle: this.movementDirection,
       force: helpers.random(130, 150),
@@ -231,8 +279,7 @@ class PlayerAI extends Player {
 
     if (distance < 300) {
       this.inputs.inputDown(Types.Input.SwordSwing);
-    }
-    else if (distance < 1300) {
+    } else if (distance < 1300) {
       this.inputs.inputDown(Types.Input.SwordThrow);
     }
     this.attackCooldown = helpers.random(0.5, 1.3);

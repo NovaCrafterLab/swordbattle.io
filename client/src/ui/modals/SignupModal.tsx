@@ -14,29 +14,47 @@ function SignupModal({ onSuccess }: any) {
 
   const onSignup = () => {
     setIsLoading(true); // Start loading
-    api.post(`${api.endpoint}/auth/register`, { username, email, password }, (data) => {
-      setIsLoading(false); // Stop loading on response
-      if (data.message) {
-        window.alert(Array.isArray(data.message) ? data.message.join('\n') : data.message);
-      } else {
-        data.account.secret = data.secret;
-        dispatch(setAccount(data.account));
-        onSuccess();
-      }
-    }, undefined, true);
-  }
+    api.post(
+      `${api.endpoint}/auth/register`,
+      { username, email, password },
+      (data) => {
+        setIsLoading(false); // Stop loading on response
+        if (data.message) {
+          window.alert(
+            Array.isArray(data.message)
+              ? data.message.join('\n')
+              : data.message,
+          );
+        } else {
+          data.account.secret = data.secret;
+          dispatch(setAccount(data.account));
+          onSuccess();
+        }
+      },
+      undefined,
+      true,
+    );
+  };
 
   return (
     <div className="signup-modal">
-      <h1 style={{marginBottom: 0}}>Sign up</h1>
-      <p style={{margin: 0, marginBottom: 10}}>Save your progress and unlock cool skins!</p>
-      <input type="text" placeholder="Username"
+      <h1 style={{ marginBottom: 0 }}>Sign up</h1>
+      <p style={{ margin: 0, marginBottom: 10 }}>
+        Save your progress and unlock cool skins!
+      </p>
+      <input
+        type="text"
+        placeholder="Username"
         onChange={(e) => setUsername(e.target.value)}
       />
-      <input type="email" placeholder="Email (optional)"
+      <input
+        type="email"
+        placeholder="Email (optional)"
         onChange={(e) => setEmail(e.target.value)}
       />
-      <input type="password" placeholder="Password"
+      <input
+        type="password"
+        placeholder="Password"
         onChange={(e) => setPassword(e.target.value)}
       />
       <button onClick={onSignup} disabled={isLoading}>

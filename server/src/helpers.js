@@ -1,6 +1,6 @@
 module.exports = {
   random(min, max) {
-    return min + (Math.random() * (max - min));
+    return min + Math.random() * (max - min);
   },
 
   randomInteger(min, max) {
@@ -12,7 +12,28 @@ module.exports = {
   },
 
   randomNickname() {
-    const consonants = ['b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'w', 'x', 'y', 'z'];
+    const consonants = [
+      'b',
+      'c',
+      'd',
+      'f',
+      'g',
+      'h',
+      'j',
+      'k',
+      'l',
+      'm',
+      'n',
+      'p',
+      'r',
+      's',
+      't',
+      'v',
+      'w',
+      'x',
+      'y',
+      'z',
+    ];
     const vowels = ['a', 'e', 'i', 'o', 'u'];
 
     let code = '';
@@ -44,13 +65,13 @@ module.exports = {
     return Math.max(min, Math.min(max, value));
   },
 
- calculateGemsXP(coins, kills) {
-    const xp = Math.floor(coins / 20) + kills
+  calculateGemsXP(coins, kills) {
+    const xp = Math.floor(coins / 20) + kills;
     if (coins >= 1250000) {
       return {
         xp,
         gems: Math.floor(xp / 5),
-        ultimacy: Math.floor((coins / 794) ** 1.5), 
+        ultimacy: Math.floor((coins / 794) ** 1.5),
       };
     } else {
       return {
@@ -73,12 +94,11 @@ module.exports = {
     //   }
     //   output += part;
     // }
-    Object.keys(captcha).forEach(key => {
-      if(key.startsWith(prefix)) {
+    Object.keys(captcha).forEach((key) => {
+      if (key.startsWith(prefix)) {
         output += captcha[key];
       }
     });
     return output;
-  }
-
+  },
 };

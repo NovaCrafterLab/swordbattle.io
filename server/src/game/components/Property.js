@@ -3,18 +3,18 @@ class Property {
     this.baseValue = baseValue;
     this.multiplier = 1;
     this.multiplierComboEnabled = enableMultiplierCombo;
-    if(enableMultiplierCombo) {
+    if (enableMultiplierCombo) {
       this.multiplier = {
         default: 1,
-      }
+      };
     }
     this.boost = 0;
   }
 
   get value() {
-    if(typeof this.multiplier === 'object') {
+    if (typeof this.multiplier === 'object') {
       let multiplier = 1;
-      for(let key in this.multiplier) {
+      for (let key in this.multiplier) {
         multiplier *= this.multiplier[key];
       }
       return (this.baseValue + this.boost) * multiplier;
@@ -27,10 +27,10 @@ class Property {
   }
 
   reset() {
-    if(typeof this.multiplier === 'object') {
+    if (typeof this.multiplier === 'object') {
       this.multiplier = {
         default: 1,
-      }
+      };
     } else {
       this.multiplier = 1;
     }

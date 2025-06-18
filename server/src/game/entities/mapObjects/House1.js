@@ -11,7 +11,7 @@ class House1 extends Entity {
 
   constructor(game, definition) {
     super(game, Types.Entity.House1, definition);
-    
+
     this.width = this.definition.width;
     this.height = this.definition.height;
     this.wallThickness = 50;
@@ -20,7 +20,12 @@ class House1 extends Entity {
     this.createShape();
     this.spawn();
 
-    this.depthZone = Polygon.createFromRectangle(this.width / 2, this.height / 2, this.width, this.height);
+    this.depthZone = Polygon.createFromRectangle(
+      this.width / 2,
+      this.height / 2,
+      this.width,
+      this.height,
+    );
   }
 
   createShape() {
@@ -30,19 +35,37 @@ class House1 extends Entity {
       [0, 0, this.width, this.wallThickness], // Top
       [0, 0, this.wallThickness, this.height], // Left
       [this.width - this.wallThickness, 0, this.wallThickness, this.height], // Right
-      [0, this.height - this.wallThickness, bottomWallWidth, this.wallThickness], // Bottom left
-      [this.width - bottomWallWidth, this.height - this.wallThickness, bottomWallWidth, this.wallThickness], // Bottom right
+      [
+        0,
+        this.height - this.wallThickness,
+        bottomWallWidth,
+        this.wallThickness,
+      ], // Bottom left
+      [
+        this.width - bottomWallWidth,
+        this.height - this.wallThickness,
+        bottomWallWidth,
+        this.wallThickness,
+      ], // Bottom right
     ];
     for (const wall of walls) {
-      const poly = Polygon.createFromRectangle(wall[0], wall[1], wall[2], wall[3], true);
+      const poly = Polygon.createFromRectangle(
+        wall[0],
+        wall[1],
+        wall[2],
+        wall[3],
+        true,
+      );
       poly.x = wall[0];
       poly.y = wall[1];
       polys.push(poly);
     }
 
     this.shape = new ComplexPolygon(polys, [
-      [0, 0], [this.width, 0],
-      [this.width, this.height], [0, this.height],
+      [0, 0],
+      [this.width, 0],
+      [this.width, this.height],
+      [0, this.height],
     ]);
   }
 

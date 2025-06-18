@@ -9,7 +9,10 @@ class Polygon extends Shape {
   constructor(x, y, points) {
     super();
     this.type = Types.Shape.Polygon;
-    this.collisionPoly = new SAT.Polygon(new SAT.Vector(x, y), points.map(([x, y]) => new SAT.Vector(x, y)));
+    this.collisionPoly = new SAT.Polygon(
+      new SAT.Vector(x, y),
+      points.map(([x, y]) => new SAT.Vector(x, y)),
+    );
     this.centerOffset = new SAT.Vector(0.5, 0.5);
     this.scale = 1;
     this.sendPoints = false;
@@ -34,8 +37,10 @@ class Polygon extends Shape {
     const px = withPosition ? x : 0;
     const py = withPosition ? y : 0;
     const points = [
-      [px, py], [px + width, py],
-      [px + width, py + height], [px, py + height],
+      [px, py],
+      [px + width, py],
+      [px + width, py + height],
+      [px, py + height],
     ];
     return new Polygon(x, y, points);
   }
@@ -49,13 +54,13 @@ class Polygon extends Shape {
     let area = 0;
     const points = this.collisionPoly.points;
     const numPoints = points.length;
-  
+
     for (let i = 0; i < numPoints; i++) {
       let j = (i + 1) % numPoints;
       area += points[i].x * points[j].y;
       area -= points[j].x * points[i].y;
     }
-  
+
     area /= 2;
     return Math.abs(area);
   }
@@ -104,15 +109,23 @@ class Polygon extends Shape {
 
   collides(shape, response) {
     if (shape.type === Types.Shape.Circle) {
-      return SAT.testPolygonCircle(this.collisionPoly, shape.collisionPoly, response);
+      return SAT.testPolygonCircle(
+        this.collisionPoly,
+        shape.collisionPoly,
+        response,
+      );
     }
     if (shape.type === Types.Shape.Polygon) {
       if (shape.isComplex) {
         return shape.collides(this, response);
       }
-      return SAT.testPolygonPolygon(this.collisionPoly, shape.collisionPoly, response);
+      return SAT.testPolygonPolygon(
+        this.collisionPoly,
+        shape.collisionPoly,
+        response,
+      );
     }
-  } 
+  }
 
   getData() {
     const data = {

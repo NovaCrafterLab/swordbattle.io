@@ -8,8 +8,7 @@ module.exports = {
       type: Types.Biome.Safezone,
       pos: [0, 0],
       radius: 2000,
-      objects: [
-      ],
+      objects: [],
     },
     {
       type: Types.Biome.River,
@@ -29,8 +28,8 @@ module.exports = {
           position: 'random',
           respawnable: true,
           size: [53, 73],
-        }
-      ]
+        },
+      ],
     },
 
     {
@@ -57,7 +56,7 @@ module.exports = {
           position: 'random',
           respawnable: true,
           size: [53, 73],
-        }
+        },
       ],
     },
 
@@ -85,7 +84,7 @@ module.exports = {
           position: 'random',
           respawnable: true,
           size: [53, 73],
-        }
+        },
       ],
     },
     {
@@ -111,7 +110,7 @@ module.exports = {
           position: 'random',
           respawnable: true,
           size: [53, 73],
-        }
+        },
       ],
     },
 
@@ -371,7 +370,7 @@ module.exports = {
           amount: 500,
           position: 'random',
           respawnable: true,
-        }
+        },
       ],
     },
   ],

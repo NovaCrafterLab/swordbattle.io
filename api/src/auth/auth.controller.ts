@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, UseGuards, Res, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  UseGuards,
+  Res,
+  Req,
+} from '@nestjs/common';
 import { Response } from 'express';
 import { RegisterDTO, LoginDTO, SecretLoginDTO } from './auth.dto';
 import { AuthService } from './auth.service';
@@ -13,7 +21,10 @@ export class AuthController {
 
   @Post('register')
   @UseGuards(RecaptchaGuard)
-  async register(@Body() registerData: RegisterDTO, @Res({ passthrough: true }) res: Response) {
+  async register(
+    @Body() registerData: RegisterDTO,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const data = await this.authService.register(registerData);
     // res.set('Authorization', `Bearer ${data.token}`);
     // this.setCookie(res, 'auth-token', data.token);
@@ -21,7 +32,10 @@ export class AuthController {
   }
 
   @Post('login')
-  async login(@Body() loginData: LoginDTO, @Res({ passthrough: true }) res: Response) {
+  async login(
+    @Body() loginData: LoginDTO,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const data = await this.authService.login(loginData);
     // res.set('Authorization', `Bearer ${data.token}`);
     // this.setCookie(res, 'auth-token', data.token);
@@ -36,10 +50,13 @@ export class AuthController {
 
   // secrets system
   @Post('loginWithSecret')
-  async loginWithSecret(@Body() loginData: SecretLoginDTO, @Res({ passthrough: true }) res: Response) {
+  async loginWithSecret(
+    @Body() loginData: SecretLoginDTO,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const data = await this.authService.secretLogin(loginData);
 
-    if(data.account.is_v1) {
+    if (data.account.is_v1) {
       // assume the migration screen will be shown
       data.account.is_v1 = false;
       await this.authService.updateAccount(data.account);
@@ -67,14 +84,20 @@ export class AuthController {
   @UseGuards(AccountGuard)
   @Post('change-username')
   async changeUsername(@Req() request) {
-    let result = await this.authService.changeUsername(request.account, request.body.newUsername);
+    let result = await this.authService.changeUsername(
+      request.account,
+      request.body.newUsername,
+    );
     return result;
   }
 
   @UseGuards(AccountGuard)
   @Post('change-clantag')
   async changeClantag(@Req() request) {
-    let result = await this.authService.changeClantag(request.account, request.body.newClantag);
+    let result = await this.authService.changeClantag(
+      request.account,
+      request.body.newClantag,
+    );
     return result;
   }
 

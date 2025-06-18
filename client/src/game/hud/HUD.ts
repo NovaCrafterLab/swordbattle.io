@@ -33,12 +33,21 @@ class HUD {
     this.chat = new Chat(this);
     this.mobileControls = new MobileControls(this);
     this.coinCounter = new CoinCounter(this);
-    this.components = [this.minimap, this.stats, this.progressBar, this.evolutionSelect, this.buffsSelect, this.chat, this.mobileControls, this.coinCounter];
+    this.components = [
+      this.minimap,
+      this.stats,
+      this.progressBar,
+      this.evolutionSelect,
+      this.buffsSelect,
+      this.chat,
+      this.mobileControls,
+      this.coinCounter,
+    ];
   }
 
   initialize() {
     this.scene = this.game.scene.add('HUD', {}, true) as Phaser.Scene;
-    this.components.forEach(component => component.initialize());
+    this.components.forEach((component) => component.initialize());
   }
 
   add(container: any) {
@@ -47,16 +56,16 @@ class HUD {
   }
 
   update(dt: number) {
-    this.components.forEach(component => component.update(dt));
+    this.components.forEach((component) => component.update(dt));
   }
 
   setShow(show: boolean, force?: boolean) {
-    this.components.forEach(component => component.setShow(show, force));
+    this.components.forEach((component) => component.setShow(show, force));
   }
 
   resize() {
     this.scale = Math.max(this.game.scale.width, this.game.scale.height) / 1400;
-    this.components.forEach(component => component.setScale(this.scale));
+    this.components.forEach((component) => component.setScale(this.scale));
   }
 }
 

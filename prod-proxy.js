@@ -2,10 +2,16 @@ const http = require('http');
 const httpProxy = require('http-proxy');
 
 // Create a proxy server for the API
-const apiProxy = httpProxy.createProxyServer({ target: 'http://localhost:3000', ws: true });
+const apiProxy = httpProxy.createProxyServer({
+  target: 'http://localhost:3000',
+  ws: true,
+});
 
 // Create a proxy server for the main server
-const mainProxy = httpProxy.createProxyServer({ target: 'http://localhost:8080', ws: true });
+const mainProxy = httpProxy.createProxyServer({
+  target: 'http://localhost:8080',
+  ws: true,
+});
 
 // Create an HTTP server to handle incoming requests
 const server = http.createServer((req, res) => {

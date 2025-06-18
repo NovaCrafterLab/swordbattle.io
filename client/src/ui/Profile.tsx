@@ -1,10 +1,25 @@
 // client/src/ui/Profile.tsx
 import { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';  // add
-import { secondsToTime, sinceFrom, numberWithCommas, lastSeen, fixDate } from '../helpers';
+import { useSearchParams, useNavigate } from 'react-router-dom'; // add
+import {
+  secondsToTime,
+  sinceFrom,
+  numberWithCommas,
+  lastSeen,
+  fixDate,
+} from '../helpers';
 import api from '../api';
 import { Line } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
 import './Profile.scss';
 import cosmetics from '../game/cosmetics.json';
 interface Stats {
@@ -13,7 +28,7 @@ interface Stats {
   ultimacy: number;
   kills: number;
   games: number;
-  coins: number
+  coins: number;
   playtime: number;
 }
 interface AccountData {
@@ -21,7 +36,7 @@ interface AccountData {
   clan: string;
   created_at: string;
   profile_views: number;
-  skins: { equipped: number, owned: number[] };
+  skins: { equipped: number; owned: number[] };
 }
 interface ProfileData {
   account: AccountData;
@@ -30,7 +45,15 @@ interface ProfileData {
   rank?: number;
 }
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+);
 
 export default function Profile() {
   const [query] = useSearchParams();
@@ -42,17 +65,21 @@ export default function Profile() {
   const navigate = useNavigate(); // hook
 
   const fetchAccount = () => {
-    api.post(`${api.endpoint}/profile/getPublicUserInfo/${username}`, {}, (data) => {
-      if (!data.message) {
-        setAccountData(data);
-      }
-      setLoading(false);
-    })
-  }
+    api.post(
+      `${api.endpoint}/profile/getPublicUserInfo/${username}`,
+      {},
+      (data) => {
+        if (!data.message) {
+          setAccountData(data);
+        }
+        setLoading(false);
+      },
+    );
+  };
   useEffect(() => fetchAccount(), []);
 
   useEffect(() => {
-    if (data?.account.username === "Update Testing Account") {
+    if (data?.account.username === 'Update Testing Account') {
       document.body.classList.add('profile-blue');
     } else {
       document.body.classList.add('profile-body');
@@ -65,7 +92,9 @@ export default function Profile() {
 
   const prepareGraphData = (dailyStats: Stats[]) => {
     // Sort the stats by date
-    dailyStats.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    dailyStats.sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    );
 
     // Create a new array for all dates in the range
     const allDates = [];
@@ -77,11 +106,15 @@ export default function Profile() {
     }
 
     // Map the stats to the new date range
-    const labels = allDates.map(date => fixDate(date).toLocaleDateString());
+    const labels = allDates.map((date) => fixDate(date).toLocaleDateString());
     let runningTotal = 0;
-    const data = allDates.map(date => {
-      const stat = dailyStats.find(stat => fixDate(new Date(stat.date)).toLocaleDateString() === fixDate(date).toLocaleDateString());
-      return stat ? runningTotal += stat.xp : runningTotal;
+    const data = allDates.map((date) => {
+      const stat = dailyStats.find(
+        (stat) =>
+          fixDate(new Date(stat.date)).toLocaleDateString() ===
+          fixDate(date).toLocaleDateString(),
+      );
+      return stat ? (runningTotal += stat.xp) : runningTotal;
     });
 
     return {
@@ -99,18 +132,18 @@ export default function Profile() {
   };
 
   if (isLoading) {
-    return <h3>Loading...</h3>
+    return <h3>Loading...</h3>;
   }
   if (!data?.account || typeof username !== 'string') {
-    return <h3 className="text-center">Account not found</h3>
+    return <h3 className="text-center">Account not found</h3>;
   }
   return (
     <section className="main-content">
       <div className="container">
-        <div className='statsContent'>
+        <div className="statsContent">
           <button
             className="back-button"
-            onClick={() => navigate('/')}  // SPA hash-router jump
+            onClick={() => navigate('/')} // SPA hash-router jump
           >
             X
           </button>
@@ -121,13 +154,14 @@ export default function Profile() {
                   src={
                     'assets/game/player/' +
                     Object.values(cosmetics.skins).find(
-                      (skin: any) => skin.id === data.account.skins.equipped
+                      (skin: any) => skin.id === data.account.skins.equipped,
                     )?.bodyFileName
                   }
                   alt="Equipped skin"
                   className="equipped-skin"
                 />
-                <span style={{ color: 'yellow' }}>[{data.account.clan}]</span> {data.account.username}
+                <span style={{ color: 'yellow' }}>[{data.account.clan}]</span>{' '}
+                {data.account.username}
               </h1>
             ) : (
               <h1>
@@ -135,7 +169,7 @@ export default function Profile() {
                   src={
                     'assets/game/player/' +
                     Object.values(cosmetics.skins).find(
-                      (skin: any) => skin.id === data.account.skins.equipped
+                      (skin: any) => skin.id === data.account.skins.equipped,
                     )?.bodyFileName
                   }
                   alt="Equipped skin"
@@ -143,62 +177,97 @@ export default function Profile() {
                 />
                 {data.account.username}
               </h1>
-            )}</center>
+            )}
+          </center>
           <br />
-          <div className='cluster'>
+          <div className="cluster">
             <center>
-              <h4 className="stat">Joined {sinceFrom(data.account.created_at)} ago</h4>
-              <h4 className="stat">{data.dailyStats && data.dailyStats.length ? `Last seen ${lastSeen(data.dailyStats[0].date)}` : ''}</h4>
+              <h4 className="stat">
+                Joined {sinceFrom(data.account.created_at)} ago
+              </h4>
+              <h4 className="stat">
+                {data.dailyStats && data.dailyStats.length
+                  ? `Last seen ${lastSeen(data.dailyStats[0].date)}`
+                  : ''}
+              </h4>
               <br />
 
               {data.rank && <h4 className="stat">#{data.rank} all time</h4>}
-              <h4 className="stat">{numberWithCommas(data.account.profile_views)} profile views</h4>
+              <h4 className="stat">
+                {numberWithCommas(data.account.profile_views)} profile views
+              </h4>
             </center>
           </div>
 
           <br />
           <div className="row">
-            <Card title="Games Played" text={data.totalStats ? numberWithCommas(data.totalStats.games) : 0} />
-            <Card title="XP" text={data.totalStats ? numberWithCommas(data.totalStats.xp) : 0} />
-            <Card title="Total Playtime" text={data.totalStats ? secondsToTime(data.totalStats.playtime) : 0} />
-            <Card title="Stabs" text={data.totalStats ? numberWithCommas(data.totalStats.kills) : 0} />
+            <Card
+              title="Games Played"
+              text={
+                data.totalStats ? numberWithCommas(data.totalStats.games) : 0
+              }
+            />
+            <Card
+              title="XP"
+              text={data.totalStats ? numberWithCommas(data.totalStats.xp) : 0}
+            />
+            <Card
+              title="Total Playtime"
+              text={
+                data.totalStats ? secondsToTime(data.totalStats.playtime) : 0
+              }
+            />
+            <Card
+              title="Stabs"
+              text={
+                data.totalStats ? numberWithCommas(data.totalStats.kills) : 0
+              }
+            />
             <Card title="Skins Owned" text={data.account.skins.owned.length} />
-            <Card title="Mastery" text={data.totalStats ? numberWithCommas(data.totalStats.ultimacy) : 0} />
+            <Card
+              title="Mastery"
+              text={
+                data.totalStats ? numberWithCommas(data.totalStats.ultimacy) : 0
+              }
+            />
           </div>
 
-          {data.dailyStats && data.dailyStats.length &&
+          {data.dailyStats && data.dailyStats.length && (
             <div className="xp-graph">
-              <Line data={prepareGraphData(data.dailyStats)} options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    ticks: {
-                      color: 'white',
-                    }
-                  },
-                  x: {
-                    ticks: {
-                      color: 'white',
-                    }
-                  }
-                },
-                plugins: {
-                  legend: {
-                    labels: {
-                      color: 'white'
+              <Line
+                data={prepareGraphData(data.dailyStats)}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: {
+                        color: 'white',
+                      },
+                    },
+                    x: {
+                      ticks: {
+                        color: 'white',
+                      },
                     },
                   },
-                },
-              }} />
+                  plugins: {
+                    legend: {
+                      labels: {
+                        color: 'white',
+                      },
+                    },
+                  },
+                }}
+              />
             </div>
-          }
+          )}
         </div>
       </div>
     </section>
   );
-};
+}
 
 function Card({ title, text }: any) {
   return (

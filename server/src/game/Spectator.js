@@ -13,7 +13,12 @@ class Spectator {
     this.shape = Circle.create(0, 0, 1);
 
     const { viewport } = config.player;
-    this.viewport = new Viewport(this, viewport.width, viewport.height, viewport.spectateZoom);
+    this.viewport = new Viewport(
+      this,
+      viewport.width,
+      viewport.height,
+      viewport.spectateZoom,
+    );
     this.viewportEntityIds = [];
 
     this.isSpectating = false;
@@ -57,8 +62,10 @@ class Spectator {
         this.updatePoint();
         this.initialized = true;
       }
-      this.shape.x = this.startX + (this.toX - this.startX) * this.timer.progress;
-      this.shape.y = this.startY + (this.toY - this.startY) * this.timer.progress;
+      this.shape.x =
+        this.startX + (this.toX - this.startX) * this.timer.progress;
+      this.shape.y =
+        this.startY + (this.toY - this.startY) * this.timer.progress;
     } else if (player) {
       this.toX = player.shape.x;
       this.toY = player.shape.y;
@@ -67,8 +74,9 @@ class Spectator {
   }
 
   getEntitiesInViewport() {
-    this.viewportEntityIds = this.game.entitiesQuadtree.get(this.viewport.boundary)
-      .map(result => result.entity.id);
+    this.viewportEntityIds = this.game.entitiesQuadtree
+      .get(this.viewport.boundary)
+      .map((result) => result.entity.id);
     return this.viewportEntityIds;
   }
 

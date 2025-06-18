@@ -21,7 +21,7 @@ async function listCommand(game) {
 }
 
 async function banIp(game, params) {
-  if(!params.ip) throw new Error('Missing ip param');
+  if (!params.ip) throw new Error('Missing ip param');
   bannedIps.push(params.ip);
   bannedIps = [...new Set(bannedIps)];
 
@@ -38,13 +38,13 @@ async function banIp(game, params) {
 
   return {
     playersKicked,
-    bannedIps
+    bannedIps,
   };
 }
 
 async function giveCoins(game, params) {
-  if(!params.id) throw new Error('Missing id param');
-  if(!params.coins) throw new Error('Missing coins param');
+  if (!params.id) throw new Error('Missing id param');
+  if (!params.coins) throw new Error('Missing coins param');
   for (const player of game.players.values()) {
     if (player.id === parseInt(params.id)) {
       player.levels.addCoins(parseInt(params.coins));
@@ -69,7 +69,7 @@ module.exports = {
         req.params = {
           secret: parts[2],
           command: parts[3],
-        }
+        };
 
         // get query params
         const query = req.getQuery();
@@ -88,22 +88,29 @@ module.exports = {
         }
 
         const command = req.params.command;
-        const cmds = [['list', listCommand], ['banip', banIp], ['givecoins', giveCoins]];
+        const cmds = [
+          ['list', listCommand],
+          ['banip', banIp],
+          ['givecoins', giveCoins],
+        ];
 
-        if (!cmds.find(c => c[0] === command)) {
+        if (!cmds.find((c) => c[0] === command)) {
           res.writeStatus('400 Bad Request');
           res.end();
           return;
         }
 
-        cmds.find(c => c[0] === command)[1](game, req.params, app).then((json) => {
-          res.writeHeader('Content-Type', 'application/json');
-          res.writeStatus('200 OK');
-          res.end(JSON.stringify(json));
-        }).catch((e) => {
-          res.writeStatus('500 Internal Server Error');
-          res.end('Internal Server Error+<br><br>' + e?.message);
-        });
+        cmds
+          .find((c) => c[0] === command)[1](game, req.params, app)
+          .then((json) => {
+            res.writeHeader('Content-Type', 'application/json');
+            res.writeStatus('200 OK');
+            res.end(JSON.stringify(json));
+          })
+          .catch((e) => {
+            res.writeStatus('500 Internal Server Error');
+            res.end('Internal Server Error+<br><br>' + e?.message);
+          });
       } catch (err) {
         console.error(err);
         res.writeStatus('500 Internal Server Error');
@@ -114,4 +121,4 @@ module.exports = {
   getBannedIps: function () {
     return bannedIps;
   },
-}
+};

@@ -18,7 +18,7 @@ const defaultOptions: HealthOptions = {
   offsetX: 0,
   offsetY: 0,
   alwaysHide: false,
-  line: 4
+  line: 4,
 };
 
 export class Health {
@@ -43,8 +43,12 @@ export class Health {
   }
 
   update(dt: number) {
-    if(this.alwaysHide) return;
-    this.value = Phaser.Math.Linear(this.value, this.entity.healthPercent, dt / 60);
+    if (this.alwaysHide) return;
+    this.value = Phaser.Math.Linear(
+      this.value,
+      this.entity.healthPercent,
+      dt / 60,
+    );
 
     if (!this.hidden) {
       const shouldHide = this.value > 0.98;
@@ -61,10 +65,10 @@ export class Health {
     const scale = this.entity.container.scale;
     const width = this.options.width * scale;
     const height = this.options.height * scale;
-    const line = this.options.line
+    const line = this.options.line;
 
     this.bar.setPosition(
-      (this.entity.container.x - width / 2) + this.options.offsetX * scale,
+      this.entity.container.x - width / 2 + this.options.offsetX * scale,
       this.entity.container.y + this.options.offsetY * scale,
     );
 

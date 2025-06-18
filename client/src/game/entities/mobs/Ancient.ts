@@ -9,7 +9,7 @@ class AncientMob extends BaseEntity {
   body!: Phaser.GameObjects.Sprite;
 
   get baseScale() {
-    return (this.shape.radius * 3) / this.body.width * 1.25;
+    return ((this.shape.radius * 3) / this.body.width) * 1.25;
   }
 
   createSprite() {
@@ -19,7 +19,9 @@ class AncientMob extends BaseEntity {
       width: this.shape.radius * 1.5,
       height: 50 * 1.25,
     });
-    this.container = this.game.add.container(this.shape.x, this.shape.y, [this.body]).setScale(this.baseScale);
+    this.container = this.game.add
+      .container(this.shape.x, this.shape.y, [this.body])
+      .setScale(this.baseScale);
     return this.container;
   }
 }

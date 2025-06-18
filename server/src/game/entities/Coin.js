@@ -4,16 +4,21 @@ const Types = require('../Types');
 const helpers = require('../../helpers');
 
 class Coin extends Entity {
-
   static defaultDefinition = {
     forbiddenEntities: [Types.Entity.IceSpike],
   };
 
   constructor(game, objectData) {
     super(game, Types.Entity.Coin, objectData);
-    if(typeof objectData.value === 'number') objectData.value = [objectData.value, objectData.value];
-    objectData.value = Array.isArray(objectData.value) ? objectData.value : [1, 1];
-    this.value = helpers.randomInteger(objectData.value[0], objectData.value[1]);
+    if (typeof objectData.value === 'number')
+      objectData.value = [objectData.value, objectData.value];
+    objectData.value = Array.isArray(objectData.value)
+      ? objectData.value
+      : [1, 1];
+    this.value = helpers.randomInteger(
+      objectData.value[0],
+      objectData.value[1],
+    );
     const radius = Math.min(200, 70 + this.value * 7);
 
     this.shape = Circle.create(0, 0, radius);
@@ -21,7 +26,7 @@ class Coin extends Entity {
     this.droppedBy = objectData.droppedBy;
 
     // Despawn coin after 2 minutes
-    this.despawnTime = Date.now() + (1000 * 60 * 2);
+    this.despawnTime = Date.now() + 1000 * 60 * 2;
 
     this.spawn();
   }
@@ -32,7 +37,7 @@ class Coin extends Entity {
     this.velocity.scale(0.5);
 
     if (Date.now() > this.despawnTime) {
-      if(this.respawnable) this.createInstance();
+      if (this.respawnable) this.createInstance();
       this.remove();
     }
   }
@@ -46,12 +51,16 @@ class Coin extends Entity {
   }
 
   processTargetsCollision(player) {
-    if(this.droppedBy && player.client?.account && player.client?.account?.id == this.droppedBy) {
+    if (
+      this.droppedBy &&
+      player.client?.account &&
+      player.client?.account?.id == this.droppedBy
+    ) {
       // bounce off the player
       const dx = player.shape.x - this.shape.x;
       const dy = player.shape.y - this.shape.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      const overlap = (this.shape.radius*0.8) + player.shape.radius - distance;
+      const overlap = this.shape.radius * 0.8 + player.shape.radius - distance;
       if (overlap > 0) {
         const angle = Math.atan2(dy, dx);
         this.velocity.x -= Math.cos(angle) * overlap;
@@ -59,12 +68,12 @@ class Coin extends Entity {
       }
       return;
     }
-    if (player.name === "Update Testing Account") {
+    if (player.name === 'Update Testing Account') {
       player.levels.addCoins(this.value * 50);
     } else {
       player.levels.addCoins(this.value);
     }
-    
+
     player.flags.set(Types.Flags.GetCoin, true);
 
     if (this.respawnable) this.createInstance();

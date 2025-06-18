@@ -33,13 +33,32 @@ const Entity = {
 };
 
 const Mobs = [
-  Entity.Wolf, Entity.Bunny, Entity.Moose, Entity.Yeti, Entity.Santa, Entity.Chimera, Entity.Roku, Entity.Ancient, Entity.Cat, Entity.Fish, Entity.AngryFish
+  Entity.Wolf,
+  Entity.Bunny,
+  Entity.Moose,
+  Entity.Yeti,
+  Entity.Santa,
+  Entity.Chimera,
+  Entity.Roku,
+  Entity.Ancient,
+  Entity.Cat,
+  Entity.Fish,
+  Entity.AngryFish,
 ];
 const Groups = {
   Obstacles: [
-    Entity.Player, Entity.Sword, Entity.Coin,
-    Entity.IceSpike, Entity.Rock, Entity.MossyRock, Entity.LavaRock,
-    Entity.Fireball, Entity.Boulder, Entity.SwordProj, Entity.Snowball, Entity.Chest,
+    Entity.Player,
+    Entity.Sword,
+    Entity.Coin,
+    Entity.IceSpike,
+    Entity.Rock,
+    Entity.MossyRock,
+    Entity.LavaRock,
+    Entity.Fireball,
+    Entity.Boulder,
+    Entity.SwordProj,
+    Entity.Snowball,
+    Entity.Chest,
     ...Mobs,
   ],
   Mobs,
@@ -110,6 +129,6 @@ module.exports = {
   DisconnectReason: {
     Server: 1,
     Player: 2,
-    Mob: 3
-  }
-}
+    Mob: 3,
+  },
+};

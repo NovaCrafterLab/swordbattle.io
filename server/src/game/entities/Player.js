@@ -68,7 +68,7 @@ class Player extends Entity {
 
     const { speed, radius, maxHealth, regeneration, viewport } = config.player;
     this.shape = Circle.create(0, 0, radius);
-    if (this.name === "Update Testing Account") {
+    if (this.name === 'Update Testing Account') {
       this.speed = new Property(1000);
     } else {
       this.speed = new Property(speed);
@@ -83,7 +83,12 @@ class Player extends Entity {
     this.biome = 0;
     this.inSafezone = true;
 
-    this.viewport = new Viewport(this, viewport.width, viewport.height, viewport.zoom);
+    this.viewport = new Viewport(
+      this,
+      viewport.width,
+      viewport.height,
+      viewport.zoom,
+    );
     this.viewportEntityIds = [];
     this.effects = new Map();
     this.flags = new Map();
@@ -125,9 +130,12 @@ class Player extends Entity {
     state.buffs = structuredClone(this.levels.buffs);
     state.evolution = this.evolutions.evolution;
     state.possibleEvolutions = {};
-    this.evolutions.possibleEvols.forEach(evol => state.possibleEvolutions[evol] = true);
+    this.evolutions.possibleEvols.forEach(
+      (evol) => (state.possibleEvolutions[evol] = true),
+    );
 
-    state.isAbilityAvailable = this.evolutions.evolutionEffect.isAbilityAvailable;
+    state.isAbilityAvailable =
+      this.evolutions.evolutionEffect.isAbilityAvailable;
     state.abilityActive = this.evolutions.evolutionEffect.isAbilityActive;
     state.abilityDuration = this.evolutions.evolutionEffect.durationTime;
     state.abilityCooldown = this.evolutions.evolutionEffect.cooldownTime;
@@ -150,13 +158,16 @@ class Player extends Entity {
   update(dt) {
     this.applyBiomeEffects();
     this.levels.applyBuffs();
-    this.effects.forEach(effect => effect.update(dt));
+    this.effects.forEach((effect) => effect.update(dt));
     this.health.update(dt);
     this.applyInputs(dt);
     this.sword.flySpeed.value = clamp(this.speed.value / 10, 100, 200);
     this.sword.update(dt);
 
-    if (this.inputs.isInputDown(Types.Input.Ability) && this.evolutions.evolutionEffect.canActivateAbility) {
+    if (
+      this.inputs.isInputDown(Types.Input.Ability) &&
+      this.evolutions.evolutionEffect.canActivateAbility
+    ) {
       this.evolutions.evolutionEffect.activateAbility();
     }
 
@@ -185,7 +196,10 @@ class Player extends Entity {
     }
 
     // excludes safezone if this.inSafezone is false
-    biomes = biomes.filter(([biome]) => biome.type !== Types.Biome.Safezone || this.inSafezone)
+    biomes = biomes
+      .filter(
+        ([biome]) => biome.type !== Types.Biome.Safezone || this.inSafezone,
+      )
       .sort((a, b) => b.zIndex - a.zIndex);
     if (biomes[0]) {
       const biome = biomes[0][0];
@@ -206,7 +220,7 @@ class Player extends Entity {
 
     const mtv = this.shape.getCollisionOverlap(response);
     const selfMtv = mtv.clone().scale(targetWeight / totalWeight);
-    const targetMtv = mtv.clone().scale(selfWeight / totalWeight * -1);
+    const targetMtv = mtv.clone().scale((selfWeight / totalWeight) * -1);
 
     this.shape.applyCollision(selfMtv);
     entity.shape.applyCollision(targetMtv);
@@ -222,13 +236,16 @@ class Player extends Entity {
     if (isMouseMovement) {
       const mouseDistanceFullStrength = 150;
       const mouseAngle = this.mouse.angle;
-      const mouseDistance = Math.min(this.mouse.force, mouseDistanceFullStrength);
+      const mouseDistance = Math.min(
+        this.mouse.force,
+        mouseDistanceFullStrength,
+      );
       speed *= mouseDistance / mouseDistanceFullStrength;
       this.movementDirection = mouseAngle;
       dx = speed * Math.cos(this.movementDirection);
       dy = speed * Math.sin(this.movementDirection);
 
-      if(this.modifiers.disableDiagonalMovement) {
+      if (this.modifiers.disableDiagonalMovement) {
         if (Math.abs(dx) > Math.abs(dy)) {
           dy = 0;
           dx = dx > 0 ? speed : -speed;
@@ -258,7 +275,7 @@ class Player extends Entity {
         dx = speed * Math.cos(this.movementDirection);
         dy = speed * Math.sin(this.movementDirection);
 
-        if(this.modifiers.disableDiagonalMovement) {
+        if (this.modifiers.disableDiagonalMovement) {
           if (directionX !== 0 && directionY !== 0) {
             dy = directionY * speed;
             dx = 0;
@@ -297,12 +314,20 @@ class Player extends Entity {
     this.movedDistance.y = dy;
 
     // Clamp to map bounds
-    this.shape.x = clamp(this.shape.x, -this.game.map.width / 2, this.game.map.width / 2);
-    this.shape.y = clamp(this.shape.y, -this.game.map.height / 2, this.game.map.height / 2);
+    this.shape.x = clamp(
+      this.shape.x,
+      -this.game.map.width / 2,
+      this.game.map.width / 2,
+    );
+    this.shape.y = clamp(
+      this.shape.y,
+      -this.game.map.height / 2,
+      this.game.map.height / 2,
+    );
   }
 
   damaged(damage, entity = null) {
-    if (this.name !== "Update Testing Account") {
+    if (this.name !== 'Update Testing Account') {
       this.health.damaged(damage);
     }
 
@@ -310,32 +335,71 @@ class Player extends Entity {
       let reason = 'Unknown Entity';
       if (entity) {
         switch (entity.type) {
-          case Types.Entity.Player: reason = entity.name; break;
-          case Types.Entity.LavaPool: reason = 'Lava'; break;
-          case Types.Entity.Wolf: reason = 'A Wolf'; break;
-          case Types.Entity.Cat: reason = 'A Cat'; break;
-          case Types.Entity.Moose: reason = 'A Moose'; break;
-          case Types.Entity.AngryFish: reason = 'A Fish'; break;
-          case Types.Entity.Yeti: reason = 'A Yeti'; break;
-          case Types.Entity.Chimera: reason = 'A Chimera'; break;
-          case Types.Entity.Roku: reason = 'Roku'; break;
-          case Types.Entity.Snowball: reason = 'Big Yeti'; break; // the yeti boss throws snowballs
-          case Types.Entity.Fireball: reason = 'Roku'; break; // the roku throws fireballs
-          case Types.Entity.SwordProj: reason = 'An Ancient Statue'; break; // the ancient statue throws swords
-          case Types.Entity.Ancient: reason = 'An Ancient Statue'; break;
-          case Types.Entity.Boulder: reason = 'An Ancient Statue'; break; // the ancient statue throws boulders
+          case Types.Entity.Player:
+            reason = entity.name;
+            break;
+          case Types.Entity.LavaPool:
+            reason = 'Lava';
+            break;
+          case Types.Entity.Wolf:
+            reason = 'A Wolf';
+            break;
+          case Types.Entity.Cat:
+            reason = 'A Cat';
+            break;
+          case Types.Entity.Moose:
+            reason = 'A Moose';
+            break;
+          case Types.Entity.AngryFish:
+            reason = 'A Fish';
+            break;
+          case Types.Entity.Yeti:
+            reason = 'A Yeti';
+            break;
+          case Types.Entity.Chimera:
+            reason = 'A Chimera';
+            break;
+          case Types.Entity.Roku:
+            reason = 'Roku';
+            break;
+          case Types.Entity.Snowball:
+            reason = 'Big Yeti';
+            break; // the yeti boss throws snowballs
+          case Types.Entity.Fireball:
+            reason = 'Roku';
+            break; // the roku throws fireballs
+          case Types.Entity.SwordProj:
+            reason = 'An Ancient Statue';
+            break; // the ancient statue throws swords
+          case Types.Entity.Ancient:
+            reason = 'An Ancient Statue';
+            break;
+          case Types.Entity.Boulder:
+            reason = 'An Ancient Statue';
+            break; // the ancient statue throws boulders
         }
       }
-      this.remove(reason, entity.type === Types.Entity.Player ? Types.DisconnectReason.Player : Types.DisconnectReason.Mob);
+      this.remove(
+        reason,
+        entity.type === Types.Entity.Player
+          ? Types.DisconnectReason.Player
+          : Types.DisconnectReason.Mob,
+      );
     }
   }
 
   addEffect(type, id, config) {
     let EffectClass = Effect;
     switch (type) {
-      case Types.Effect.Speed: EffectClass = SpeedEffect; break;
-      case Types.Effect.Slipping: EffectClass = SlippingEffect; break;
-      case Types.Effect.Burning: EffectClass = BurningEffect; break;
+      case Types.Effect.Speed:
+        EffectClass = SpeedEffect;
+        break;
+      case Types.Effect.Slipping:
+        EffectClass = SlippingEffect;
+        break;
+      case Types.Effect.Burning:
+        EffectClass = BurningEffect;
+        break;
     }
 
     if (!id) id = Math.random();
@@ -357,17 +421,18 @@ class Player extends Entity {
   }
 
   getEntitiesInViewport() {
-    this.viewportEntityIds = this.game.entitiesQuadtree.get(this.viewport.boundary)
-      .map(result => result.entity.id);
-      return this.viewportEntityIds;
+    this.viewportEntityIds = this.game.entitiesQuadtree
+      .get(this.viewport.boundary)
+      .map((result) => result.entity.id);
+    return this.viewportEntityIds;
   }
 
   remove(message = 'Server', type = Types.DisconnectReason.Server) {
     if (this.client) {
       this.client.disconnectReason = {
         message: message,
-        type: type
-      }
+        type: type,
+      };
       const game = {
         coins: this.levels.coins,
         kills: this.kills,
@@ -377,16 +442,25 @@ class Player extends Entity {
     }
     super.remove();
 
-    if (this.name !== "Update Testing Account") {
-      this.game.map.spawnCoinsInShape(this.shape, this.calculateDropAmount(), this.client?.account?.id);
+    if (this.name !== 'Update Testing Account') {
+      this.game.map.spawnCoinsInShape(
+        this.shape,
+        this.calculateDropAmount(),
+        this.client?.account?.id,
+      );
     }
   }
 
   calculateDropAmount() {
     const coins = this.levels.coins;
-    return coins < 13 ? 10 : Math.round(coins < 25000 ? coins * 0.8 : Math.log10(coins) * 30000 - 111938.2002602);
+    return coins < 13
+      ? 10
+      : Math.round(
+          coins < 25000
+            ? coins * 0.8
+            : Math.log10(coins) * 30000 - 111938.2002602,
+        );
   }
-
 
   cleanup() {
     super.cleanup();
@@ -394,7 +468,14 @@ class Player extends Entity {
     this.flags.clear();
     this.modifiers = {};
 
-    [this.speed, this.regeneration, this.friction, this.viewport.zoom, this.knockbackResistance, this.health.regenWait].forEach((property) => property.reset());
+    [
+      this.speed,
+      this.regeneration,
+      this.friction,
+      this.viewport.zoom,
+      this.knockbackResistance,
+      this.health.regenWait,
+    ].forEach((property) => property.reset());
   }
 }
 

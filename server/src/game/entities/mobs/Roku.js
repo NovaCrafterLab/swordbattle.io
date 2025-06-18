@@ -36,8 +36,16 @@ class RokuMob extends Entity {
     this.angle = helpers.random(-Math.PI, Math.PI);
     this.coinsDrop = 55000;
 
-    this.jumpTimer = new Timer(0, this.definition.jumpCooldown[0], this.definition.jumpCooldown[1]);
-    this.fireballTimer = new Timer(0, this.definition.fireballCooldown[0], this.definition.fireballCooldown[1]);
+    this.jumpTimer = new Timer(
+      0,
+      this.definition.jumpCooldown[0],
+      this.definition.jumpCooldown[1],
+    );
+    this.fireballTimer = new Timer(
+      0,
+      this.definition.fireballCooldown[0],
+      this.definition.fireballCooldown[1],
+    );
 
     this.health = new Health(this.definition.health, this.definition.regen);
     this.speed = new Property(this.definition.speed);
@@ -68,7 +76,12 @@ class RokuMob extends Entity {
         if (target === this) continue;
         if (target.type !== Types.Entity.Player) continue;
 
-        const distance = helpers.distance(this.shape.x, this.shape.y, target.shape.x, target.shape.y);
+        const distance = helpers.distance(
+          this.shape.x,
+          this.shape.y,
+          target.shape.x,
+          target.shape.y,
+        );
         if (distance < searchRadius) {
           this.target = target;
           break;
@@ -81,14 +94,28 @@ class RokuMob extends Entity {
     this.jumpTimer.update(dt);
 
     if (this.target) {
-      const targetAngle = helpers.angle(this.shape.x, this.shape.y, this.target.shape.x, this.target.shape.y);
-      const distance = helpers.distance(this.shape.x, this.shape.y, this.target.shape.x, this.target.shape.y);
+      const targetAngle = helpers.angle(
+        this.shape.x,
+        this.shape.y,
+        this.target.shape.x,
+        this.target.shape.y,
+      );
+      const distance = helpers.distance(
+        this.shape.x,
+        this.shape.y,
+        this.target.shape.x,
+        this.target.shape.y,
+      );
 
       if (distance > this.definition.attackRadius) {
         this.target = null;
       }
 
-      this.angle = helpers.angleLerp(this.angle, targetAngle, dt * this.definition.rotationSpeed);
+      this.angle = helpers.angleLerp(
+        this.angle,
+        targetAngle,
+        dt * this.definition.rotationSpeed,
+      );
       if (this.fireballTimer.finished) {
         this.fireballTimer.renew();
         const fireballs = helpers.randomChoice(this.definition.fireballCount);
@@ -98,9 +125,12 @@ class RokuMob extends Entity {
             type: Types.Entity.Fireball,
             size: this.definition.fireballSize,
             speed: this.definition.fireballSpeed,
-            angle: this.angle - ((i - (fireballs - 1) / 2) * spread),
+            angle: this.angle - (i - (fireballs - 1) / 2) * spread,
             damage: this.damage.value,
-            duration: [this.definition.fireballDuration[0], this.definition.fireballDuration[1]],
+            duration: [
+              this.definition.fireballDuration[0],
+              this.definition.fireballDuration[1],
+            ],
             position: [this.shape.x, this.shape.y],
           });
         }
@@ -113,9 +143,12 @@ class RokuMob extends Entity {
         this.angle += helpers.random(-Math.PI, Math.PI) / 2;
       }
 
-      this.velocity.add(new SAT.Vector(
-        this.speed.value * Math.cos(this.angle),
-        this.speed.value * Math.sin(this.angle)));
+      this.velocity.add(
+        new SAT.Vector(
+          this.speed.value * Math.cos(this.angle),
+          this.speed.value * Math.sin(this.angle),
+        ),
+      );
     }
 
     this.velocity.scale(0.9);
@@ -132,7 +165,7 @@ class RokuMob extends Entity {
 
     const mtv = this.shape.getCollisionOverlap(response);
     const selfMtv = mtv.clone().scale(targetWeight / totalWeight);
-    const targetMtv = mtv.clone().scale(selfWeight / totalWeight * -1);
+    const targetMtv = mtv.clone().scale((selfWeight / totalWeight) * -1);
 
     entity.shape.applyCollision(targetMtv);
     this.shape.applyCollision(selfMtv);

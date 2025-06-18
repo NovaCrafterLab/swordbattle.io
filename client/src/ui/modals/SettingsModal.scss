@@ -30,8 +30,9 @@
     flex-direction: row;
     justify-content: space-between;
   }
-  
-  select, input {
+
+  select,
+  input {
     width: 100%;
     margin: 0 0 10px;
     font-size: 18px;
@@ -58,24 +59,24 @@
     right: 0;
     bottom: 0;
     background-color: #ccc;
-    -webkit-transition: .4s;
-    transition: .4s;
+    -webkit-transition: 0.4s;
+    transition: 0.4s;
 
     &:before {
       position: absolute;
-      content: "";
+      content: '';
       height: 15px;
       width: 15px;
       left: 6px;
       bottom: 3px;
       background-color: white;
-      -webkit-transition: .4s;
-      transition: .4s;
+      -webkit-transition: 0.4s;
+      transition: 0.4s;
     }
   }
 
   input:checked + .slider {
-    background-color: #2196F3;
+    background-color: #2196f3;
 
     &:before {
       -webkit-transform: translateX(26px);
@@ -85,7 +86,7 @@
   }
 
   input:focus + .slider {
-    box-shadow: 0 0 1px #2196F3;
+    box-shadow: 0 0 1px #2196f3;
   }
 }
 

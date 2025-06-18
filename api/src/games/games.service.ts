@@ -22,7 +22,7 @@ export class GamesService {
 
   async fetch(fetchData: FetchGamesDTO) {
     let { sortBy, timeRange, limit } = fetchData;
-    if(limit > 100) {
+    if (limit > 100) {
       limit = 100;
     }
     let where = {};
@@ -39,7 +39,11 @@ export class GamesService {
 
     return await this.gamesRepository
       .createQueryBuilder('game')
-      .leftJoinAndSelect('game.account', 'account', 'account.id = game.account_id')
+      .leftJoinAndSelect(
+        'game.account',
+        'account',
+        'account.id = game.account_id',
+      )
       .select([
         'account.username as username',
         'game.created_at',

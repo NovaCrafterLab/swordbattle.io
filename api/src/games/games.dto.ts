@@ -3,7 +3,7 @@ import { TimeRange } from 'src/stats/stats.dto';
 
 export class SaveGameDTO {
   @IsInt() account_id: number;
-  
+
   @IsInt() coins: number;
 
   @IsInt() kills: number;

@@ -1,4 +1,4 @@
-const SAT = require('sat')
+const SAT = require('sat');
 const State = require('../components/State');
 const Health = require('../components/Health');
 const Types = require('../Types');
@@ -38,7 +38,12 @@ class Entity {
   }
 
   processDefinition() {
-    this.definition = Object.assign({}, Entity.defaultDefinition, this.constructor.defaultDefinition, this.definition);
+    this.definition = Object.assign(
+      {},
+      Entity.defaultDefinition,
+      this.constructor.defaultDefinition,
+      this.definition,
+    );
 
     const { definition } = this;
 
@@ -101,11 +106,15 @@ class Entity {
     if (!this.game.entitiesQuadtree) return false;
 
     for (const entityType of this.definition.forbiddenEntities) {
-      const targets = this.game.entitiesQuadtree.get(this.shape.boundary).map(res => res.entity);
+      const targets = this.game.entitiesQuadtree
+        .get(this.shape.boundary)
+        .map((res) => res.entity);
       for (const entity of targets) {
         if (entity.type !== entityType) continue;
 
-        const collisionShape = entity.depthZone ? entity.depthZone : entity.shape;
+        const collisionShape = entity.depthZone
+          ? entity.depthZone
+          : entity.shape;
         if (collisionShape.collides(this.shape, response)) {
           if (!collide) return true;
 
@@ -135,8 +144,16 @@ class Entity {
     this.shape.x += this.velocity.x;
     this.shape.y += this.velocity.y;
     // prevent leaving map
-    this.shape.x = helpers.clamp(this.shape.x, -this.game.map.width / 2, this.game.map.width / 2);
-    this.shape.y = helpers.clamp(this.shape.y, -this.game.map.height / 2, this.game.map.height / 2);
+    this.shape.x = helpers.clamp(
+      this.shape.x,
+      -this.game.map.width / 2,
+      this.game.map.width / 2,
+    );
+    this.shape.y = helpers.clamp(
+      this.shape.y,
+      -this.game.map.height / 2,
+      this.game.map.height / 2,
+    );
     this.velocity.scale(0.9);
   }
 
@@ -152,7 +169,10 @@ class Entity {
 
   createInstance() {
     if (this.definition.respawnTime) {
-      this.game.map.addEntityTimer(this.originalDefinition, this.definition.respawnTime);
+      this.game.map.addEntityTimer(
+        this.originalDefinition,
+        this.definition.respawnTime,
+      );
     } else {
       this.game.map.addEntity(this.originalDefinition);
     }

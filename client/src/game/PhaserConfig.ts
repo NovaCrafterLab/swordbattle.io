@@ -1,6 +1,6 @@
-import Phaser from 'phaser'
-import Game from './scenes/Game'
-import { Settings } from './Settings'
+import Phaser from 'phaser';
+import Game from './scenes/Game';
+import { Settings } from './Settings';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Settings.useWebGL ? Phaser.WEBGL : Phaser.CANVAS,
@@ -28,6 +28,6 @@ const config: Phaser.Types.Core.GameConfig = {
     createContainer: true,
   },
   scene: [Game],
-}
+};
 
-export default config
+export default config;

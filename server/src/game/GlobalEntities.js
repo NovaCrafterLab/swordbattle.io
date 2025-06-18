@@ -1,7 +1,16 @@
 const Types = require('./Types');
 
 class GlobalEntities {
-  static fields = ['id', 'type', 'name', 'coins', 'shapeData', 'removed', 'angle', 'account'];
+  static fields = [
+    'id',
+    'type',
+    'name',
+    'coins',
+    'shapeData',
+    'removed',
+    'angle',
+    'account',
+  ];
 
   constructor(game) {
     this.game = game;
@@ -43,10 +52,14 @@ class GlobalEntities {
         if (this.game.newEntities.has(entity.id)) {
           this.filterAndWrite(this.getChangesCache, id, fields);
         } else {
-          this.filterAndWrite(this.getChangesCache, id, entity.state.getChanges());
+          this.filterAndWrite(
+            this.getChangesCache,
+            id,
+            entity.state.getChanges(),
+          );
         }
       });
-      this.game.removedEntities.forEach(entity => {
+      this.game.removedEntities.forEach((entity) => {
         if (!entity.isGlobal) return;
 
         this.getChangesCache[entity.id] = { removed: true };

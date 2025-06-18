@@ -10,20 +10,20 @@ import './GlobalLeaderboard.scss';
 // import cosmetics from '../game/cosmetics.json';
 
 const types: Record<string, string> = {
-  'kills': 'Kills',
-  'coins': 'Coins',
-  'playtime': 'Survived',
-  'xp': 'XP',
-  'ultimacy': 'Mastery',
+  kills: 'Kills',
+  coins: 'Coins',
+  playtime: 'Survived',
+  xp: 'XP',
+  ultimacy: 'Mastery',
   'total-coins': 'Total Coins',
   'total-kills': 'Total Stabs',
   'total-playtime': 'Total Playtime',
 };
 
 const ranges: Record<string, string> = {
-  'all': 'All-Time',
-  'day': 'Past Day',
-  'week': 'Past Week',
+  all: 'All-Time',
+  day: 'Past Day',
+  week: 'Past Week',
 };
 
 export function GlobalLeaderboard() {
@@ -31,16 +31,20 @@ export function GlobalLeaderboard() {
   const [range, setRange] = useState<string>('all');
   const [data, setData] = useState<any[]>([]);
 
-  const navigate = useNavigate();              // router navigation helper
+  const navigate = useNavigate(); // router navigation helper
 
   const fetchData = () => {
     const isGames = type === 'coins' || type === 'kills' || type === 'playtime';
     const url = `${api.endpoint}/${isGames ? 'games' : 'stats'}/fetch`;
-    api.post(url, {
-      sortBy: type.startsWith('total') ? type.slice(6) : type,
-      timeRange: range,
-      limit: 100,
-    }, (data: any) => setData(!data.message ? data : []));
+    api.post(
+      url,
+      {
+        sortBy: type.startsWith('total') ? type.slice(6) : type,
+        timeRange: range,
+        limit: 100,
+      },
+      (data: any) => setData(!data.message ? data : []),
+    );
   };
   const changeType = (type: string) => {
     setData([]);
@@ -71,25 +75,51 @@ export function GlobalLeaderboard() {
         <br />
 
         <div className="dropdown d-inline-block">
-          <button className="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+          <button
+            className="btn btn-secondary dropdown-toggle"
+            type="button"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+          >
             {types[type]}
           </button>
           <ul className="dropdown-menu">
             {Object.entries(types).map(([key, name]) => {
               if (key === type) return false;
-              return <li key={key} className="dropdown-item" onClick={() => changeType(key)}>{name}</li>;
+              return (
+                <li
+                  key={key}
+                  className="dropdown-item"
+                  onClick={() => changeType(key)}
+                >
+                  {name}
+                </li>
+              );
             })}
           </ul>
         </div>
 
         <div className="dropdown d-inline-block">
-          <button className="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+          <button
+            className="btn btn-secondary dropdown-toggle"
+            type="button"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+          >
             {ranges[range]}
           </button>
           <ul className="dropdown-menu">
             {Object.entries(ranges).map(([key, name]) => {
               if (key === range) return false;
-              return <li key={key} className="dropdown-item" onClick={() => changeRange(key)}>{name}</li>;
+              return (
+                <li
+                  key={key}
+                  className="dropdown-item"
+                  onClick={() => changeRange(key)}
+                >
+                  {name}
+                </li>
+              );
             })}
           </ul>
         </div>
@@ -98,11 +128,13 @@ export function GlobalLeaderboard() {
         <br />
 
         <div className="row">
-          {data.length > 2 ? (<>
-            <LeaderboardCard type={type} row={data[0]} index={0} />
-            <LeaderboardCard type={type} row={data[1]} index={1} />
-            <LeaderboardCard type={type} row={data[2]} index={2} />
-          </>) : (
+          {data.length > 2 ? (
+            <>
+              <LeaderboardCard type={type} row={data[0]} index={0} />
+              <LeaderboardCard type={type} row={data[1]} index={1} />
+              <LeaderboardCard type={type} row={data[2]} index={2} />
+            </>
+          ) : (
             <>Loading...</>
           )}
         </div>
@@ -112,12 +144,22 @@ export function GlobalLeaderboard() {
             <tr>
               <th>Rank</th>
               <th>Name</th>
-              {type !== 'xp' && type !== 'ultimacy' && !type.startsWith('total') ? (<>
-                <th>Coins</th>
-                <th>Kills</th>
-                <th>Survived</th>
-              </>) : (
-                <th>{type === 'xp' ? 'XP' : type === 'ultimacy' ? 'Mastery' : type.slice(6)}</th>
+              {type !== 'xp' &&
+              type !== 'ultimacy' &&
+              !type.startsWith('total') ? (
+                <>
+                  <th>Coins</th>
+                  <th>Kills</th>
+                  <th>Survived</th>
+                </>
+              ) : (
+                <th>
+                  {type === 'xp'
+                    ? 'XP'
+                    : type === 'ultimacy'
+                      ? 'Mastery'
+                      : type.slice(6)}
+                </th>
               )}
             </tr>
           </thead>
@@ -127,7 +169,9 @@ export function GlobalLeaderboard() {
               const index = data.indexOf(row);
               return (
                 <tr key={index}>
-                  <td><b>#{index + 1}</b></td>
+                  <td>
+                    <b>#{index + 1}</b>
+                  </td>
                   <td>
                     <div className="d-flex align-items-center">
                       <div className="user-info__basic">
@@ -137,14 +181,23 @@ export function GlobalLeaderboard() {
                             rel="noreferrer"
                             style={{ color: 'black' }}
                           >
-                            {row.clan && <span style={{ color: '#b0b000' }} className='clan'>[{row.clan}] </span>}
+                            {row.clan && (
+                              <span
+                                style={{ color: '#b0b000' }}
+                                className="clan"
+                              >
+                                [{row.clan}]{' '}
+                              </span>
+                            )}
                             {row.username}
                           </Link>
                         </h5>
                       </div>
                     </div>
                   </td>
-                  {type !== 'xp' && type !== 'ultimacy' && !type.startsWith('total') ? (
+                  {type !== 'xp' &&
+                  type !== 'ultimacy' &&
+                  !type.startsWith('total') ? (
                     <>
                       <td>
                         <div className="d-flex align-items-baseline">
@@ -163,7 +216,8 @@ export function GlobalLeaderboard() {
                         {type === 'ultimacy' && numberWithCommas(row.ultimacy)}
                         {type === 'total-coins' && numberWithCommas(row.coins)}
                         {type === 'total-kills' && numberWithCommas(row.kills)}
-                        {type === 'total-playtime' && secondsToTime(row.playtime)}
+                        {type === 'total-playtime' &&
+                          secondsToTime(row.playtime)}
                       </h4>
                     </td>
                   )}
@@ -173,24 +227,44 @@ export function GlobalLeaderboard() {
           </tbody>
         </table>
       </div>
-
     </section>
   );
 }
 
-function LeaderboardCard({ type, row, index }: { type: string, row: any, index: number }) {
+function LeaderboardCard({
+  type,
+  row,
+  index,
+}: {
+  type: string;
+  row: any;
+  index: number;
+}) {
   const isFirst = index === 0;
   return (
     <div className="col-sm-4">
-      <div className={clsx('leaderboard-card', isFirst && 'leaderboard-card--first')}>
+      <div
+        className={clsx(
+          'leaderboard-card',
+          isFirst && 'leaderboard-card--first',
+        )}
+      >
         <div className="leaderboard-card__top">
           <h3 className="text-center">
-            #{index + 1} - <Link
+            #{index + 1} -{' '}
+            <Link
               to={`/profile?username=${encodeURIComponent(row.username)}`}
               rel="noreferrer"
               style={{ color: isFirst ? 'white' : 'black' }}
             >
-              {row.clan && <span style={{ color: isFirst ? '#ffff00' : '#b0b000' }} className='clan'>[{row.clan}] </span>}
+              {row.clan && (
+                <span
+                  style={{ color: isFirst ? '#ffff00' : '#b0b000' }}
+                  className="clan"
+                >
+                  [{row.clan}]{' '}
+                </span>
+              )}
               {row.username}
             </Link>
           </h3>
@@ -198,18 +272,26 @@ function LeaderboardCard({ type, row, index }: { type: string, row: any, index: 
         <div className="leaderboard-card__body">
           <div className="text-center">
             <br />
-            {type !== 'xp' && type !== 'ultimacy' && !type.startsWith('total') ? (<>
-              <h5 className="mb-0">{numberWithCommas(row.coins)} coins</h5>
-              <p className="text-muted mb-0">
-                Kills: {row.kills}, Survived: {secondsToTime(row.playtime)}
-              </p>
-            </>) : (
+            {type !== 'xp' &&
+            type !== 'ultimacy' &&
+            !type.startsWith('total') ? (
+              <>
+                <h5 className="mb-0">{numberWithCommas(row.coins)} coins</h5>
+                <p className="text-muted mb-0">
+                  Kills: {row.kills}, Survived: {secondsToTime(row.playtime)}
+                </p>
+              </>
+            ) : (
               <h5 className="mb-0">
                 {type === 'xp' && numberWithCommas(row.xp) + ' XP'}
-                {type === 'ultimacy' && numberWithCommas(row.ultimacy) + '  mastery'}
-                {type === 'total-coins' && numberWithCommas(row.coins) + ' coins'}
-                {type === 'total-kills' && numberWithCommas(row.kills) + ' stabs'}
-                {type === 'total-playtime' && secondsToTime(row.playtime) + ' played'}
+                {type === 'ultimacy' &&
+                  numberWithCommas(row.ultimacy) + '  mastery'}
+                {type === 'total-coins' &&
+                  numberWithCommas(row.coins) + ' coins'}
+                {type === 'total-kills' &&
+                  numberWithCommas(row.kills) + ' stabs'}
+                {type === 'total-playtime' &&
+                  secondsToTime(row.playtime) + ' played'}
               </h5>
             )}
           </div>

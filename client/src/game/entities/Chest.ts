@@ -16,10 +16,11 @@ class Chest extends BaseEntity {
       height: this.sprite.width / 17.6,
       offsetX: this.sprite.width / 2,
       offsetY: -30,
-      alwaysHide: this.rarity === 0
+      alwaysHide: this.rarity === 0,
     });
 
-    this.container = this.game.add.container(this.shape.x, this.shape.y, [this.sprite])
+    this.container = this.game.add
+      .container(this.shape.x, this.shape.y, [this.sprite])
       .setScale(this.size / this.sprite.width);
 
     return this.container;

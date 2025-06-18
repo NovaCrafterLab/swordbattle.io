@@ -1,12 +1,12 @@
-import Coin from "./game/entities/Coin";
-import Player from "./game/entities/Player";
+import Coin from './game/entities/Coin';
+import Player from './game/entities/Player';
 
 export function random(min: number, max: number) {
-  return min + (Math.random() * (max - min));
+  return min + Math.random() * (max - min);
 }
 
 export function isObject(item: any) {
-  return (item && typeof item === 'object' && !Array.isArray(item));
+  return item && typeof item === 'object' && !Array.isArray(item);
 }
 
 export function mergeDeep(target: any, ...sources: any): any {
@@ -28,7 +28,7 @@ export function mergeDeep(target: any, ...sources: any): any {
 }
 
 export function numberWithCommas(x: number) {
-  return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
 export function secondsToTime(duration: number) {
@@ -38,14 +38,14 @@ export function secondsToTime(duration: number) {
   const hours = Math.trunc(duration / secInHour);
   if (hours > 0) {
     portions.push(hours + 'h');
-    duration = duration - (hours * secInHour);
+    duration = duration - hours * secInHour;
   }
 
   const secInMinute = 60;
   const minutes = Math.trunc(duration / secInMinute);
   if (minutes > 0) {
     portions.push(minutes + 'm');
-    duration = duration - (minutes * secInMinute);
+    duration = duration - minutes * secInMinute;
   }
 
   const seconds = Math.trunc(duration);
@@ -101,7 +101,6 @@ export function lastSeen(dateString: string) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-
   const diff = (today as any) - (inputDate as any);
 
   const daysDiff = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -115,18 +114,17 @@ export function lastSeen(dateString: string) {
   }
 }
 
-
 export function addCommas(num: number) {
-  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
 export function calculateGemsXP(coins: number, kills: number) {
-  const xp = Math.floor(coins / 20) + kills
+  const xp = Math.floor(coins / 20) + kills;
   if (coins >= 1250000) {
     return {
       xp,
       gems: Math.floor(xp / 5),
-      ultimacy: Math.floor((coins / 794) ** 1.5), 
+      ultimacy: Math.floor((coins / 794) ** 1.5),
     };
   } else {
     return {
@@ -138,14 +136,59 @@ export function calculateGemsXP(coins: number, kills: number) {
 }
 
 export function buyFormats(amount: number) {
+  if (amount === 0) return '0';
 
-  if(amount === 0) return '0';
-
-  const values = ['<3', '<5', '<10', '10+', '20+', '30+', '40+', '50+', '60+', '70+', '80+', '90+', '100+', '200+', '300+', '400+', '500+', '600+', '700+', '800+', '900+', '1K+', '2K+', '3K+', '4K+', '5K+', '6K+', '7K+', '8K+', '9K+', '10K+', '15K+', '67K+', '68K+', '69K+', '70K+', '71K+', '72K+', '73K+', '74K+', '75K+'];
+  const values = [
+    '<3',
+    '<5',
+    '<10',
+    '10+',
+    '20+',
+    '30+',
+    '40+',
+    '50+',
+    '60+',
+    '70+',
+    '80+',
+    '90+',
+    '100+',
+    '200+',
+    '300+',
+    '400+',
+    '500+',
+    '600+',
+    '700+',
+    '800+',
+    '900+',
+    '1K+',
+    '2K+',
+    '3K+',
+    '4K+',
+    '5K+',
+    '6K+',
+    '7K+',
+    '8K+',
+    '9K+',
+    '10K+',
+    '15K+',
+    '67K+',
+    '68K+',
+    '69K+',
+    '70K+',
+    '71K+',
+    '72K+',
+    '73K+',
+    '74K+',
+    '75K+',
+  ];
 
   const amountToNumber = (val: string) => {
     const num = parseFloat(val.replace(/[<+KM]/g, ''));
-    return val.includes('M') ? num * 1000000 : val.includes('K') ? num * 1000 : num;
+    return val.includes('M')
+      ? num * 1000000
+      : val.includes('K')
+        ? num * 1000
+        : num;
   };
 
   for (let i = 0; i < values.length; i++) {
@@ -155,8 +198,10 @@ export function buyFormats(amount: number) {
     const currentVal = amountToNumber(current);
     const nextVal = next ? amountToNumber(next) : Infinity;
 
-    if ((current.includes('<') && amount < currentVal) ||
-        (!current.includes('<') && amount >= currentVal && amount < nextVal)) {
+    if (
+      (current.includes('<') && amount < currentVal) ||
+      (!current.includes('<') && amount >= currentVal && amount < nextVal)
+    ) {
       return current;
     }
   }
@@ -174,24 +219,26 @@ export function getCookies() {
 }
 
 export function findCoinCollector(coin: Coin, players: Player[]) {
-    const errorThreshold = 1.1;
-    const coinRadius = coin.shape.radius * coin.container.scale * errorThreshold;
-    const coinX = coin.shape.x;
-    const coinY = coin.shape.y;
+  const errorThreshold = 1.1;
+  const coinRadius = coin.shape.radius * coin.container.scale * errorThreshold;
+  const coinX = coin.shape.x;
+  const coinY = coin.shape.y;
 
-    let entity = null;
-    players.forEach((player: Player) => {
-      const playerRadius = player.shape.radius * 2 * errorThreshold;
-      if (playerRadius > coinRadius) {
-        const distance = Math.sqrt(Math.pow(player.shape.x - coinX, 2) + Math.pow(player.shape.y - coinY, 2));
-        if (distance < playerRadius) {
-          entity = player;
-        }
+  let entity = null;
+  players.forEach((player: Player) => {
+    const playerRadius = player.shape.radius * 2 * errorThreshold;
+    if (playerRadius > coinRadius) {
+      const distance = Math.sqrt(
+        Math.pow(player.shape.x - coinX, 2) +
+          Math.pow(player.shape.y - coinY, 2),
+      );
+      if (distance < playerRadius) {
+        entity = player;
       }
-    });
-    return entity;
+    }
+  });
+  return entity;
 }
-
 
 // export const playVideoAd = () => {
 //   const windowAny = window as any;
@@ -302,7 +349,6 @@ export function findCoinCollector(coin: Coin, players: Player[]) {
 //       console.log("starting preroll");
 //       windowAny.aiptag.adplayer.startPreRoll();
 //     });
-
 
 //     // if debugAd = true, dont reset lastVidAdTime
 //     const urlParams = new URLSearchParams(window.location.search);

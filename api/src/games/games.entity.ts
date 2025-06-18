@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Account } from 'src/accounts/account.entity';
 
 @Entity({ name: 'games' })
@@ -13,7 +20,7 @@ export class Game {
 
   @Column() kills: number;
 
-  @ManyToOne(() => Account, account => account.games)
+  @ManyToOne(() => Account, (account) => account.games)
   @JoinColumn({ name: 'account_id' })
   account: Account;
 }

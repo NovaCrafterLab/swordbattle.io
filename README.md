@@ -6,11 +6,11 @@
 
 ## Branch roles (no tables, quick view)
 
-* **`web3-main` – default**
+- **`web3-main` – default**
   Web3 gameplay & release line. Free push / typical feature branches.
-* **`main` – upstream sync + patches**
-  Mirrors `codergautam/main` & holds cherry‑picked security fixes. *No Web3 code.* Protected branch.
-* **`upstream-main` – local mirror**
+- **`main` – upstream sync + patches**
+  Mirrors `codergautam/main` & holds cherry‑picked security fixes. _No Web3 code._ Protected branch.
+- **`upstream-main` – local mirror**
   Fast‑forward copy of upstream. Never pushed.
 
 > **PR guide**
@@ -38,7 +38,7 @@ The script will:
 3. Create branches `web3-main`, `main`, `upstream-main`
 4. Set `gh` default repo to the fork
 
-After it prints *✔ Ready* you can:
+After it prints _✔ Ready_ you can:
 
 ```bash
 git checkout -b feat/my-awesome-feature   # start coding on web3-main
@@ -57,13 +57,12 @@ git checkout -b feat/my-awesome-feature   # start coding on web3-main
 
 ## Respecting upstream
 
-* Original code © upstream authors, GPL v3.
-* Only clean security fixes are sent upstream; Web3 logic stays here unless requested.
+- Original code © upstream authors, GPL v3.
+- Only clean security fixes are sent upstream; Web3 logic stays here unless requested.
 
 ---
 
-*(Original upstream README below for reference)*
-
+_(Original upstream README below for reference)_
 
 <details>
 <summary>Original upstream README</summary>
@@ -74,10 +73,10 @@ Swordbattle.io is a multiplayer game where players fight each other with differe
 
 ## Special Thanks
 
-* Guru for helping make it less laggy
-* Mistik for networking base
-* Cool guy 53 (aka yocto) for maintaining the game late 2024
-* All the artists for bringing sb to life
+- Guru for helping make it less laggy
+- Mistik for networking base
+- Cool guy 53 (aka yocto) for maintaining the game late 2024
+- All the artists for bringing sb to life
 
 > Note: you are looking at the V2 version of the code. For the old V1 version, go to the [v1 repo](https://github.com/codergautam/swordbattle.io-legacy)
 
@@ -85,7 +84,7 @@ Play now at [swordbattle.io](http://swordbattle.io) and see the [leaderboard](ht
 
 ## Community
 
-* [Discord](https://discord.com/invite/BDG8AfkysZ)
+- [Discord](https://discord.com/invite/BDG8AfkysZ)
 
 ## Run Locally
 

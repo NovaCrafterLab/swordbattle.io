@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Account } from 'src/accounts/account.entity';
 
 @Entity({ name: 'daily_stats' })
@@ -10,7 +16,7 @@ export class DailyStats {
   @Column({ default: 0 }) xp: number;
 
   @Column({ default: 0 }) coins: number;
-  
+
   @Column({ default: 0 }) kills: number;
 
   @Column({ default: 0 }) ultimacy: number;
@@ -21,7 +27,7 @@ export class DailyStats {
 
   @Column({ default: 0 }) login_streak: number;
 
-  @ManyToOne(() => Account, account => account.daily_stats)
+  @ManyToOne(() => Account, (account) => account.daily_stats)
   @JoinColumn({ name: 'account_id' })
   account: Account;
 }

@@ -12,7 +12,7 @@ export type AccountState = {
   skins: { equipped: number; owned: number[] };
   is_v1: boolean;
   xp: number;
-}
+};
 
 const initialState: AccountState = {
   email: '',
@@ -31,7 +31,6 @@ const initialState: AccountState = {
 export const logoutAsync = createAsyncThunk(
   'account/logout',
   async (_, { dispatch }) => {
-
     try {
       console.log('Clearing secret');
       window.localStorage.removeItem('secret');
@@ -40,27 +39,35 @@ export const logoutAsync = createAsyncThunk(
     }
 
     dispatch(clearAccount());
-  }
+  },
 );
 
 export const updateAccountAsync = createAsyncThunk(
   'account/updateAccount',
   (_, { getState, dispatch }) => {
     return new Promise((resolve, reject) => {
-    const state: any = getState();
-    api.post(`${api.endpoint}/profile/getPrivateUserInfo`, {}, (response: any) => {
-    if (response.error) {
-      alert(response.error);
-      reject(response.error);
-    } else if (response.account) {
-      response.account.secret = state.account.secret;
-      dispatch(setAccount(response.account));
-      window.phaser_game?.events.emit('tokenUpdate', state.account.secret);
-      resolve(response.account);
-    }
-  }, state.account.secret);
-  });
-  }
+      const state: any = getState();
+      api.post(
+        `${api.endpoint}/profile/getPrivateUserInfo`,
+        {},
+        (response: any) => {
+          if (response.error) {
+            alert(response.error);
+            reject(response.error);
+          } else if (response.account) {
+            response.account.secret = state.account.secret;
+            dispatch(setAccount(response.account));
+            window.phaser_game?.events.emit(
+              'tokenUpdate',
+              state.account.secret,
+            );
+            resolve(response.account);
+          }
+        },
+        state.account.secret,
+      );
+    });
+  },
 );
 
 export const changeNameAsync = createAsyncThunk(
@@ -68,9 +75,12 @@ export const changeNameAsync = createAsyncThunk(
   async (newUsername: string, { getState, dispatch }) => {
     // const state: any = getState();
     try {
-      const response = await api.postAsync(`${api.endpoint}/auth/change-username?now=${Date.now()}`, {
-        newUsername
-      });
+      const response = await api.postAsync(
+        `${api.endpoint}/auth/change-username?now=${Date.now()}`,
+        {
+          newUsername,
+        },
+      );
 
       if (response.error) {
         alert(response.error);
@@ -85,7 +95,7 @@ export const changeNameAsync = createAsyncThunk(
       console.error(error);
       alert('An error occurred while changing the name.');
     }
-  }
+  },
 );
 
 export const changeClanAsync = createAsyncThunk(
@@ -93,9 +103,12 @@ export const changeClanAsync = createAsyncThunk(
   async (newClantag: string, { getState, dispatch }) => {
     // const state: any = getState();
     try {
-      const response = await api.postAsync(`${api.endpoint}/auth/change-clantag?now=${Date.now()}`, {
-        newClantag
-      });
+      const response = await api.postAsync(
+        `${api.endpoint}/auth/change-clantag?now=${Date.now()}`,
+        {
+          newClantag,
+        },
+      );
 
       if (response.error) {
         alert(response.error);
@@ -110,7 +123,7 @@ export const changeClanAsync = createAsyncThunk(
       console.error(error);
       alert('An error occurred while changing the clan tag.');
     }
-  }
+  },
 );
 
 const accountSlice = createSlice({
@@ -179,5 +192,6 @@ const accountSlice = createSlice({
   },
 });
 
-export const { setAccount, clearAccount, setName, setClantag, setSecret } = accountSlice.actions;
+export const { setAccount, clearAccount, setName, setClantag, setSecret } =
+  accountSlice.actions;
 export default accountSlice.reducer;

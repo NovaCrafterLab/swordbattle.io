@@ -2,13 +2,13 @@ const isDev = process.env.NODE_ENV === 'development';
 
 interface SettingType {
   name: string;
-  default: any,
+  default: any;
   type?: string;
   min?: number;
   max?: number;
   list?: any;
   onChange?: any;
-};
+}
 
 let isLoaded = false;
 
@@ -17,27 +17,27 @@ export const settingsList: Record<string, SettingType> = {
     name: 'Show skins swords in shop',
     type: 'toggle',
     default: false,
-    },
+  },
   coins: {
-      name: 'Use legacy coin images (requires reload)',
-      type: 'toggle',
-      default: false,
-      onChange: () => {
-        if (isLoaded) {
-          window.location.reload();
-        }
-      },
-      },
+    name: 'Use legacy coin images (requires reload)',
+    type: 'toggle',
+    default: false,
+    onChange: () => {
+      if (isLoaded) {
+        window.location.reload();
+      }
+    },
+  },
   loadskins: {
-      name: 'Refuse all skin loading attempts',
-      type: 'toggle',
-      default: false,
-      onChange: () => {
-        if (isLoaded) {
-          window.location.reload();
-        }
-      },
-      },
+    name: 'Refuse all skin loading attempts',
+    type: 'toggle',
+    default: false,
+    onChange: () => {
+      if (isLoaded) {
+        window.location.reload();
+      }
+    },
+  },
   useWebGL: {
     name: 'Use WebGL (requires reload)',
     type: 'toggle',
@@ -109,7 +109,7 @@ class SettingsManager {
           value = newValue;
           this.saveSetting(key, newValue);
         },
-      })
+      });
     }
 
     const savedSettings = this.get();
@@ -121,23 +121,23 @@ class SettingsManager {
 
   get() {
     let savedSettings: any = {};
-		try {
-			const data = JSON.parse(localStorage.getItem(this.key) as string);
-			// console.log('Loaded Settings', data);
+    try {
+      const data = JSON.parse(localStorage.getItem(this.key) as string);
+      // console.log('Loaded Settings', data);
       if (data) {
-				savedSettings = data;
-			}
-		} catch (e) {
-			console.warn('Corrupted Settings');
-			localStorage.removeItem(this.key);
-		}
-		return savedSettings;
+        savedSettings = data;
+      }
+    } catch (e) {
+      console.warn('Corrupted Settings');
+      localStorage.removeItem(this.key);
+    }
+    return savedSettings;
   }
 
   saveSetting(key: string, value: any) {
-		const savedSettings = this.get();
-		savedSettings[key] = value;
-		localStorage.setItem(this.key, JSON.stringify(savedSettings));
+    const savedSettings = this.get();
+    savedSettings[key] = value;
+    localStorage.setItem(this.key, JSON.stringify(savedSettings));
 
     // console.log('Saved Settings', savedSettings);
     if (settingsList[key].onChange) {

@@ -50,24 +50,31 @@ class Sword extends Entity {
   }
 
   canCollide(entity) {
-    return (this.isFlying || this.raiseAnimation)
-      && !this.collidedEntities.has(entity)
-      && this.player.depth === entity.depth;
+    return (
+      (this.isFlying || this.raiseAnimation) &&
+      !this.collidedEntities.has(entity) &&
+      this.player.depth === entity.depth
+    );
   }
 
   canSwing() {
-    return !this.isFlying
-      && this.player.inputs.isInputDown(Types.Input.SwordSwing)
-      && this.isAnimationFinished
-      && this.player.modifiers.invisible == false;
+    return (
+      !this.isFlying &&
+      this.player.inputs.isInputDown(Types.Input.SwordSwing) &&
+      this.isAnimationFinished &&
+      this.player.modifiers.invisible == false
+    );
   }
 
   canFly() {
     if (this.canSwing()) return false;
-    return !this.isFlying && !this.restrictFly
-      && this.player.inputs.isInputDown(Types.Input.SwordThrow)
-      && this.flyCooldownTime <= 0
-      && this.player.modifiers.invisible == false;
+    return (
+      !this.isFlying &&
+      !this.restrictFly &&
+      this.player.inputs.isInputDown(Types.Input.SwordThrow) &&
+      this.flyCooldownTime <= 0 &&
+      this.player.modifiers.invisible == false
+    );
   }
 
   stopFly() {
@@ -80,7 +87,8 @@ class Sword extends Entity {
     const state = super.createState();
     state.size = this.size;
     state.isFlying = this.isFlying;
-    state.abilityActive = this.player.evolutions.evolutionEffect.isAbilityActive;
+    state.abilityActive =
+      this.player.evolutions.evolutionEffect.isAbilityActive;
     state.skin = this.skin;
     return state;
   }
@@ -92,8 +100,10 @@ class Sword extends Entity {
 
     if (this.isFlying) {
       player.speed.multiplier *= this.playerSpeedBoost.value;
-      this.shape.x += this.flySpeed.value * Math.cos(this.shape.angle - Math.PI / 2);
-      this.shape.y += this.flySpeed.value * Math.sin(this.shape.angle - Math.PI / 2);
+      this.shape.x +=
+        this.flySpeed.value * Math.cos(this.shape.angle - Math.PI / 2);
+      this.shape.y +=
+        this.flySpeed.value * Math.sin(this.shape.angle - Math.PI / 2);
 
       this.flyTime += dt;
       if (this.flyTime >= this.flyDuration.value) {
@@ -145,7 +155,11 @@ class Sword extends Entity {
       this.player.inputs.inputUp(Types.Input.SwordThrow);
     }
 
-    if (!this.isAnimationFinished && !this.raiseAnimation && !this.player.inputs.isInputDown(Types.Input.SwordSwing)) {
+    if (
+      !this.isAnimationFinished &&
+      !this.raiseAnimation &&
+      !this.player.inputs.isInputDown(Types.Input.SwordSwing)
+    ) {
       this.decreaseAnimation = true;
       this.focusDamageMultiplier = 1;
       this.lastSwordSwing = Date.now();
@@ -184,19 +198,24 @@ class Sword extends Entity {
     if (entity === this.player) return;
     if (!this.canCollide(entity)) return;
 
-    const angle = Math.atan2(this.player.shape.y - entity.shape.y, this.player.shape.x - entity.shape.x);
-    let power = (this.knockback.value / (entity.knockbackResistance?.value || 1));
+    const angle = Math.atan2(
+      this.player.shape.y - entity.shape.y,
+      this.player.shape.x - entity.shape.x,
+    );
+    let power = this.knockback.value / (entity.knockbackResistance?.value || 1);
     power = Math.max(Math.min(power, 400), 100);
     const xComp = power * Math.cos(angle);
     const yComp = power * Math.sin(angle);
-    entity.velocity.x = -1*xComp;
-    entity.velocity.y =  -1*yComp;
-    if ((this.isFlying && !this.raiseAnimation && !this.decreaseAnimation) || 
-      (!this.isFlying && (this.raiseAnimation || this.decreaseAnimation))) {
+    entity.velocity.x = -1 * xComp;
+    entity.velocity.y = -1 * yComp;
+    if (
+      (this.isFlying && !this.raiseAnimation && !this.decreaseAnimation) ||
+      (!this.isFlying && (this.raiseAnimation || this.decreaseAnimation))
+    ) {
       entity.damaged(this.damage.value, this.player);
     }
 
-    if(this.player.modifiers.leech) {
+    if (this.player.modifiers.leech) {
       this.player.health.gain(this.damage.value * this.player.modifiers.leech);
     }
 
@@ -210,9 +229,9 @@ class Sword extends Entity {
         entity.flags.set(Types.Flags.PlayerDeath, true);
       } else {
         entity.flags.set(Types.Flags.Damaged, entity.id);
-        [...this.player.tamedEntities].forEach(wolf => {
+        [...this.player.tamedEntities].forEach((wolf) => {
           const wolfObj = this.game.entities.get(wolf);
-          if(wolfObj && !wolfObj.removed) {
+          if (wolfObj && !wolfObj.removed) {
             wolfObj.target = entity;
             wolfObj.angryTimer.renew();
           }
@@ -224,7 +243,13 @@ class Sword extends Entity {
   cleanup() {
     super.cleanup();
 
-    [this.damage, this.knockback, this.swingDuration, this.flySpeed, this.flyDuration].forEach(prop => prop.reset());
+    [
+      this.damage,
+      this.knockback,
+      this.swingDuration,
+      this.flySpeed,
+      this.flyDuration,
+    ].forEach((prop) => prop.reset());
   }
 }
 

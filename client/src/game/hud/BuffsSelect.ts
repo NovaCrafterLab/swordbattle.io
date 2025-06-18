@@ -25,12 +25,14 @@ class BuffsSelect extends HudComponent {
   initialize() {
     if (!this.hud.scene) return;
 
-    this.hideButton = this.hud.scene.add.text(10, 10, '', {
-      fontSize: 22,
-      fontStyle: 'bold',
-      stroke: '#000000',
-      strokeThickness: 4,
-    }).setOrigin(0)
+    this.hideButton = this.hud.scene.add
+      .text(10, 10, '', {
+        fontSize: 22,
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 4,
+      })
+      .setOrigin(0)
       .setInteractive()
       .on('pointerover', () => {
         this.game.add.tween({
@@ -50,16 +52,24 @@ class BuffsSelect extends HudComponent {
       })
       .on('pointerdown', () => this.toggleMinimize());
 
-    this.buffsContainer = this.hud.scene.add.container(-this.width, 40).setAlpha(0);
-    this.container = this.hud.scene.add.container(10, 10, [this.buffsContainer, this.hideButton]);
+    this.buffsContainer = this.hud.scene.add
+      .container(-this.width, 40)
+      .setAlpha(0);
+    this.container = this.hud.scene.add.container(10, 10, [
+      this.buffsContainer,
+      this.hideButton,
+    ]);
   }
 
   get height() {
     // Calculate height of the buffs and everything else
     let height = 0;
-    if(!this.minimized) {
-    height = (this.lineHeight+5) * Object.keys(this.game.gameState.self.entity!.buffs).length * this.scale;
-  }
+    if (!this.minimized) {
+      height =
+        (this.lineHeight + 5) *
+        Object.keys(this.game.gameState.self.entity!.buffs).length *
+        this.scale;
+    }
     return height + 10 + this.hideButton!.displayHeight;
   }
 
@@ -74,14 +84,16 @@ class BuffsSelect extends HudComponent {
     });
   }
 
-  resize() {
-  }
+  resize() {}
 
   selectBuff(type: any) {
     this.game.gameState.selectedBuff = type;
-    if(this.game.gameState?.self?.entity?.upgradePoints === 1 && !this.minimized) {
+    if (
+      this.game.gameState?.self?.entity?.upgradePoints === 1 &&
+      !this.minimized
+    ) {
       setTimeout(() => {
-      this.toggleMinimize();
+        this.toggleMinimize();
       }, 500);
     }
   }
@@ -99,8 +111,12 @@ class BuffsSelect extends HudComponent {
       if (!this.buffs[type]) {
         const config = buffsData[type];
         if (!config) continue;
-        const buffContainer = scene.add.container(0, i * (this.lineHeight + 10))
-          .setInteractive(new Phaser.Geom.Rectangle(0, 0, this.width, this.lineHeight), Phaser.Geom.Rectangle.Contains)
+        const buffContainer = scene.add
+          .container(0, i * (this.lineHeight + 10))
+          .setInteractive(
+            new Phaser.Geom.Rectangle(0, 0, this.width, this.lineHeight),
+            Phaser.Geom.Rectangle.Contains,
+          )
           .on('pointerover', () => {
             this.game.add.tween({
               targets: buffContainer,
@@ -122,18 +138,36 @@ class BuffsSelect extends HudComponent {
         // background
         const background = scene.add.graphics();
         background.fillStyle(0x111111, 0.5);
-        background.fillRoundedRect(0, 0, this.width, this.lineHeight, this.lineHeight / 2);
+        background.fillRoundedRect(
+          0,
+          0,
+          this.width,
+          this.lineHeight,
+          this.lineHeight / 2,
+        );
 
         // progress bar
         const progress = scene.add.graphics();
         progress.fillStyle(config[1], 1);
-        progress.fillRoundedRect(2, 2, this.width - 4, this.lineHeight - 4, this.lineHeight / 3);
+        progress.fillRoundedRect(
+          2,
+          2,
+          this.width - 4,
+          this.lineHeight - 4,
+          this.lineHeight / 3,
+        );
         this.buffsProgress[type] = progress;
 
         // steps
         const steps = scene.add.graphics();
         steps.lineStyle(2, 0x111111);
-        steps.strokeRoundedRect(0, 0, this.width, this.lineHeight, this.lineHeight / 2);
+        steps.strokeRoundedRect(
+          0,
+          0,
+          this.width,
+          this.lineHeight,
+          this.lineHeight / 2,
+        );
         for (let j = 1; j < buff.max; j++) {
           steps.lineBetween(step * j, 0, step * j, this.lineHeight);
         }

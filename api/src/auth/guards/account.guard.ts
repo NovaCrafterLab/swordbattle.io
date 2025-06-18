@@ -8,19 +8,19 @@ export interface AccountRequest extends Request {
 
 @Injectable()
 export class AccountGuard implements CanActivate {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const body = request.body;
     const secretKey = body.secret;
 
-    if(!secretKey) {
+    if (!secretKey) {
       return false;
     }
 
     const account = await this.authService.getAccountFromSecret(secretKey);
-    if(!account) {
+    if (!account) {
       return false;
     }
 

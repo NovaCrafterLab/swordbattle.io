@@ -19,7 +19,9 @@ class ChimeraMob extends BaseEntity {
     this.body = this.game.add.sprite(0, 0, 'chimera').setOrigin(0.5, 0.5);
     this.body.setScale(this.isAngry ? this.flyingScale : this.baseScale);
     this.healthBar = new Health(this, { offsetY: -this.shape.radius - 300 });
-    this.container = this.game.add.container(this.shape.x, this.shape.y, [this.body]);
+    this.container = this.game.add.container(this.shape.x, this.shape.y, [
+      this.body,
+    ]);
     return this.container;
   }
 

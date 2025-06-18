@@ -1,55 +1,56 @@
 const Types = require('../Types');
-const { swingDurationIncrease, maxSwingDuration } = require('../../config').sword;
+const { swingDurationIncrease, maxSwingDuration } =
+  require('../../config').sword;
 
 var levels = [
-  {'coins': 0, 'scale': 0},
-  {'coins': 5, 'scale': 1},
-{'coins': 15, 'scale': 2},
-{'coins': 25, 'scale': 4},
-{'coins': 50, 'scale': 8},
-{'coins': 75, 'scale': 10},
-{'coins': 100, 'scale': 11},
-{'coins': 200, 'scale': 12},
-{'coins': 300, 'scale': 13},
-{'coins': 400, 'scale': 15},
-{'coins': 500, 'scale': 20},
-{'coins': 700, 'scale': 21},
-{'coins': 900, 'scale': 23},
-{'coins': 1000, 'scale': 24},
-{'coins': 1500, 'scale': 27},
-{'coins': 2000, 'scale': 30},
-{'coins': 2500, 'scale': 31},
-{'coins': 3000, 'scale': 32},
-{'coins': 3500, 'scale': 34},
-{'coins': 4000, 'scale': 36},
-{'coins': 4500, 'scale': 36},
-{'coins': 5000, 'scale': 38},
-{'coins': 7500, 'scale': 40},
-{'coins': 9000, 'scale': 41},
-{'coins': 10000, 'scale': 42},
-{'coins': 15000, 'scale': 43},
-{'coins': 20000, 'scale': 44},
-{'coins': 30000, 'scale': 45},
-{'coins': 50000, 'scale': 46},
-{'coins': 75000, 'scale': 47},
-{'coins': 100000, 'scale': 48},
-{'coins': 150000, 'scale': 49},
-{'coins': 200000, 'scale': 49},
-{'coins': 300000, 'scale': 50},
-{'coins': 400000, 'scale': 51},
-{'coins': 500000, 'scale': 51},
-{'coins': 650000, 'scale': 52},
-{'coins': 800000, 'scale': 53},
-{'coins': 1000000, 'scale': 54},
-{'coins': 1500000, 'scale': 55},
-{'coins': 2000000, 'scale': 55}
+  { coins: 0, scale: 0 },
+  { coins: 5, scale: 1 },
+  { coins: 15, scale: 2 },
+  { coins: 25, scale: 4 },
+  { coins: 50, scale: 8 },
+  { coins: 75, scale: 10 },
+  { coins: 100, scale: 11 },
+  { coins: 200, scale: 12 },
+  { coins: 300, scale: 13 },
+  { coins: 400, scale: 15 },
+  { coins: 500, scale: 20 },
+  { coins: 700, scale: 21 },
+  { coins: 900, scale: 23 },
+  { coins: 1000, scale: 24 },
+  { coins: 1500, scale: 27 },
+  { coins: 2000, scale: 30 },
+  { coins: 2500, scale: 31 },
+  { coins: 3000, scale: 32 },
+  { coins: 3500, scale: 34 },
+  { coins: 4000, scale: 36 },
+  { coins: 4500, scale: 36 },
+  { coins: 5000, scale: 38 },
+  { coins: 7500, scale: 40 },
+  { coins: 9000, scale: 41 },
+  { coins: 10000, scale: 42 },
+  { coins: 15000, scale: 43 },
+  { coins: 20000, scale: 44 },
+  { coins: 30000, scale: 45 },
+  { coins: 50000, scale: 46 },
+  { coins: 75000, scale: 47 },
+  { coins: 100000, scale: 48 },
+  { coins: 150000, scale: 49 },
+  { coins: 200000, scale: 49 },
+  { coins: 300000, scale: 50 },
+  { coins: 400000, scale: 51 },
+  { coins: 500000, scale: 51 },
+  { coins: 650000, scale: 52 },
+  { coins: 800000, scale: 53 },
+  { coins: 1000000, scale: 54 },
+  { coins: 1500000, scale: 55 },
+  { coins: 2000000, scale: 55 },
 ];
 
 class LevelSystem {
   constructor(player) {
     this.player = player;
     this.level = 1;
-    this.maxLevel = levels.length-1;
+    this.maxLevel = levels.length - 1;
     this.coins = 0;
     this.previousLevelCoins = 0;
     this.nextLevelCoins = levels[this.level].coins;
@@ -86,7 +87,7 @@ class LevelSystem {
         max: 10,
         buyable: true,
       },
-    }
+    };
   }
 
   addCoins(coins) {
@@ -103,18 +104,18 @@ class LevelSystem {
     return this.upgradePoints > 0 && buff && buff.level < buff.max;
   }
 
-  addBuff(type, buy=true, cnt=1) {
-    for(let i=0; i<cnt; i++) {
-    if (!this.canBuff(type)) return;
-    if (buy && !this.buffs[type].buyable) return;
-    this.buffs[type].level += 1;
-    if(buy) this.upgradePoints -= 1;
+  addBuff(type, buy = true, cnt = 1) {
+    for (let i = 0; i < cnt; i++) {
+      if (!this.canBuff(type)) return;
+      if (buy && !this.buffs[type].buyable) return;
+      this.buffs[type].level += 1;
+      if (buy) this.upgradePoints -= 1;
 
-    // if health buff, increase current health
-    if (type === Types.Buff.Health) {
-      this.player.health.percent *= 1.25;
-      this.player.health.percent = Math.min(1, this.player.health.percent);
-    }
+      // if health buff, increase current health
+      if (type === Types.Buff.Health) {
+        this.player.health.percent *= 1.25;
+        this.player.health.percent = Math.min(1, this.player.health.percent);
+      }
     }
   }
 
@@ -141,19 +142,26 @@ class LevelSystem {
           break;
       }
     }
-    this.player.sword.swingDuration.multiplier['level'] = Math.min(maxSwingDuration, Math.max(1, swingDurationIncrease * (this.level-1)));
-    this.player.sword.knockback.multiplier['level'] = 1 + (this.buffs[Types.Buff.Size].level * 0.015);
+    this.player.sword.swingDuration.multiplier['level'] = Math.min(
+      maxSwingDuration,
+      Math.max(1, swingDurationIncrease * (this.level - 1)),
+    );
+    this.player.sword.knockback.multiplier['level'] =
+      1 + this.buffs[Types.Buff.Size].level * 0.015;
   }
 
   levelUp() {
     this.level += 1;
     this.previousLevelCoins = this.nextLevelCoins;
-    this.nextLevelCoins = levels[this.level] ? levels[this.level].coins : this.nextLevelCoins * 2.2;
+    this.nextLevelCoins = levels[this.level]
+      ? levels[this.level].coins
+      : this.nextLevelCoins * 2.2;
     this.upgradePoints += 1;
     this.player.evolutions.checkForEvolutions();
 
-    let sizeBuffsNeeded = levels[this.level].scale - levels[this.level-1].scale;
-    if(!sizeBuffsNeeded) sizeBuffsNeeded = 0;
+    let sizeBuffsNeeded =
+      levels[this.level].scale - levels[this.level - 1].scale;
+    if (!sizeBuffsNeeded) sizeBuffsNeeded = 0;
     this.addBuff(Types.Buff.Size, false, sizeBuffsNeeded);
   }
 }

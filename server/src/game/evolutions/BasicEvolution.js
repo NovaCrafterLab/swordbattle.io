@@ -37,8 +37,8 @@ class BasicEvolution extends Effect {
   }
 
   activateAbility() {
-    if(!this.canActivateAbility) return;
-    if(this.isAbilityActive) return;
+    if (!this.canActivateAbility) return;
+    if (this.isAbilityActive) return;
     this.abilityDurationTimer.renew();
     this.isAbilityActive = true;
   }
@@ -52,8 +52,7 @@ class BasicEvolution extends Effect {
     this.isAbilityActive = false;
   }
 
-  applyAbilityEffects() {
-  }
+  applyAbilityEffects() {}
 
   update(dt) {
     this.player.modifiers.invisible = false;

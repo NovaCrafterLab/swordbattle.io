@@ -9,7 +9,6 @@ import { config } from './config';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-
   app.use(cookieParser(config.appSecret));
   app.enableCors({
     origin: (origin, callback) => callback(null, true),
@@ -26,6 +25,8 @@ async function bootstrap() {
   app.useGlobalInterceptors(new ExcludeInterceptor());
 
   await app.listen(config.port);
-  console.log(`Server is running on: ${await app.getUrl()}\nProduction mode ${config.isProduction ? 'enabled' : 'disabled'}`);
+  console.log(
+    `Server is running on: ${await app.getUrl()}\nProduction mode ${config.isProduction ? 'enabled' : 'disabled'}`,
+  );
 }
 bootstrap();

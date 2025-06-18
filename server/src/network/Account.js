@@ -8,10 +8,10 @@ class Account {
 
   update(data) {
     Object.assign(this, data);
-    if(this.skins && typeof this.skins === 'string') {
+    if (this.skins && typeof this.skins === 'string') {
       try {
-      this.skins = JSON.parse(this.skins);
-      } catch(e) {
+        this.skins = JSON.parse(this.skins);
+      } catch (e) {
         console.error('Error parsing skins', e);
       }
     }

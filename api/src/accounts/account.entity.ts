@@ -1,4 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany, BeforeInsert, OneToOne, Generated } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  OneToMany,
+  BeforeInsert,
+  OneToOne,
+  Generated,
+} from 'typeorm';
 import { Exclude } from 'class-transformer';
 import * as bcrypt from 'bcrypt';
 import { Game } from 'src/games/games.entity';
@@ -16,7 +25,8 @@ export class Account {
   @Column({ default: '' }) clan: string;
 
   @Exclude()
-  @Column() password: string;
+  @Column()
+  password: string;
 
   @Column({ default: '' }) email: string;
 
@@ -32,19 +42,19 @@ export class Account {
 
   @Column({ default: 0 }) profile_views: number;
 
-  @Column({ nullable: true })  lastUsernameChange: Date;
-  @Column({ nullable: true })  lastClanChange: Date;
+  @Column({ nullable: true }) lastUsernameChange: Date;
+  @Column({ nullable: true }) lastClanChange: Date;
 
-  @OneToMany(() => Transaction, transaction => transaction.account)
+  @OneToMany(() => Transaction, (transaction) => transaction.account)
   transactions: Transaction[];
 
-  @OneToMany(() => DailyStats, stats => stats.account)
+  @OneToMany(() => DailyStats, (stats) => stats.account)
   daily_stats: DailyStats[];
 
-  @OneToOne(() => TotalStats, stats => stats.account)
+  @OneToOne(() => TotalStats, (stats) => stats.account)
   total_stats: TotalStats;
 
-  @OneToMany(() => Game, game => game.account)
+  @OneToMany(() => Game, (game) => game.account)
   games: Game[];
 
   @Column({ type: 'jsonb', default: '{"equipped": 1, "owned": [1]}' })

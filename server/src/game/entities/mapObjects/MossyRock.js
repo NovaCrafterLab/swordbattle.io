@@ -23,7 +23,8 @@ class MossyRock extends Entity {
   }
 
   processTargetsCollision(entity, response) {
-    if (entity.type === Types.Entity.Sword && !entity.canCollide(entity)) return;
+    if (entity.type === Types.Entity.Sword && !entity.canCollide(entity))
+      return;
 
     const selfWeight = this.weight;
     const targetWeight = entity.weight;
@@ -31,7 +32,7 @@ class MossyRock extends Entity {
 
     const mtv = this.shape.getCollisionOverlap(response);
     const selfMtv = mtv.clone().scale(targetWeight / totalWeight);
-    const targetMtv = mtv.clone().scale(selfWeight / totalWeight * -1);
+    const targetMtv = mtv.clone().scale((selfWeight / totalWeight) * -1);
 
     this.shape.applyCollision(selfMtv);
     entity.shape.applyCollision(targetMtv);

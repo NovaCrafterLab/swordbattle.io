@@ -31,4 +31,4 @@ module.exports = class Tank extends Evolution {
     this.player.health.regenWait.multiplier *= 0.8;
     //TODO: Damagecooldown: 1.1
   }
-}
+};

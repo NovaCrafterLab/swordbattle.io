@@ -10,12 +10,12 @@ function get(path, callback = (data) => {}) {
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': endpoint,
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
     },
   })
-  .then(res => res.json())
-  .then(callback)
-  .catch((err) => callback({ message: err }));
+    .then((res) => res.json())
+    .then(callback)
+    .catch((err) => callback({ message: err }));
 }
 
 function post(path, body, callback = (data) => {}) {
@@ -26,12 +26,12 @@ function post(path, body, callback = (data) => {}) {
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': endpoint,
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
     },
   })
-  .then(res => res.json())
-  .then(callback)
-  .catch((err) => callback({ message: err }));
+    .then((res) => res.json())
+    .then(callback)
+    .catch((err) => callback({ message: err }));
 }
 
 module.exports = { get, post };

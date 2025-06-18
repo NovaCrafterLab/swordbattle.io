@@ -1,6 +1,6 @@
 import { ShapeTypes } from '../Types';
 
-export type Point = { x: number, y: number };
+export type Point = { x: number; y: number };
 export type ShapeType = Shape | CircleShape | PolygonShape;
 
 export class Shape {
@@ -14,7 +14,7 @@ export class Shape {
     this.x = x;
     this.y = y;
   }
-  
+
   recalculateBounds() {}
 
   fillShape(graphics: Phaser.GameObjects.Graphics) {}
@@ -108,7 +108,7 @@ export class PolygonShape extends Shape {
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
-    
+
     for (const point of this.points) {
       if (minX > point.x) minX = point.x;
       else if (maxX < point.x) maxX = point.x;
@@ -122,7 +122,12 @@ export class PolygonShape extends Shape {
     minY += this.y;
     maxY += this.y;
 
-    this.polygonBounds = new Phaser.Geom.Rectangle(minX, minY, maxX - minX, maxY - minY);
+    this.polygonBounds = new Phaser.Geom.Rectangle(
+      minX,
+      minY,
+      maxX - minX,
+      maxY - minY,
+    );
     return this.bounds;
   }
 

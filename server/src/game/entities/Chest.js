@@ -7,7 +7,7 @@ const helpers = require('../../helpers');
 
 // size, coins, health, weight
 const rarities = [
-  [200, 50, 1, 75], 
+  [200, 50, 1, 75],
   [350, 150, 30, 13],
   [400, 250, 70, 6],
   [750, 750, 200, 4],
@@ -27,7 +27,7 @@ class Chest extends Entity {
     super(game, Types.Entity.Chest, objectData);
 
     let rand = helpers.randomInteger(0, totalWeight - 1);
-    this.rarity = rarities.findIndex(rarity => {
+    this.rarity = rarities.findIndex((rarity) => {
       rand -= rarity[3];
       return rand < 0;
     });
@@ -40,14 +40,14 @@ class Chest extends Entity {
     this.targets.push(Types.Entity.Sword);
 
     // Despawn coin after 20 minutes
-    this.despawnTime = Date.now() + (1000 * 60 * 20);
+    this.despawnTime = Date.now() + 1000 * 60 * 20;
 
     this.spawn();
   }
 
   update() {
     if (Date.now() > this.despawnTime) {
-      if(this.respawnable) this.createInstance();
+      if (this.respawnable) this.createInstance();
       this.remove();
     }
   }

@@ -10,7 +10,7 @@
   background-color: #333333;
   width: 100%;
   height: 100%;
-	transition: 500ms all ease-in-out;
+  transition: 500ms all ease-in-out;
 
   .loading-container {
     width: 400px;
@@ -19,7 +19,7 @@
     .loading-text {
       color: #ffffff;
       font-size: 45px;
-      margin-bottom: 10px
+      margin-bottom: 10px;
     }
 
     .progress-bar {

@@ -47,13 +47,21 @@ class Circle extends Shape {
 
   collides(shape, response) {
     if (shape.type === Types.Shape.Circle) {
-      return SAT.testCircleCircle(this.collisionPoly, shape.collisionPoly, response);
+      return SAT.testCircleCircle(
+        this.collisionPoly,
+        shape.collisionPoly,
+        response,
+      );
     }
     if (shape.type === Types.Shape.Polygon) {
       if (shape.isComplex) {
         return shape.collides(this, response);
       }
-      return SAT.testCirclePolygon(this.collisionPoly, shape.collisionPoly, response);
+      return SAT.testCirclePolygon(
+        this.collisionPoly,
+        shape.collisionPoly,
+        response,
+      );
     }
   }
 

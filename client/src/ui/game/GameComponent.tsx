@@ -12,7 +12,15 @@ declare global {
   }
 }
 
-function GameComponent({ onHome, onGameReady, onConnectionClosed, loggedIn, dimensions, game, setGame }: any) {
+function GameComponent({
+  onHome,
+  onGameReady,
+  onConnectionClosed,
+  loggedIn,
+  dimensions,
+  game,
+  setGame,
+}: any) {
   const [gameResults, setGameResults] = useState<any>(null);
   const [playing, setPlaying] = useState(false);
 
@@ -43,17 +51,29 @@ function GameComponent({ onHome, onGameReady, onConnectionClosed, loggedIn, dime
   return (
     <div className="game">
       <div id="phaser-container" />
-      { playing && <Leaderboard game={game} /> }
+      {playing && <Leaderboard game={game} />}
       {gameResults && (
-      <>
-      <GameResults
-        onHome={onHome}
-        game={game}
-        results={gameResults}
-        isLoggedIn={loggedIn}
-        adElement={<Ad screenW={dimensions.width} screenH={dimensions.height} types={[[728, 90], [970, 90], [970, 250]]} centerOnOverflow={600} horizThresh={0.2} />}
-      />
-      </>
+        <>
+          <GameResults
+            onHome={onHome}
+            game={game}
+            results={gameResults}
+            isLoggedIn={loggedIn}
+            adElement={
+              <Ad
+                screenW={dimensions.width}
+                screenH={dimensions.height}
+                types={[
+                  [728, 90],
+                  [970, 90],
+                  [970, 250],
+                ]}
+                centerOnOverflow={600}
+                horizThresh={0.2}
+              />
+            }
+          />
+        </>
       )}
     </div>
   );

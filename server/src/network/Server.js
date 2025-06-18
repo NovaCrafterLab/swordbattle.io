@@ -21,18 +21,27 @@ class Server {
       idleTimeout: 32,
       maxPayloadLength: 2048,
       upgrade: (res, req, context) => {
-
-        res.upgrade({ id: uuidv4(), ip: req.getHeader('x-forwarded-for') || req.getHeader('cf-connecting-ip') || '' },
+        res.upgrade(
+          {
+            id: uuidv4(),
+            ip:
+              req.getHeader('x-forwarded-for') ||
+              req.getHeader('cf-connecting-ip') ||
+              '',
+          },
           req.getHeader('sec-websocket-key'),
           req.getHeader('sec-websocket-protocol'),
-          req.getHeader('sec-websocket-extensions'), context,
+          req.getHeader('sec-websocket-extensions'),
+          context,
         );
       },
       open: (socket) => {
         const client = new Client(this.game, socket);
         if (getBannedIps().includes(client.ip)) {
           client.socket.close();
-          console.log(`Client ${client.id} (${client.ip}) tried to connect but is banned.`);
+          console.log(
+            `Client ${client.id} (${client.ip}) tried to connect but is banned.`,
+          );
           return;
         }
         this.addClient(client);
@@ -49,13 +58,12 @@ class Server {
           const client = this.clients.get(socket.id);
           client.isSocketClosed = true;
           if (client.player && !client.player.removed) {
-            client.player.remove()
+            client.player.remove();
           }
           this.removeClient(client);
           console.log(`Client disconnected with code ${code}.`);
-        } catch (e) {
-        }
-      }
+        } catch (e) {}
+      },
     });
   }
 
@@ -98,7 +106,7 @@ class Server {
     }
 
     this.game.endTick();
-    this.clients.forEach(client => client.cleanup());
+    this.clients.forEach((client) => client.cleanup());
 
     // calculate top entity types
     // const topEntityTypes = new Map();

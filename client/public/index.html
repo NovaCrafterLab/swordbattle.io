@@ -1,32 +1,43 @@
 <!-- client/public/index.html -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <!-- Phaser runtime -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"
-          integrity="sha512-YQL0GVx/Too3vZjBl9plePRIYsRnd1s8N6QOvXPdZ+JMH2mtRTLQXGUDGjNW6zr1HUgcOIury67IvWe91oeEwQ=="
-          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <head>
+    <!-- Phaser runtime -->
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"
+      integrity="sha512-YQL0GVx/Too3vZjBl9plePRIYsRnd1s8N6QOvXPdZ+JMH2mtRTLQXGUDGjNW6zr1HUgcOIury67IvWe91oeEwQ=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
 
-  <!-- Playlight discovery UI styles (safe to load in dev/prod) -->
-  <link rel="stylesheet" href="https://sdk.playlight.dev/playlight-sdk.css">
+    <!-- Playlight discovery UI styles (safe to load in dev/prod) -->
+    <link rel="stylesheet" href="https://sdk.playlight.dev/playlight-sdk.css" />
 
-  <!-- production-logic：负责 GA / Ads / Playlight，开发环境会自动跳过 -->
-  <script defer src="%PUBLIC_URL%/prod-logic.js"></script>
+    <!-- production-logic：负责 GA / Ads / Playlight，开发环境会自动跳过 -->
+    <script defer src="%PUBLIC_URL%/prod-logic.js"></script>
 
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
-  <meta name="theme-color" content="#000000" />
-  <meta name="description"
-        content="Swordbattle.io is an online sword fighting io game! Fight with friends and enemies in this multiplayer battle arena!" />
-  <meta name="keywords" content="IOGAME, swordbattle, codergautam, swordiogame, swordio" />
-  <meta property="og:image" content="/assets/game/player/sword.png" />
-  <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-  <title>Swordbattle.io</title>
-</head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,user-scalable=no"
+    />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Swordbattle.io is an online sword fighting io game! Fight with friends and enemies in this multiplayer battle arena!"
+    />
+    <meta
+      name="keywords"
+      content="IOGAME, swordbattle, codergautam, swordiogame, swordio"
+    />
+    <meta property="og:image" content="/assets/game/player/sword.png" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <title>Swordbattle.io</title>
+  </head>
 
-<body>
-  <noscript>You need to enable JavaScript to run this app.</noscript>
-  <div id="root"></div>
-  <div id="preroll"></div>
-</body>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <div id="preroll"></div>
+  </body>
 </html>

@@ -32,7 +32,10 @@ class State {
     let changed = false;
     for (const key in fields) {
       if (Array.isArray(fields[key])) {
-        if (!previousFields[key] || fields[key].length !== previousFields[key].length) {
+        if (
+          !previousFields[key] ||
+          fields[key].length !== previousFields[key].length
+        ) {
           changed = true;
         } else {
           for (let i = 0; i < fields[key].length; i++) {
@@ -67,12 +70,18 @@ class State {
     const changes = {};
     for (const key in fields) {
       if (Array.isArray(fields[key])) {
-        const subChanged = this.getChanges(fields[key], previousFields[key] || []);
+        const subChanged = this.getChanges(
+          fields[key],
+          previousFields[key] || [],
+        );
         if (Object.keys(subChanged).length) {
           changes[key] = fields[key];
         }
       } else if (typeof fields[key] === 'object') {
-        const subChanges = this.getChanges(fields[key], previousFields[key] || {});
+        const subChanges = this.getChanges(
+          fields[key],
+          previousFields[key] || {},
+        );
         if (Object.keys(subChanges).length) {
           changes[key] = subChanges;
         }

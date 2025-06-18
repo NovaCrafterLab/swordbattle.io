@@ -12,34 +12,56 @@ class SoundManager {
     this.game = game;
     this.manager = {
       [FlagTypes.EnemyHit]: new Sound(FlagTypes.EnemyHit, [
-        'HitEnemy/EnemyHit1.wav', 'HitEnemy/EnemyHit2.wav', 'HitEnemy/EnemyHit3.wav',
+        'HitEnemy/EnemyHit1.wav',
+        'HitEnemy/EnemyHit2.wav',
+        'HitEnemy/EnemyHit3.wav',
       ]),
       [FlagTypes.Damaged]: new Sound(FlagTypes.Damaged, [
-        'TakeDamage/TakeDamage1.wav', 'TakeDamage/TakeDamage2.wav', 'TakeDamage/TakeDamage3.wav',
+        'TakeDamage/TakeDamage1.wav',
+        'TakeDamage/TakeDamage2.wav',
+        'TakeDamage/TakeDamage3.wav',
       ]),
-      [FlagTypes.LavaDamaged]: new Sound(FlagTypes.LavaDamaged, [
-        'TakeDamage/LavaDamage.mp3',
-      ], 500),
-      [FlagTypes.GetCoin]: new Sound(FlagTypes.GetCoin, [
-        'GetCoin/GetCoin1.wav', 'GetCoin/GetCoin2.wav', 'GetCoin/GetCoin3.wav',
-      ], 50),
+      [FlagTypes.LavaDamaged]: new Sound(
+        FlagTypes.LavaDamaged,
+        ['TakeDamage/LavaDamage.mp3'],
+        500,
+      ),
+      [FlagTypes.GetCoin]: new Sound(
+        FlagTypes.GetCoin,
+        [
+          'GetCoin/GetCoin1.wav',
+          'GetCoin/GetCoin2.wav',
+          'GetCoin/GetCoin3.wav',
+        ],
+        50,
+      ),
       [FlagTypes.ChestHit]: new Sound(FlagTypes.ChestHit, [
-        'HitChest/HitChest1.wav', 'HitChest/HitChest2.wav', 'HitChest/HitChest3.wav',
+        'HitChest/HitChest1.wav',
+        'HitChest/HitChest2.wav',
+        'HitChest/HitChest3.wav',
       ]),
       [FlagTypes.ChestDestroy]: new Sound(FlagTypes.ChestDestroy, [
-        'ChestDestroy/ChestDestroy1.wav', 'ChestDestroy/ChestDestroy2.wav', 'ChestDestroy/ChestDestroy3.wav',
+        'ChestDestroy/ChestDestroy1.wav',
+        'ChestDestroy/ChestDestroy2.wav',
+        'ChestDestroy/ChestDestroy3.wav',
       ]),
       [FlagTypes.SwordSwing]: new Sound(FlagTypes.SwordSwing, [
         'SwordSwing/SwordSwing1.wav',
       ]),
       [FlagTypes.SwordThrow]: new Sound(FlagTypes.SwordThrow, [
-        'SwordThrow/SwordThrow1.wav', 'SwordThrow/SwordThrow2.wav', 'SwordThrow/SwordThrow3.wav',
+        'SwordThrow/SwordThrow1.wav',
+        'SwordThrow/SwordThrow2.wav',
+        'SwordThrow/SwordThrow3.wav',
       ]),
       [FlagTypes.PlayerKill]: new Sound(FlagTypes.PlayerKill, [
-        'PlayerKill/PlayerKill1.wav', 'PlayerKill/PlayerKill2.wav', 'PlayerKill/PlayerKill3.wav',
+        'PlayerKill/PlayerKill1.wav',
+        'PlayerKill/PlayerKill2.wav',
+        'PlayerKill/PlayerKill3.wav',
       ]),
       [FlagTypes.PlayerDeath]: new Sound(FlagTypes.PlayerDeath, [
-        'PlayerDeath/PlayerDeath1.wav', 'PlayerDeath/PlayerDeath2.wav', 'PlayerDeath/PlayerDeath3.wav',
+        'PlayerDeath/PlayerDeath1.wav',
+        'PlayerDeath/PlayerDeath2.wav',
+        'PlayerDeath/PlayerDeath3.wav',
       ]),
     };
   }

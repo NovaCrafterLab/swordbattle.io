@@ -13,7 +13,7 @@ class Biome {
   container: Phaser.GameObjects.TileSprite | null = null;
   type: BiomeTypes;
   shape: ShapeType;
-  viewportSize: { width: number, height: number };
+  viewportSize: { width: number; height: number };
   zIndex = -3;
   tileScale = 2;
 
@@ -36,11 +36,21 @@ class Biome {
   createSprite() {
     let texture = '';
     switch (this.type) {
-      case BiomeTypes.Fire: texture = 'fireTile'; break;
-      case BiomeTypes.Earth: texture = 'earthTile'; break;
-      case BiomeTypes.Ice: texture = 'iceTile'; break;
-      case BiomeTypes.River: texture = 'river'; break;
-      case BiomeTypes.Safezone: texture = 'safezone'; break;
+      case BiomeTypes.Fire:
+        texture = 'fireTile';
+        break;
+      case BiomeTypes.Earth:
+        texture = 'earthTile';
+        break;
+      case BiomeTypes.Ice:
+        texture = 'iceTile';
+        break;
+      case BiomeTypes.River:
+        texture = 'river';
+        break;
+      case BiomeTypes.Safezone:
+        texture = 'safezone';
+        break;
     }
 
     const graphics = this.scene.make.graphics();
@@ -48,12 +58,13 @@ class Biome {
     this.shape.fillShape(graphics);
     const mask = new Phaser.Display.Masks.GeometryMask(this.scene, graphics);
 
-    this.container = containers.pop()!
+    this.container = containers
+      .pop()!
       .setTexture(texture)
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(this.zIndex)
-      .setMask(mask)
+      .setMask(mask);
     this.resize();
   }
 
@@ -76,7 +87,8 @@ class Biome {
       this.container.setTileScale(camera.zoom * this.tileScale);
       this.container.setTilePosition(
         (camera.scrollX - camera.displayWidth / 2) / this.tileScale,
-        (camera.scrollY - camera.displayHeight / 2) / this.tileScale);
+        (camera.scrollY - camera.displayHeight / 2) / this.tileScale,
+      );
     }
   }
 }

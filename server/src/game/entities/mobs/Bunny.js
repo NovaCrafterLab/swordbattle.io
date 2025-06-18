@@ -50,14 +50,24 @@ class BunnyMob extends Entity {
       this.jumpTimer.renew();
 
       if (this.target) {
-        const angle = helpers.angle(this.target.shape.x, this.target.shape.y, this.shape.x, this.shape.y);
+        const angle = helpers.angle(
+          this.target.shape.x,
+          this.target.shape.y,
+          this.shape.x,
+          this.shape.y,
+        );
         this.angle = angle;
         this.speed.multiplier *= 2.5;
       } else {
         this.angle += helpers.random(-Math.PI, Math.PI) / 2;
       }
 
-      this.velocity.add(new SAT.Vector(this.speed.value * Math.cos(this.angle), this.speed.value * Math.sin(this.angle)));
+      this.velocity.add(
+        new SAT.Vector(
+          this.speed.value * Math.cos(this.angle),
+          this.speed.value * Math.sin(this.angle),
+        ),
+      );
     }
 
     this.velocity.scale(0.92);
@@ -72,7 +82,7 @@ class BunnyMob extends Entity {
 
     const mtv = this.shape.getCollisionOverlap(response);
     const selfMtv = mtv.clone().scale(targetWeight / totalWeight);
-    const targetMtv = mtv.clone().scale(selfWeight / totalWeight * -1);
+    const targetMtv = mtv.clone().scale((selfWeight / totalWeight) * -1);
 
     entity.shape.applyCollision(targetMtv);
     this.shape.applyCollision(selfMtv);

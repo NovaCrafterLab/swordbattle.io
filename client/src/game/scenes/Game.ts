@@ -10,7 +10,7 @@ import { Settings } from '../Settings';
 import { config } from '../../config';
 import { Controls } from '../Controls';
 import * as cosmetics from '../cosmetics.json';
-const {skins} = cosmetics;
+const { skins } = cosmetics;
 
 const publicPath = process.env.PUBLIC_URL as string;
 
@@ -25,15 +25,15 @@ export default class Game extends Phaser.Scene {
   zoom = 1;
   scaleZoom = 1;
 
-	constructor() {
-		super('game');
+  constructor() {
+    super('game');
     this.gameState = new GameState(this);
     this.soundManager = new SoundManager(this);
     this.controls = new Controls(this);
     this.hud = new HUD(this);
-	}
+  }
 
-	init() {
+  init() {
     this.gameState.initialize();
     this.game.canvas.oncontextmenu = (e) => e.preventDefault();
     this.isMobile = this.game.device.os.android || this.game.device.os.iOS;
@@ -65,13 +65,22 @@ export default class Game extends Phaser.Scene {
     this.load.image('lavaRock', publicPath + '/assets/game/Lava_Rock.png');
     this.load.image('lavaPool', publicPath + '/assets/game/Lava_Pool.png');
 
-    this.load.image('wolfMobPassive', publicPath + '/assets/game/mobs/wolfPassive.png');
-    this.load.image('wolfMobAggressive', publicPath + '/assets/game/mobs/wolfAggressive.png');
+    this.load.image(
+      'wolfMobPassive',
+      publicPath + '/assets/game/mobs/wolfPassive.png',
+    );
+    this.load.image(
+      'wolfMobAggressive',
+      publicPath + '/assets/game/mobs/wolfAggressive.png',
+    );
     this.load.image('catMobPassive', publicPath + '/assets/game/mobs/cat.png');
     this.load.image('bunny', publicPath + '/assets/game/mobs/bunny.png');
     this.load.image('moose', publicPath + '/assets/game/mobs/moose.png');
     this.load.image('fish', publicPath + '/assets/game/mobs/bluefish.png');
-    this.load.image('angryFish', publicPath + '/assets/game/mobs/angryfish.png');
+    this.load.image(
+      'angryFish',
+      publicPath + '/assets/game/mobs/angryfish.png',
+    );
     this.load.image('chimera', publicPath + '/assets/game/mobs/chimera.png');
     this.load.image('yeti', publicPath + '/assets/game/mobs/yeti.png');
     this.load.image('santa', publicPath + '/assets/game/mobs/santa.png');
@@ -93,34 +102,68 @@ export default class Game extends Phaser.Scene {
 
     // evols
     this.load.image('tankOverlay', publicPath + '/assets/game/player/tank.png');
-    this.load.image('berserkerOverlay', publicPath + '/assets/game/player/berserker.png');
-    this.load.image('vampireOverlay', publicPath + '/assets/game/player/vampire.png');
-    this.load.image('knightOverlay', publicPath + '/assets/game/player/knight.png');
-    this.load.image('samuraiOverlay', publicPath + '/assets/game/player/samurai.png');
+    this.load.image(
+      'berserkerOverlay',
+      publicPath + '/assets/game/player/berserker.png',
+    );
+    this.load.image(
+      'vampireOverlay',
+      publicPath + '/assets/game/player/vampire.png',
+    );
+    this.load.image(
+      'knightOverlay',
+      publicPath + '/assets/game/player/knight.png',
+    );
+    this.load.image(
+      'samuraiOverlay',
+      publicPath + '/assets/game/player/samurai.png',
+    );
     this.load.image('rookOverlay', publicPath + '/assets/game/player/rook.png');
-    this.load.image('stalkerOverlay', publicPath + '/assets/game/player/stalker.png');
+    this.load.image(
+      'stalkerOverlay',
+      publicPath + '/assets/game/player/stalker.png',
+    );
 
-    this.load.image('hitParticle', publicPath + '/assets/game/particles/hit.png');
-    this.load.image('starParticle', publicPath + '/assets/game/particles/star.png');
+    this.load.image(
+      'hitParticle',
+      publicPath + '/assets/game/particles/hit.png',
+    );
+    this.load.image(
+      'starParticle',
+      publicPath + '/assets/game/particles/star.png',
+    );
 
     this.load.image('chatButton', publicPath + '/assets/game/ui/chat.png');
     if (this.isMobile) {
-      this.load.image('abilityButton', publicPath + '/assets/game/ui/ability.png');
+      this.load.image(
+        'abilityButton',
+        publicPath + '/assets/game/ui/ability.png',
+      );
     } else {
-      this.load.image('abilityButton', publicPath + '/assets/game/ui/abilityText.png');
+      this.load.image(
+        'abilityButton',
+        publicPath + '/assets/game/ui/abilityText.png',
+      );
     }
-    this.load.image('swordThrowButton', publicPath + '/assets/game/ui/swordThrow.png');
+    this.load.image(
+      'swordThrowButton',
+      publicPath + '/assets/game/ui/swordThrow.png',
+    );
 
     // load skins
-    const basePath =  `${publicPath}/assets/game/player/`;
+    const basePath = `${publicPath}/assets/game/player/`;
     // for (const skin of Object.values(skins)) {
     //   this.load.image(skin.name+'Body', basePath + skin.bodyFileName);
     //   this.load.image(skin.name+'Sword', basePath + skin.swordFileName);
     // }
-    this.load.image(skins.player.name+'Body', basePath + skins.player.bodyFileName);
-    this.load.image(skins.player.name+'Sword', basePath + skins.player.swordFileName);
-
-
+    this.load.image(
+      skins.player.name + 'Body',
+      basePath + skins.player.bodyFileName,
+    );
+    this.load.image(
+      skins.player.name + 'Sword',
+      basePath + skins.player.swordFileName,
+    );
 
     this.load.plugin('rexVirtualJoystick', VirtualJoyStickPlugin, true);
 
@@ -130,7 +173,10 @@ export default class Game extends Phaser.Scene {
 
     // log progress on load
     this.load.on('progress', (value: number) => {
-      if(!this.isReady) window.dispatchEvent(new CustomEvent('assetsLoadProgress', { detail: value }));
+      if (!this.isReady)
+        window.dispatchEvent(
+          new CustomEvent('assetsLoadProgress', { detail: value }),
+        );
     });
   }
 
@@ -145,11 +191,13 @@ export default class Game extends Phaser.Scene {
 
     window.addEventListener('resize', () => this.resize());
     window.addEventListener('orientationchange', () => {
-      if (window.orientation === 0 || window.orientation === 180) { // Portrait
+      if (window.orientation === 0 || window.orientation === 180) {
+        // Portrait
         // if (this.scale.isFullscreen) {
         //   this.scale.startFullscreen();
         // }
-      } else { // Landscape
+      } else {
+        // Landscape
         // this.scale.startFullscreen();
       }
     });
@@ -175,7 +223,12 @@ export default class Game extends Phaser.Scene {
 
   updateZoom(zoom: number, duration = 1500) {
     this.zoom = zoom;
-    this.cameras.main.zoomTo(zoom * this.scaleZoom, duration, Phaser.Math.Easing.Cubic.InOut, true);
+    this.cameras.main.zoomTo(
+      zoom * this.scaleZoom,
+      duration,
+      Phaser.Math.Easing.Cubic.InOut,
+      true,
+    );
   }
 
   setScaleZoom(zoom: number) {
@@ -187,19 +240,28 @@ export default class Game extends Phaser.Scene {
     const camera = this.cameras.main;
     const sprite = entity.container;
     entity.following = false;
-    camera.pan(sprite.x, sprite.y, 1500, Phaser.Math.Easing.Cubic.InOut, true, (camera, progress) => {
-      if (progress === 1) {
-        entity.following = true;
-        camera.startFollow(sprite);
-        this.gameState.spectator.disable();
-      }
-    });
+    camera.pan(
+      sprite.x,
+      sprite.y,
+      1500,
+      Phaser.Math.Easing.Cubic.InOut,
+      true,
+      (camera, progress) => {
+        if (progress === 1) {
+          entity.following = true;
+          camera.startFollow(sprite);
+          this.gameState.spectator.disable();
+        }
+      },
+    );
   }
 
-	update(time: number, dt: number) {
+  update(time: number, dt: number) {
     if (!this.isReady) {
       this.isReady = true;
-      window.dispatchEvent(new CustomEvent('assetsLoadProgress', { detail: 1 }));
+      window.dispatchEvent(
+        new CustomEvent('assetsLoadProgress', { detail: 1 }),
+      );
       console.log('Game is ready');
     }
     this.soundManager.update(dt);

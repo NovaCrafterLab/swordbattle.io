@@ -12,8 +12,8 @@ module.exports = class Knight extends Evolution {
     this.player.sword.damage.multiplier *= 1.25;
     this.player.sword.knockback.multiplier['ability'] = 1.4;
     this.player.speed.multiplier *= 1.25;
-     this.player.sword.swingDuration.multiplier['ability'] = 0.7;
-     this.player.knockbackResistance.multiplier *= 1.3;
+    this.player.sword.swingDuration.multiplier['ability'] = 0.7;
+    this.player.knockbackResistance.multiplier *= 1.3;
   }
 
   update(dt) {
@@ -24,4 +24,4 @@ module.exports = class Knight extends Evolution {
     this.player.speed.multiplier *= 1.15;
     this.player.health.max.multiplier *= 0.9;
   }
-}
+};

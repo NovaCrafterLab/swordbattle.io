@@ -1,4 +1,4 @@
-version: "3.9"
+version: '3.9'
 
 ########################  SERVICES  ########################
 services:
@@ -7,17 +7,17 @@ services:
     image: postgres:16-alpine
     env_file: .env
     environment:
-      POSTGRES_USER:     ${DB_USERNAME}
+      POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB:       postgres
+      POSTGRES_DB: postgres
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME}']
       interval: 5s
       retries: 20
     restart: unless-stopped
-    networks: [ backnet ]
+    networks: [backnet]
 
   # ---------- REST API ----------
   api:
@@ -35,9 +35,9 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "8090:8080"
+      - '8090:8080'
     restart: unless-stopped
-    networks: [ backnet ]
+    networks: [backnet]
 
   # ---------- WebSocket Game Server ----------
   server:
@@ -55,9 +55,9 @@ services:
       api:
         condition: service_started
     ports:
-      - "8000:8000"
+      - '8000:8000'
     restart: unless-stopped
-    networks: [ backnet ]
+    networks: [backnet]
 
   # ---------- Frontend (Static Client) ----------
   client:
@@ -65,16 +65,16 @@ services:
       context: ./client
       target: runtime
       args:
-        REACT_APP_API:            ${REACT_APP_API}
-        REACT_APP_ENDPOINT_DEV:   ${REACT_APP_ENDPOINT_DEV}
-        REACT_APP_ENDPOINT_TEST:  ${REACT_APP_ENDPOINT_TEST}
+        REACT_APP_API: ${REACT_APP_API}
+        REACT_APP_ENDPOINT_DEV: ${REACT_APP_ENDPOINT_DEV}
+        REACT_APP_ENDPOINT_TEST: ${REACT_APP_ENDPOINT_TEST}
     env_file: .env
     ports:
-      - "3000:80"
+      - '3000:80'
     depends_on:
       - server
     restart: unless-stopped
-    networks: [ backnet ]
+    networks: [backnet]
 
 ########################  VOLUMES & NETWORKS  ########################
 volumes:

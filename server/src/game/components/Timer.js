@@ -7,7 +7,7 @@ class Timer {
     this.maxTime = maxTime === undefined ? minTime : maxTime;
     this.duration = helpers.random(this.minTime, this.maxTime);
     // Prevent NaN
-    if(isNaN(this.duration)) {
+    if (isNaN(this.duration)) {
       throw new Error(`Timer duration is NaN: ${this.duration}`);
     }
     this.finished = false;

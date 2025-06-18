@@ -13,7 +13,9 @@ class IdPool {
 
   give(id) {
     if (this.available.includes(id)) {
-      console.debug(`Warning: Duplicate id in the id pool: ${id}. Id pool size: ${this.available.length}`);
+      console.debug(
+        `Warning: Duplicate id in the id pool: ${id}. Id pool size: ${this.available.length}`,
+      );
     } else {
       this.available.unshift(id);
     }

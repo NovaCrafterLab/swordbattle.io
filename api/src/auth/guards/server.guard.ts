@@ -15,7 +15,7 @@ export class ServerGuard implements CanActivate {
 
     const secretKey = authHeader.split(' ')[1];
 
-    if(!secretKey || (secretKey !== config.serverSecret)) {
+    if (!secretKey || secretKey !== config.serverSecret) {
       return false;
     }
 

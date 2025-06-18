@@ -17,12 +17,13 @@ class Minimap extends HudComponent {
   minimized = false;
 
   initialize() {
-    this.toggleButton = this.hud.scene.add.text(this.width - 100, -25, 'Minimap', {
-      fontSize: 22,
-      fontStyle: 'bold',
-      stroke: '#000000',
-      strokeThickness: 4,
-    })
+    this.toggleButton = this.hud.scene.add
+      .text(this.width - 100, -25, 'Minimap', {
+        fontSize: 22,
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 4,
+      })
       .setInteractive()
       .on('pointerover', () => {
         this.game.add.tween({
@@ -32,24 +33,30 @@ class Minimap extends HudComponent {
           duration: 100,
         });
       })
-       .on('pointerout', () => {
+      .on('pointerout', () => {
         this.game.add.tween({
           targets: this.toggleButton,
           scaleX: 1,
           scaleY: 1,
           duration: 100,
         });
-       })
+      })
       .on('pointerdown', () => this.toggleMinimize());
 
-    this.mapBackground = this.game.add.graphics()
+    this.mapBackground = this.game.add.graphics();
     this.mapBackground.lineStyle(2, 0x96e398);
     this.mapBackground.strokeRect(0, 0, this.width, this.height);
 
     this.crown = this.game.add.sprite(0, 0, 'crown').setScale(0.3);
     this.graphics = this.game.add.graphics();
     this.mapContainer = this.game.add.container();
-    this.container = this.game.add.container(0, 0, [this.toggleButton, this.mapBackground, this.mapContainer, this.graphics, this.crown])
+    this.container = this.game.add.container(0, 0, [
+      this.toggleButton,
+      this.mapBackground,
+      this.mapContainer,
+      this.graphics,
+      this.crown,
+    ]);
     this.hud.add(this.container);
   }
 
@@ -57,7 +64,12 @@ class Minimap extends HudComponent {
     this.minimized = !this.minimized;
 
     this.hud.scene!.tweens.add({
-      targets: [this.mapBackground, this.mapContainer, this.graphics, this.crown],
+      targets: [
+        this.mapBackground,
+        this.mapContainer,
+        this.graphics,
+        this.crown,
+      ],
       alpha: this.minimized ? 0 : 1,
       duration: 250,
     });
@@ -71,8 +83,8 @@ class Minimap extends HudComponent {
   resize() {
     if (!this.container) return;
 
-    const x = this.game.scale.width - (this.width * this.scale) - 10;
-    const y = this.game.scale.height - (this.height * this.scale) - 10;
+    const x = this.game.scale.width - this.width * this.scale - 10;
+    const y = this.game.scale.height - this.height * this.scale - 10;
     this.container.setPosition(x, y);
   }
 
@@ -90,11 +102,21 @@ class Minimap extends HudComponent {
     for (const biome of map.biomes) {
       let color = 0x4854a2;
       switch (biome.type) {
-        case BiomeTypes.Fire: color = 0x9a2c13; break;
-        case BiomeTypes.Earth: color = 0x1aad41; break;
-        case BiomeTypes.Ice: color = 0xffffff; break;
-        case BiomeTypes.River: color = 0x4854a2; break;
-        case BiomeTypes.Safezone: color = 0x999999; break;
+        case BiomeTypes.Fire:
+          color = 0x9a2c13;
+          break;
+        case BiomeTypes.Earth:
+          color = 0x1aad41;
+          break;
+        case BiomeTypes.Ice:
+          color = 0xffffff;
+          break;
+        case BiomeTypes.River:
+          color = 0x4854a2;
+          break;
+        case BiomeTypes.Safezone:
+          color = 0x999999;
+          break;
       }
 
       const graphics = this.game.add.graphics();
@@ -126,8 +148,8 @@ class Minimap extends HudComponent {
 
       if (!entity.container) {
         try {
-        const sprite = entity.createSprite();
-        this.mapContainer?.add(sprite);
+          const sprite = entity.createSprite();
+          this.mapContainer?.add(sprite);
         } catch (e) {
           console.error('Failed to add mm entity', e);
         }
@@ -156,7 +178,7 @@ class Minimap extends HudComponent {
       graphics.fillCircle(playerX, playerY, player.shape.radius * scale);
       graphics.stroke();
 
-      if (!leader || (player.coins > leader.coins)) {
+      if (!leader || player.coins > leader.coins) {
         leader = player;
       }
     }

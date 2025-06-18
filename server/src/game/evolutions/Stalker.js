@@ -4,14 +4,14 @@ const Types = require('../Types');
 module.exports = class Stalker extends Evolution {
   static type = Types.Evolution.Stalker;
   static level = 25;
-  static previousEvol = "secret";
+  static previousEvol = 'secret';
   static abilityDuration = 6.5;
   static abilityCooldown = 72;
 
   applyAbilityEffects() {
     this.player.modifiers.invisible = true;
-      this.player.shape.setScale(0.01);
-      this.player.viewport.zoom.multiplier *= 0.01
+    this.player.shape.setScale(0.01);
+    this.player.viewport.zoom.multiplier *= 0.01;
 
     this.player.speed.multiplier *= 1.32;
 
@@ -32,4 +32,4 @@ module.exports = class Stalker extends Evolution {
     this.player.health.regenWait.multiplier = 0.5;
     this.player.health.regen.multiplier *= 0.5;
   }
-}
+};

@@ -68,40 +68,69 @@ export const EntityDepth: Record<any, number> = {
 
 export const GetEntityClass = (type: EntityTypes): typeof BaseEntity => {
   switch (type) {
-    case EntityTypes.Player: return Player;
-    case EntityTypes.Coin: return Coin;
-    case EntityTypes.House1: return House1;
-    case EntityTypes.Chest: return Chest;
-    case EntityTypes.Sword: return Sword;
+    case EntityTypes.Player:
+      return Player;
+    case EntityTypes.Coin:
+      return Coin;
+    case EntityTypes.House1:
+      return House1;
+    case EntityTypes.Chest:
+      return Chest;
+    case EntityTypes.Sword:
+      return Sword;
 
-    case EntityTypes.Wolf: return WolfMob;
-    case EntityTypes.Cat: return CatMob;
-    case EntityTypes.Bunny: return BunnyMob;
-    case EntityTypes.Moose: return MooseMob;
-    case EntityTypes.Fish: return FishMob;
-    case EntityTypes.AngryFish: return AngryFishMob;
-    case EntityTypes.Chimera: return ChimeraMob;
-    case EntityTypes.Yeti: return YetiMob;
-    case EntityTypes.Santa: return SantaMob;
-    case EntityTypes.Roku: return RokuMob;
-    case EntityTypes.Ancient: return AncientMob;
-    case EntityTypes.Fireball: return Fireball;
-    case EntityTypes.Boulder: return Boulder;
-    case EntityTypes.SwordProj: return SwordProj;
-    case EntityTypes.Snowball: return Snowball;
+    case EntityTypes.Wolf:
+      return WolfMob;
+    case EntityTypes.Cat:
+      return CatMob;
+    case EntityTypes.Bunny:
+      return BunnyMob;
+    case EntityTypes.Moose:
+      return MooseMob;
+    case EntityTypes.Fish:
+      return FishMob;
+    case EntityTypes.AngryFish:
+      return AngryFishMob;
+    case EntityTypes.Chimera:
+      return ChimeraMob;
+    case EntityTypes.Yeti:
+      return YetiMob;
+    case EntityTypes.Santa:
+      return SantaMob;
+    case EntityTypes.Roku:
+      return RokuMob;
+    case EntityTypes.Ancient:
+      return AncientMob;
+    case EntityTypes.Fireball:
+      return Fireball;
+    case EntityTypes.Boulder:
+      return Boulder;
+    case EntityTypes.SwordProj:
+      return SwordProj;
+    case EntityTypes.Snowball:
+      return Snowball;
 
-    case EntityTypes.Rock: return Rock;
-    case EntityTypes.Bush: return Bush;
-    case EntityTypes.Pond: return Pond;
-    case EntityTypes.MossyRock: return MossyRock;
-    case EntityTypes.IcePond: return IcePond;
-    case EntityTypes.IceMound: return IceMound;
-    case EntityTypes.IceSpike: return IceSpike;
-    case EntityTypes.LavaRock: return LavaRock;
-    case EntityTypes.LavaPool: return LavaPool;
+    case EntityTypes.Rock:
+      return Rock;
+    case EntityTypes.Bush:
+      return Bush;
+    case EntityTypes.Pond:
+      return Pond;
+    case EntityTypes.MossyRock:
+      return MossyRock;
+    case EntityTypes.IcePond:
+      return IcePond;
+    case EntityTypes.IceMound:
+      return IceMound;
+    case EntityTypes.IceSpike:
+      return IceSpike;
+    case EntityTypes.LavaRock:
+      return LavaRock;
+    case EntityTypes.LavaPool:
+      return LavaPool;
 
     default:
       console.trace('Unknown entity type: ', type);
       return BaseEntity;
   }
-}
+};

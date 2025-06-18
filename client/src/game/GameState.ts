@@ -21,7 +21,7 @@ class GameState {
   removedEntities: Set<any> = new Set();
   gameMap: GameMap;
   spectator: Spectator;
-  self: { id: number, entity?: Player } = { id: -1 };
+  self: { id: number; entity?: Player } = { id: -1 };
   lastLeaderboardUpdate: number = 0;
   leaderboardUpdateInterval: number = 1000;
   playerAngle: number = 0;
@@ -31,7 +31,7 @@ class GameState {
   disconnectReason = {
     code: 0,
     reason: '',
-  }
+  };
   name = '';
   tps = 0;
   ping = 0;
@@ -43,7 +43,7 @@ class GameState {
   chatMessage: string | null = null;
   captchaVerified = false;
   failedSkinLoads: Record<number, boolean> = {};
-  recentDeadPlayers: Record<number, { name: string, time: number }> = {};
+  recentDeadPlayers: Record<number, { name: string; time: number }> = {};
 
   constructor(game: Game) {
     this.game = game;
@@ -54,30 +54,34 @@ class GameState {
 
     this.debugMode = false;
     try {
-    this.debugMode = window.location.search.includes("debugAlertMode");
-      if(this.debugMode) {
-        alert("Debug alert mode activated");
+      this.debugMode = window.location.search.includes('debugAlertMode');
+      if (this.debugMode) {
+        alert('Debug alert mode activated');
       }
-    } catch(e) {}
-
+    } catch (e) {}
   }
 
   refreshSocket(unbind = false) {
     // unbind
-    if(unbind) {
-    this.socket.removeEventListener('open', this.onServerOpen.bind(this));
-    this.socket.removeEventListener('message', this.onServerMessage.bind(this));
-    this.socket.removeEventListener('close', this.onServerClose.bind(this));
+    if (unbind) {
+      this.socket.removeEventListener('open', this.onServerOpen.bind(this));
+      this.socket.removeEventListener(
+        'message',
+        this.onServerMessage.bind(this),
+      );
+      this.socket.removeEventListener('close', this.onServerClose.bind(this));
 
-    this.gameMap = new GameMap(this.game);
-    this.spectator = new Spectator(this.game);
+      this.gameMap = new GameMap(this.game);
+      this.spectator = new Spectator(this.game);
     }
     // rebind
-    console.time("getServer");
-    getServer().then(server => {
-      console.timeEnd("getServer");
-      if(this.debugMode) {
-        alert("Sending ws connection to "+server.address+" name "+server.name);
+    console.time('getServer');
+    getServer().then((server) => {
+      console.timeEnd('getServer');
+      if (this.debugMode) {
+        alert(
+          'Sending ws connection to ' + server.address + ' name ' + server.name,
+        );
       }
       console.log('connecting to', server.address, Date.now());
       this.socket = Socket.connect(
@@ -86,7 +90,7 @@ class GameState {
         this.onServerMessage.bind(this),
         this.onServerClose.bind(this),
       );
-    })
+    });
   }
 
   initialize() {
@@ -98,45 +102,46 @@ class GameState {
   }
 
   start(name: string) {
-
     const afterSent = () => {
-    if(!this.game.hud.buffsSelect.minimized) this.game.hud.buffsSelect.toggleMinimize();
-    }
+      if (!this.game.hud.buffsSelect.minimized)
+        this.game.hud.buffsSelect.toggleMinimize();
+    };
     Socket.emit({ play: true, name });
     afterSent();
   }
 
   restart() {
     Socket.emit({ play: true });
-    if(!this.game.hud.buffsSelect.minimized) this.game.hud.buffsSelect.toggleMinimize();
-    if(!this.game.hud.evolutionSelect.minimized) this.game.hud.evolutionSelect.toggleMinimize();
+    if (!this.game.hud.buffsSelect.minimized)
+      this.game.hud.buffsSelect.toggleMinimize();
+    if (!this.game.hud.evolutionSelect.minimized)
+      this.game.hud.evolutionSelect.toggleMinimize();
   }
 
   spectate() {
-    if(config.recaptchaClientKey && !this.captchaVerified) {
-    if(this.debugMode) alert("Attempting recaptcha");
+    if (config.recaptchaClientKey && !this.captchaVerified) {
+      if (this.debugMode) alert('Attempting recaptcha');
       const waitForRecaptcha = () => {
         if ((window as any).recaptcha) {
-            // reCAPTCHA is available, execute your code
-            if(this.debugMode) alert("Recaptcha available, executing");
-            // (window as any).recaptcha.execute(config.recaptchaClientKey, { action: 'spectate' }).then((captcha: any) => {
-                // if (this.debugMode) alert("Received captcha of length " + captcha.length + ", sending spectate");
-                this.captchaVerified = true;
-                Socket.emit({ spectate: true });
-            // });
+          // reCAPTCHA is available, execute your code
+          if (this.debugMode) alert('Recaptcha available, executing');
+          // (window as any).recaptcha.execute(config.recaptchaClientKey, { action: 'spectate' }).then((captcha: any) => {
+          // if (this.debugMode) alert("Received captcha of length " + captcha.length + ", sending spectate");
+          this.captchaVerified = true;
+          Socket.emit({ spectate: true });
+          // });
         } else {
-            // reCAPTCHA is not available, check again after 100ms
-            if(this.debugMode) alert("Recaptcha not available, waiting 100ms");
-            setTimeout(waitForRecaptcha, 100);
+          // reCAPTCHA is not available, check again after 100ms
+          if (this.debugMode) alert('Recaptcha not available, waiting 100ms');
+          setTimeout(waitForRecaptcha, 100);
         }
-    }
+      };
 
-    // Start the process
-    waitForRecaptcha();
-
+      // Start the process
+      waitForRecaptcha();
     } else {
-      if(this.debugMode) alert("Sending spectate w/o recaptcha");
-    Socket.emit({ spectate: true });
+      if (this.debugMode) alert('Sending spectate w/o recaptcha');
+      Socket.emit({ spectate: true });
     }
   }
 
@@ -154,7 +159,7 @@ class GameState {
     clearInterval(this.interval);
 
     let reason = event.reason || 'Connection failed';
-    if(endpoint) {
+    if (endpoint) {
       reason += ` (${endpoint})`;
     }
     this.game.game.events.emit('connectionClosed', reason);
@@ -166,8 +171,9 @@ class GameState {
       this.payloadsQueue.push(data);
     } else {
       if (this.payloadsQueue.length !== 0) {
-        this.payloadsQueue.forEach(msg => this.processServerMessage(msg));
-        if(this.debugMode) alert("Clearing payload queue of "+this.payloadsQueue.length);
+        this.payloadsQueue.forEach((msg) => this.processServerMessage(msg));
+        if (this.debugMode)
+          alert('Clearing payload queue of ' + this.payloadsQueue.length);
         this.payloadsQueue = [];
       }
       this.processServerMessage(data);
@@ -175,7 +181,7 @@ class GameState {
   }
 
   resize() {
-    this.gameMap.biomes.forEach(biome => biome.resize());
+    this.gameMap.biomes.forEach((biome) => biome.resize());
   }
 
   processServerMessage(data: any) {
@@ -187,7 +193,7 @@ class GameState {
     }
 
     if (data.fullSync) {
-      Object.values(this.entities).forEach(entity => entity.remove());
+      Object.values(this.entities).forEach((entity) => entity.remove());
       this.entities = {};
       this.self.id = data.selfId;
     }
@@ -202,12 +208,12 @@ class GameState {
 
       if (entityData.removed) {
         if (id === this.self.id) {
-          if(typeof entityData.disconnectReasonType !== "undefined") {
-          this.disconnectReason = {
-            reason: entityData.disconnectReasonMessage,
-            code: entityData.disconnectReasonType,
+          if (typeof entityData.disconnectReasonType !== 'undefined') {
+            this.disconnectReason = {
+              reason: entityData.disconnectReasonMessage,
+              code: entityData.disconnectReasonType,
+            };
           }
-        }
           this.showGameResults();
         }
         this.removeEntity(id, entityData);
@@ -248,7 +254,7 @@ class GameState {
 
       if (!this.isReady) {
         console.log('game ready', Date.now());
-        if(this.debugMode) alert("Game ready-- fullsync");
+        if (this.debugMode) alert('Game ready-- fullsync');
 
         this.isReady = true;
         this.game.game.events.emit('gameReady');
@@ -291,7 +297,7 @@ class GameState {
   }
 
   sendInputs() {
-    if(!this.self.entity?.following) return;
+    if (!this.self.entity?.following) return;
     const inputs = this.game.controls.getChanges();
 
     const data: any = {};
@@ -341,17 +347,22 @@ class GameState {
     if (entity.type === EntityTypes.Coin) {
       entity.removed = true;
       // entity.hunter = this.entities[data.hunterId];
-      entity.hunter = findCoinCollector(entity, Object.values(this.entities).filter((e: any) => e.type === EntityTypes.Player));
+      entity.hunter = findCoinCollector(
+        entity,
+        Object.values(this.entities).filter(
+          (e: any) => e.type === EntityTypes.Player,
+        ),
+      );
       this.removedEntities.add(entity);
     } else {
-      if(entity.type === EntityTypes.Player) {
+      if (entity.type === EntityTypes.Player) {
         this.recentDeadPlayers[id] = { name: entity.name, time: Date.now() };
-        if(Object.keys(this.recentDeadPlayers).length > 10) {
+        if (Object.keys(this.recentDeadPlayers).length > 10) {
           // delete the oldest
           let oldestTime = Infinity;
           let oldestId = 0;
-          for(const id in this.recentDeadPlayers) {
-            if(this.recentDeadPlayers[id].time < oldestTime) {
+          for (const id in this.recentDeadPlayers) {
+            if (this.recentDeadPlayers[id].time < oldestTime) {
               oldestTime = this.recentDeadPlayers[id].time;
               oldestId = Number(id);
             }
@@ -377,7 +388,9 @@ class GameState {
   }
 
   getPlayers() {
-    return Object.values(this.globalEntities).filter((e: any) => e.type === EntityTypes.Player);
+    return Object.values(this.globalEntities).filter(
+      (e: any) => e.type === EntityTypes.Player,
+    );
   }
 
   showGameResults() {

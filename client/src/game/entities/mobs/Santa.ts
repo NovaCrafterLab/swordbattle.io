@@ -20,7 +20,9 @@ class SantaMob extends BaseEntity {
       width: this.shape.radius * 3,
       height: this.shape.radius / 5,
     });
-    this.container = this.game.add.container(this.shape.x, this.shape.y, [this.body]);
+    this.container = this.game.add.container(this.shape.x, this.shape.y, [
+      this.body,
+    ]);
     return this.container;
   }
 }

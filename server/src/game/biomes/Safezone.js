@@ -12,7 +12,7 @@ class Safezone extends Biome {
   initialize(biomeData) {
     super.initialize(biomeData);
 
-    const step = Math.PI * 2 / this.bushesCount;
+    const step = (Math.PI * 2) / this.bushesCount;
     for (let i = 0; i < this.bushesCount; i++) {
       const angle = i * step;
       const size = 150 + Math.random() * 250;

@@ -28,11 +28,11 @@ export class AccountsController {
     const itemId = request.params.itemId;
     const type = request.params.type;
 
-    if(!['skins'].includes(type)) {
+    if (!['skins'].includes(type)) {
       return { error: 'Invalid type' };
     }
 
-    if(!itemId || isNaN(Number(itemId))) {
+    if (!itemId || isNaN(Number(itemId))) {
       return { error: 'Invalid item id' };
     }
 
@@ -47,7 +47,7 @@ export class AccountsController {
     const { token } = request.body;
     const id = request.account.id;
     const skinId = request.params.skinId;
-    if(!skinId || isNaN(Number(skinId))) {
+    if (!skinId || isNaN(Number(skinId))) {
       return { error: 'Invalid skin id' };
     }
     const skinIdNum = Number(skinId);
@@ -73,7 +73,10 @@ export class AccountsController {
   }
 
   @Post('getPublicUserInfo/:username')
-  async getAccount(@Param('username') username: string, @Req() request: Request) {
+  async getAccount(
+    @Param('username') username: string,
+    @Req() request: Request,
+  ) {
     const account = await this.accountsService.getByUsername(username);
     const totalStats = await this.statsService.getTotalStats(account);
     const dailyStats = await this.statsService.getAllDailyStats(account);

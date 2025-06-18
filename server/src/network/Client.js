@@ -13,7 +13,12 @@ class Client {
     // make sure to work for cf as well (headers['cf-connecting-ip'])
     // this.ip = String.fromCharCode.apply(null, new Uint8Array(socket.getRemoteAddressAsText()));
 
-    this.ip = socket.ip || String.fromCharCode.apply(null, new Uint8Array(socket.getRemoteAddressAsText()));
+    this.ip =
+      socket.ip ||
+      String.fromCharCode.apply(
+        null,
+        new Uint8Array(socket.getRemoteAddressAsText()),
+      );
 
     console.log(`Client ${this.id} connected from ${this.ip} at ${Date.now()}`);
     this.token = '';
@@ -31,12 +36,17 @@ class Client {
     this.pingTimer = 0;
     this.disconnectReason = {
       message: '',
-      type: 0
-    }
+      type: 0,
+    };
   }
 
   addMessage(message) {
-    if(message.hasOwnProperty("token") && message.token === '' && this.token !== '' && this.account !== null) {
+    if (
+      message.hasOwnProperty('token') &&
+      message.token === '' &&
+      this.token !== '' &&
+      this.account !== null
+    ) {
       this.token = '';
       this.account = null;
     }
@@ -53,7 +63,12 @@ class Client {
 
   send(data) {
     if (!data) return;
-    if(data.fullSync) console.log('sending fullsync to', this.player?.name ?? 'spectator', Date.now());
+    if (data.fullSync)
+      console.log(
+        'sending fullsync to',
+        this.player?.name ?? 'spectator',
+        Date.now(),
+      );
 
     const packet = Protocol.encode(data);
     if (!this.isSocketClosed) {
@@ -88,7 +103,11 @@ class Client {
     }
 
     this.isReady = false;
-    console.log('Client', this.id, 'authenticating with token POST /auth/verify');
+    console.log(
+      'Client',
+      this.id,
+      'authenticating with token POST /auth/verify',
+    );
     api.post('/auth/verify', { secret: this.token }, (data) => {
       if (data.account) {
         const username = data.account.username;
@@ -98,11 +117,10 @@ class Client {
           if (rankData.rank) {
             data.account.rank = rankData.rank;
           }
-        this.account.update(data.account);
-
+          this.account.update(data.account);
         });
       } else {
-        console.log("Failed to authenticate", data)
+        console.log('Failed to authenticate', data);
       }
       this.isReady = true;
     });
@@ -128,9 +146,11 @@ class Client {
   }
 
   shouldSaveGame(game) {
-    return game.playtime >= config.saveGame.playtime * 60
-      || game.kills >= config.saveGame.kills
-      || game.coins >= config.saveGame.coins;
+    return (
+      game.playtime >= config.saveGame.playtime * 60 ||
+      game.kills >= config.saveGame.kills ||
+      game.coins >= config.saveGame.coins
+    );
   }
 
   saveGame(game) {

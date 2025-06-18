@@ -23,14 +23,19 @@ class Stats extends HudComponent {
     this.tpsSprite = this.game.add.text(0, indent * 2, '', style);
     this.pingSprite = this.game.add.text(0, indent * 3, '', style);
 
-    this.container = this.game.add.container(0, 0, [this.playersSprite, this.fpsSprite, this.tpsSprite, this.pingSprite]);
+    this.container = this.game.add.container(0, 0, [
+      this.playersSprite,
+      this.fpsSprite,
+      this.tpsSprite,
+      this.pingSprite,
+    ]);
     this.hud.add(this.container);
   }
 
   resize() {
     if (!this.container) return;
     this.container.x = 10;
-    this.container.y = this.game.scale.height - (this.indent * 5) * this.scale;
+    this.container.y = this.game.scale.height - this.indent * 5 * this.scale;
   }
 
   update() {

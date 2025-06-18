@@ -44,7 +44,7 @@ class ComplexPolygon extends Shape {
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
-    
+
     for (const point of this.points) {
       if (minX > point.x) minX = point.x;
       else if (maxX < point.x) maxX = point.x;
@@ -92,7 +92,7 @@ class ComplexPolygon extends Shape {
       x: this.shapes[0].x,
       y: this.shapes[0].y,
       points: this.points,
-    }
+    };
   }
 }
 

@@ -1,7 +1,11 @@
 export class Sound {
   id: string;
   source: string[];
-  sounds: (Phaser.Sound.NoAudioSound | Phaser.Sound.HTML5AudioSound | Phaser.Sound.WebAudioSound)[] = [];
+  sounds: (
+    | Phaser.Sound.NoAudioSound
+    | Phaser.Sound.HTML5AudioSound
+    | Phaser.Sound.WebAudioSound
+  )[] = [];
   volume = 1;
   cooldown = 0;
   cooldownTime = 0;
@@ -22,9 +26,9 @@ export class Sound {
     const options = { volume: this.volume };
     for (let i = 0; i < this.source.length; i++) {
       try {
-      this.sounds.push(scene.sound.add(this.id + i.toString(), options));
-      } catch(e) {
-        console.log("Failed to initialize sound", e);
+        this.sounds.push(scene.sound.add(this.id + i.toString(), options));
+      } catch (e) {
+        console.log('Failed to initialize sound', e);
       }
     }
   }
@@ -38,7 +42,7 @@ export class Sound {
   }
 
   setVolume(volume: number) {
-    this.sounds.forEach(sound => sound.setVolume(volume));
+    this.sounds.forEach((sound) => sound.setVolume(volume));
   }
 
   update(dt: number) {

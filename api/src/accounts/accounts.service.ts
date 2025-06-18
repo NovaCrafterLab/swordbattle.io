@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, UnauthorizedException, Module } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+  Module,
+} from '@nestjs/common';
 import { InjectRepository, TypeOrmModule } from '@nestjs/typeorm';
 import { FindOneOptions, Repository } from 'typeorm';
 import { Account } from './account.entity';
@@ -12,17 +17,17 @@ import CacheObj from 'src/Cache';
 const usernameWaitTime = config.config.usernameWaitTime;
 const clanWaitTime = config.config.clanWaitTime;
 
-
 @Injectable()
 export class AccountsService {
-  private cosmeticCountsCache = new CacheObj<{ [key: number]: number }>(7200000) // 2 hours in milliseconds
+  private cosmeticCountsCache = new CacheObj<{ [key: number]: number }>(
+    7200000,
+  ); // 2 hours in milliseconds
 
   constructor(
     @InjectRepository(Account)
     private readonly accountsRepository: Repository<Account>,
     @InjectRepository(Transaction)
     private readonly transactionsRepository: Repository<Transaction>,
-
   ) {}
 
   async create(data: Partial<Account>) {
@@ -42,13 +47,17 @@ export class AccountsService {
     const queryBuilder = this.accountsRepository.createQueryBuilder('account');
 
     if (options.where.username) {
-        queryBuilder.where('LOWER(account.username) = LOWER(:username)', { username: options.where.username });
+      queryBuilder.where('LOWER(account.username) = LOWER(:username)', {
+        username: options.where.username,
+      });
     } else if (options.where.email) {
-        queryBuilder.where('LOWER(account.email) = LOWER(:email)', { email: options.where.email });
+      queryBuilder.where('LOWER(account.email) = LOWER(:email)', {
+        email: options.where.email,
+      });
     }
 
     return queryBuilder.getOne();
-}
+  }
 
   async getById(id: number) {
     const account = await this.findOne({ where: { id } });
@@ -79,9 +88,10 @@ export class AccountsService {
 
     // Iterate over each skinId and count occurrences in the database
     for (const skinId of skinIds) {
-      const countResult = await this.accountsRepository.createQueryBuilder()
-        .select("COUNT(*)", "count")
-        .where("skins @> :skinId", { skinId: `{"owned": [${skinId}]}` }) // Adjust the condition according to your database type and schema
+      const countResult = await this.accountsRepository
+        .createQueryBuilder()
+        .select('COUNT(*)', 'count')
+        .where('skins @> :skinId', { skinId: `{"owned": [${skinId}]}` }) // Adjust the condition according to your database type and schema
         .getRawOne();
 
       counts[skinId] = parseInt(countResult.count);
@@ -92,18 +102,20 @@ export class AccountsService {
 
   async equipSkin(userId: number, skinId: number) {
     // Fetch the user's current skin data
-    const user = await this.accountsRepository.findOne({ where: { id: userId } });
+    const user = await this.accountsRepository.findOne({
+      where: { id: userId },
+    });
     if (!user) {
       throw new Error('User not found');
     }
 
-    if(typeof skinId !== 'number') {
+    if (typeof skinId !== 'number') {
       return { error: 'Invalid skin id' };
     }
     // Parse the 'skins' data
     let skinsData;
     try {
-      skinsData = user.skins
+      skinsData = user.skins;
     } catch (e) {
       return { error: 'Failed to parse skins data' };
     }
@@ -114,7 +126,7 @@ export class AccountsService {
     }
 
     // Update the 'equipped' field
-    skinsData.equipped = skinId
+    skinsData.equipped = skinId;
 
     // Save the updated skins data back to the user's account
     user.skins = skinsData;
@@ -133,7 +145,7 @@ export class AccountsService {
     // Parse the 'skins' data
     let skinsData;
     try {
-      skinsData = user.skins
+      skinsData = user.skins;
     } catch (e) {
       return { error: 'Failed to parse skins data' };
     }
@@ -144,11 +156,12 @@ export class AccountsService {
     }
 
     // Check if the skin exists
-    const cosmetic: any = Object.values(cosmetics[type]).find((c: any) => c.id === itemId);
+    const cosmetic: any = Object.values(cosmetics[type]).find(
+      (c: any) => c.id === itemId,
+    );
     if (!cosmetic || !cosmetic.buyable) {
       return { error: 'Invalid skin id' };
     }
-
 
     // Check if the user has enough gems
     const skinPrice = cosmetic.price;
@@ -164,12 +177,12 @@ export class AccountsService {
 
     // Check if prerequisite skins are bought
     if (cosmetic.original) {
-        if (!skinsData.owned.includes(cosmetic.original)) {
-          return { error: 'You need to buy the original version of this skin first' };
-        }
+      if (!skinsData.owned.includes(cosmetic.original)) {
+        return {
+          error: 'You need to buy the original version of this skin first',
+        };
       }
-
-
+    }
 
     // Update the 'owned' field
     skinsData.owned.push(itemId);
@@ -192,19 +205,19 @@ export class AccountsService {
       const transaction = this.transactionsRepository.create({
         account: user,
         amount: skinPrice,
-        description: "buy-" + type + "-" + itemId,
-        transaction_id: "gems",
+        description: 'buy-' + type + '-' + itemId,
+        transaction_id: 'gems',
       });
 
       await this.transactionsRepository.save(transaction);
 
-       return { success: true };
+      return { success: true };
     } else {
       const transaction = this.transactionsRepository.create({
         account: user,
         amount: -skinPrice,
-        description: "buy-" + type + "-" + itemId,
-        transaction_id: "gems",
+        description: 'buy-' + type + '-' + itemId,
+        transaction_id: 'gems',
       });
 
       await this.transactionsRepository.save(transaction);
@@ -213,8 +226,8 @@ export class AccountsService {
     }
   }
 
-  async addGems(account: Account, gems: number, reason = "server") {
-    if(gems === 0) return account;
+  async addGems(account: Account, gems: number, reason = 'server') {
+    if (gems === 0) return account;
     account.gems += gems;
     await this.accountsRepository.save(account);
     // add to transactions table
@@ -222,15 +235,15 @@ export class AccountsService {
       account: account,
       amount: gems,
       description: reason,
-      transaction_id: "gems",
+      transaction_id: 'gems',
     });
     await this.transactionsRepository.save(transaction);
 
     return account;
   }
 
-  async addUltimacy(account: Account, ultimacy: number, reason = "server") {
-    if(ultimacy === 0) return account;
+  async addUltimacy(account: Account, ultimacy: number, reason = 'server') {
+    if (ultimacy === 0) return account;
     account.ultimacy += ultimacy;
     await this.accountsRepository.save(account);
     // add to transactions table
@@ -238,7 +251,7 @@ export class AccountsService {
       account: account,
       amount: ultimacy,
       description: reason,
-      transaction_id: "ultimacy",
+      transaction_id: 'ultimacy',
     });
     await this.transactionsRepository.save(transaction);
 
@@ -246,7 +259,7 @@ export class AccountsService {
   }
 
   async addXp(account: Account, xp: number) {
-    if(xp === 0) return account;
+    if (xp === 0) return account;
     account.xp += xp;
     await this.accountsRepository.save(account);
     return account;
@@ -271,8 +284,8 @@ export class AccountsService {
 
   async changeClantag(id: number, clantag: string) {
     // validate clantag
-    if(validateClantag(clantag)) {
-      return {error: validateClantag(clantag)};
+    if (validateClantag(clantag)) {
+      return { error: validateClantag(clantag) };
     }
     const account = await this.getById(id);
 
@@ -281,7 +294,6 @@ export class AccountsService {
     const lastClanChange = new Date(account.lastClanChange);
     const diff = now.getTime() - lastClanChange.getTime();
     if (diff < clanWaitTime) {
-
       // Human readable error time left (seconds, hours, days)
       let human = '';
       const seconds = Math.ceil((clanWaitTime - diff) / 1000);
@@ -295,29 +307,31 @@ export class AccountsService {
         human = Math.ceil(seconds / 86400) + ' days';
       }
 
-     return {error: 'You can change your clan again in ' + human};
+      return { error: 'You can change your clan again in ' + human };
     }
 
     account.clan = clantag.toUpperCase();
     account.lastClanChange = new Date();
     try {
-    await this.accountsRepository.save(account);
-    return {success: true};
-    } catch(e) {
-      return {error: 'Failed to update clan, '+ e.message};
+      await this.accountsRepository.save(account);
+      return { success: true };
+    } catch (e) {
+      return { error: 'Failed to update clan, ' + e.message };
     }
   }
 
   async changeUsername(id: number, username: string) {
     // validate username
-    if(validateUsername(username)) {
-      return {error: validateUsername(username)};
+    if (validateUsername(username)) {
+      return { error: validateUsername(username) };
     }
     const account = await this.getById(id);
     // Make sure the username is not taken
-    const existingAccount = await this.findOneWithLowercase({ where: { username } });
+    const existingAccount = await this.findOneWithLowercase({
+      where: { username },
+    });
     if (existingAccount) {
-      return {error: 'Username already taken'};
+      return { error: 'Username already taken' };
     }
 
     // Make sure the username is not changed too often
@@ -325,7 +339,6 @@ export class AccountsService {
     const lastUsernameChange = new Date(account.lastUsernameChange);
     const diff = now.getTime() - lastUsernameChange.getTime();
     if (diff < usernameWaitTime) {
-
       // Human readable error time left (seconds, hours, days)
       let human = '';
       const seconds = Math.ceil((usernameWaitTime - diff) / 1000);
@@ -339,16 +352,16 @@ export class AccountsService {
         human = Math.ceil(seconds / 86400) + ' days';
       }
 
-     return {error: 'You can change your name again in ' + human};
+      return { error: 'You can change your name again in ' + human };
     }
 
     account.username = username;
     account.lastUsernameChange = new Date();
     try {
-    await this.accountsRepository.save(account);
-    return {success: true};
-    } catch(e) {
-      return {error: 'Failed to update name, '+ e.message};
+      await this.accountsRepository.save(account);
+      return { success: true };
+    } catch (e) {
+      return { error: 'Failed to update name, ' + e.message };
     }
   }
 

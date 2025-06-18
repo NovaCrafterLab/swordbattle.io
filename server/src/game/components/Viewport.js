@@ -14,7 +14,8 @@ class Viewport {
     return {
       x: this.entity.shape.x - width / 2,
       y: this.entity.shape.y - height / 2,
-      width, height,
+      width,
+      height,
     };
   }
 }

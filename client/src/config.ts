@@ -18,8 +18,12 @@ interface Config {
 export const config: Config = {
   basename: process.env.REACT_APP_BASENAME || '',
   isDev: process.env.NODE_ENV === 'development',
-  
-  serverDev: process.env.REACT_APP_ENDPOINT_DEV || (window.location.hostname.includes('replit.dev') ? (window.location.hostname + ":8008") : (window.location.hostname + ":8000")),
+
+  serverDev:
+    process.env.REACT_APP_ENDPOINT_DEV ||
+    (window.location.hostname.includes('replit.dev')
+      ? window.location.hostname + ':8008'
+      : window.location.hostname + ':8000'),
   serverEU: process.env.REACT_APP_ENDPOINT_EU || '',
   serverUS: process.env.REACT_APP_ENDPOINT_US || '',
   serverUSBackup: process.env.REACT_APP_ENDPOINT_US_BACKUP || '',
@@ -31,5 +35,5 @@ export const config: Config = {
   apiEndpointBackup: process.env.REACT_APP_API_BACKUP,
   recaptchaClientKey: process.env.REACT_APP_RECAPTCHA_CLIENT_KEY || '',
   viewportSize: 1400,
-  cursorUrl: "cursor: url(/assets/img/cursor.cur) 20 20, crosshair;"
+  cursorUrl: 'cursor: url(/assets/img/cursor.cur) 20 20, crosshair;',
 };

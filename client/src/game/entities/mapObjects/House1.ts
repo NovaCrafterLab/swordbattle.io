@@ -8,13 +8,20 @@ class House1 extends BaseEntity {
   isRoofTransparent: boolean = false;
 
   createSprite() {
-    this.houseSprite = this.game.add.sprite(0, 0, 'house1').setOrigin(0).setDepth(1);
-    this.roofSprite = this.game.add.sprite(0, 0, 'house1roof').setOrigin(0).setDepth(50);
+    this.houseSprite = this.game.add
+      .sprite(0, 0, 'house1')
+      .setOrigin(0)
+      .setDepth(1);
+    this.roofSprite = this.game.add
+      .sprite(0, 0, 'house1roof')
+      .setOrigin(0)
+      .setDepth(50);
 
     this.houseSprite.x = this.roofSprite.x = this.shape.x;
     this.houseSprite.y = this.roofSprite.y = this.shape.y;
     this.houseSprite.displayWidth = this.roofSprite.displayWidth = this.width;
-    this.houseSprite.displayHeight = this.roofSprite.displayHeight = this.height;
+    this.houseSprite.displayHeight = this.roofSprite.displayHeight =
+      this.height;
 
     this.container = this.game.add.container(this.shape.x, this.shape.y, []);
   }

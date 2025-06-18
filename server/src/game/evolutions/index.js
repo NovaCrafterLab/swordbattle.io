@@ -28,7 +28,10 @@ class EvolutionSystem {
     // Wait for player select previous tier evols
 
     for (const evolution in evolutions) {
-      if (!this.skippedEvols.has(evolution) && this.checkRequirements(evolution)) {
+      if (
+        !this.skippedEvols.has(evolution) &&
+        this.checkRequirements(evolution)
+      ) {
         this.possibleEvols.add(evolution);
       }
     }
@@ -36,10 +39,15 @@ class EvolutionSystem {
 
   checkRequirements(evolution) {
     const Evol = evolutions[evolution];
-    return Evol && Evol.level <= this.player.levels.level
-      && (Evol.biomes.length === 0 || Evol.biomes.includes(this.player.biome))
-      && evolutions[this.evolution].level < Evol.level
-      && (Evol.previousEvol === undefined || this.evolution === Evol.previousEvol || (Evol.previousEvol === "secret" && this.evolution === 0));
+    return (
+      Evol &&
+      Evol.level <= this.player.levels.level &&
+      (Evol.biomes.length === 0 || Evol.biomes.includes(this.player.biome)) &&
+      evolutions[this.evolution].level < Evol.level &&
+      (Evol.previousEvol === undefined ||
+        this.evolution === Evol.previousEvol ||
+        (Evol.previousEvol === 'secret' && this.evolution === 0))
+    );
   }
 
   upgrade(evol) {
@@ -51,7 +59,7 @@ class EvolutionSystem {
     this.evolution = Evolution.type;
     this.player.effects.set('evolution', this.evolutionEffect);
 
-    this.possibleEvols.forEach(type => this.skippedEvols.add(type));
+    this.possibleEvols.forEach((type) => this.skippedEvols.add(type));
     this.possibleEvols.clear();
     this.checkForEvolutions();
   }

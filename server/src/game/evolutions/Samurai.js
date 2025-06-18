@@ -32,4 +32,4 @@ module.exports = class Samurai extends Evolution {
     this.player.health.regenWait.multiplier *= 1;
     //TODO: Damagecooldown: 1.1
   }
-}
+};

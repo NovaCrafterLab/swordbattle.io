@@ -11,20 +11,24 @@ interface Server {
   realPlayersCnt?: number;
 }
 
-
 let debugMode = false;
 try {
-  debugMode = window.location.search.includes("debugAlertMode");
-  } catch(e) {}
+  debugMode = window.location.search.includes('debugAlertMode');
+} catch (e) {}
 
 const servers: Server[] = [
-  { value: 'test', name: 'TEST', address: config.serverTest, ping: 0 }
+  { value: 'test', name: 'TEST', address: config.serverTest, ping: 0 },
   // { value: 'eu', name: 'Europe', address: config.serverEU, ping: 0 },
   // { value: 'us', name: 'USA', address: config.serverUS, ping: 0 },
   // { value: 'usbackup', name: 'USA Unblocked', address: config.serverUSBackup, ping: 0 },
 ];
 if (config.isDev) {
-  servers.unshift({ value: 'dev', name: 'Development', address: config.serverDev, ping: 0 });
+  servers.unshift({
+    value: 'dev',
+    name: 'Development',
+    address: config.serverDev,
+    ping: 0,
+  });
 }
 
 let lastPingUpdate = 0;
@@ -34,7 +38,7 @@ export async function updatePing() {
   const cache: Record<string, Server> = {};
   // Wait if update is already in progress
   while (isUpdating) {
-    await new Promise(resolve => setTimeout(resolve, 10)); // Wait for 10ms before checking again
+    await new Promise((resolve) => setTimeout(resolve, 10)); // Wait for 10ms before checking again
   }
 
   if (Date.now() - lastPingUpdate < 60000) {
@@ -49,7 +53,10 @@ export async function updatePing() {
       // instead lets do it at the same time
       // const promises = servers.map((server2) => {
       const start = Date.now();
-      if (!server.address || (!config.isDev && server.address.includes('localhost'))) {
+      if (
+        !server.address ||
+        (!config.isDev && server.address.includes('localhost'))
+      ) {
         server.offline = true;
         server.ping = Infinity;
       } else {
@@ -59,25 +66,26 @@ export async function updatePing() {
           server.playerCnt = cache[server.address].realPlayersCnt;
         } else {
           try {
-            const data = await fetch(`${window.location.protocol}//${server.address}/serverinfo?${Date.now()}`, {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'text/plain',
+            const data = await fetch(
+              `${window.location.protocol}//${server.address}/serverinfo?${Date.now()}`,
+              {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'text/plain',
+                },
               },
-            })
+            );
             try {
-              const json = await data.json()
+              const json = await data.json();
               server.offline = false;
               server.ping = Date.now() - start;
               server.playerCnt = json.realPlayersCnt;
               cache[server.address] = server;
             } catch (e) {
-
               server.offline = true;
               server.ping = Infinity;
               cache[server.address] = server;
             }
-
           } catch (e) {
             server.offline = true;
             server.ping = Infinity;
@@ -86,8 +94,6 @@ export async function updatePing() {
         }
       }
     }
-
-
   } finally {
     isUpdating = false; // Reset flag whether update is successful or not
   }
@@ -96,21 +102,23 @@ export async function updatePing() {
 }
 
 export async function getServerList() {
-  console.time('updatePingServerList')
+  console.time('updatePingServerList');
   await updatePing();
-  console.timeEnd('updatePingServerList')
+  console.timeEnd('updatePingServerList');
   const autoServer = getAutoServer();
-  const list = [{
-    ...autoServer,
-    value: 'auto',
-    name: `AUTO (${autoServer.name})`
-  }, ...servers];
+  const list = [
+    {
+      ...autoServer,
+      value: 'auto',
+      name: `AUTO (${autoServer.name})`,
+    },
+    ...servers,
+  ];
 
   return list;
 }
 
 function getAutoServer(): Server {
-
   let server: Server = servers[0];
 
   // pick server with lowest ping
@@ -120,17 +128,19 @@ function getAutoServer(): Server {
     }
   }
 
-  if(server.offline) {
-    alert('All servers are offline or blocked. Please try again in 5-10 mins. If not fixed, please report to support@swordbattle.io');
+  if (server.offline) {
+    alert(
+      'All servers are offline or blocked. Please try again in 5-10 mins. If not fixed, please report to support@swordbattle.io',
+    );
   }
 
   return server;
 }
 
 export async function getServer(): Promise<Server> {
-  console.time('updatePingServer')
+  console.time('updatePingServer');
   await updatePing();
-  console.timeEnd('updatePingServer')
+  console.timeEnd('updatePingServer');
   let server: Server = getAutoServer();
 
   if (Settings.server === 'auto') {
@@ -144,9 +154,14 @@ export async function getServer(): Promise<Server> {
       break;
     }
   }
-  if(Settings.server !== server.value) {
-    if(debugMode) {
-      alert('changed server to ' + server.value+ ' because the previous one was offline, previous server: ' + Settings.server)
+  if (Settings.server !== server.value) {
+    if (debugMode) {
+      alert(
+        'changed server to ' +
+          server.value +
+          ' because the previous one was offline, previous server: ' +
+          Settings.server,
+      );
     }
     Settings.server = server.value;
     window.location.reload();

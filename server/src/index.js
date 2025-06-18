@@ -5,7 +5,7 @@ const Game = require('./game/Game');
 const Loop = require('./utilities/Loop');
 const Server = require('./network/Server');
 const config = require('./config');
-const {initModeration} = require('./moderation');
+const { initModeration } = require('./moderation');
 const { writeHeapSnapshot } = require('node:v8');
 const fs = require('fs');
 const util = require('util');
@@ -85,12 +85,15 @@ function start() {
     setCorsHeaders(res);
     res.writeHeader('Content-Type', 'application/json');
     res.writeStatus('200 OK');
-    res.end(JSON.stringify({
-      tps: game.tps,
-      entityCnt: game.entities.size,
-      playerCnt: game.players.size,
-      realPlayersCnt: [...game.players.values()].filter(p => !p.isBot).length,
-    }));
+    res.end(
+      JSON.stringify({
+        tps: game.tps,
+        entityCnt: game.entities.size,
+        playerCnt: game.players.size,
+        realPlayersCnt: [...game.players.values()].filter((p) => !p.isBot)
+          .length,
+      }),
+    );
   });
   initModeration(game, app);
 
@@ -104,36 +107,43 @@ function start() {
   loop.onTpsUpdate = (tps) => {
     game.tps = tps;
     loop.entityCnt = game.entities.size;
-  }
+  };
   loop.start();
 
   function stop(reason) {
     try {
-    console.log('Stopping game...', reason);
-    for (const client of server.clients.values()) {
-      console.log(`Disconnecting client ${client.id}`);
-      if (client.player) {
-        console.log(`Saving game for player ${client.player.id} (${client.player.name})`);
-        try {
-        const data = {
-          coins: client.player.levels?.coins,
-          kills: client.player.kills,
-          playtime: client.player.playtime,
-        };
+      console.log('Stopping game...', reason);
+      for (const client of server.clients.values()) {
+        console.log(`Disconnecting client ${client.id}`);
+        if (client.player) {
+          console.log(
+            `Saving game for player ${client.player.id} (${client.player.name})`,
+          );
+          try {
+            const data = {
+              coins: client.player.levels?.coins,
+              kills: client.player.kills,
+              playtime: client.player.playtime,
+            };
 
-        client.saveGame(data);
-      } catch (err) {
-        console.error('Failed to save game for player', client.player.id, client.player.name, err);
+            client.saveGame(data);
+          } catch (err) {
+            console.error(
+              'Failed to save game for player',
+              client.player.id,
+              client.player.name,
+              err,
+            );
+          }
+        }
       }
-      }
+
+      console.log('All games saved. Exiting...');
+      process.exit(0);
+    } catch (err) {
+      console.error(err);
+      process.exit(1);
     }
-
-    console.log('All games saved. Exiting...');
-    process.exit(0);
-  } catch (err) {
-    console.error(err);
-    process.exit(1);
-  }
   }
 
   process.on('SIGTERM', () => {

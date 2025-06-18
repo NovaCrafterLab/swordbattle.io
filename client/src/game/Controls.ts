@@ -33,25 +33,33 @@ export class Controls {
   };
 
   initialize() {
-    const { game: { input } } = this;
+    const {
+      game: { input },
+    } = this;
     if (this.game.isMobile) {
       // @ts-ignore
-      this.joystick = this.game.plugins.get('rexVirtualJoystick')?.add(this.game.hud.scene, {
-        radius: 130,
-      }) as VirtualJoyStick;
+      this.joystick = this.game.plugins
+        .get('rexVirtualJoystick')
+        ?.add(this.game.hud.scene, {
+          radius: 130,
+        }) as VirtualJoyStick;
       this.joystick.on('pointerdown', (pointer: any) => {
         this.joystickPointer = pointer;
       });
       this.joystick.on('pointerup', () => {
         this.joystickPointer = null;
-      })
+      });
       input.addPointer(2);
     }
 
     for (const inputType in Controls.inputKeybinds) {
       for (const key of Controls.inputKeybinds[inputType]) {
-        input.keyboard?.on(`keydown-${key}`, () => this.inputDown(Number(inputType) as InputTypes));
-        input.keyboard?.on(`keyup-${key}`, () => this.inputUp(Number(inputType) as InputTypes));
+        input.keyboard?.on(`keydown-${key}`, () =>
+          this.inputDown(Number(inputType) as InputTypes),
+        );
+        input.keyboard?.on(`keyup-${key}`, () =>
+          this.inputUp(Number(inputType) as InputTypes),
+        );
       }
     }
 
@@ -66,10 +74,9 @@ export class Controls {
     });
     input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       pointer.event.preventDefault();
-        this.inputUp(InputTypes.SwordSwing);
-        this.inputUp(InputTypes.SwordThrow);
+      this.inputUp(InputTypes.SwordSwing);
+      this.inputUp(InputTypes.SwordThrow);
     });
-
 
     window.addEventListener('blur', () => this.clear());
     this.disabledKeys = [];
@@ -110,14 +117,14 @@ export class Controls {
   }
 
   disableKeys(keys: number[], append = false) {
-    if(!append) this.disabledKeys = keys;
+    if (!append) this.disabledKeys = keys;
     else this.disabledKeys = this.disabledKeys.concat(keys);
 
     this.disabledKeys = Array.from(new Set(this.disabledKeys));
   }
 
   enableKeys(keys: number[]) {
-    this.disabledKeys = this.disabledKeys.filter(key => !keys.includes(key));
+    this.disabledKeys = this.disabledKeys.filter((key) => !keys.includes(key));
   }
 
   enableAllKeys() {
@@ -133,14 +140,22 @@ export class Controls {
   }
 
   inputDown(inputType: InputTypes) {
-    if (this.isInputDown(inputType) || this.disabled || this.disabledKeys.includes(inputType)) {
+    if (
+      this.isInputDown(inputType) ||
+      this.disabled ||
+      this.disabledKeys.includes(inputType)
+    ) {
       return;
     }
     this.downInputs.push(inputType);
   }
 
   inputUp(inputType: InputTypes) {
-    if (this.isInputUp(inputType) || this.disabled || this.disabledKeys.includes(inputType)) {
+    if (
+      this.isInputUp(inputType) ||
+      this.disabled ||
+      this.disabledKeys.includes(inputType)
+    ) {
       return;
     }
     this.downInputs.splice(this.downInputs.indexOf(inputType), 1);
@@ -149,16 +164,20 @@ export class Controls {
   getChanges() {
     const difference: any = [];
 
-    const newlyDown = this.downInputs.filter(i => this.previousDownInputs.indexOf(i) < 0);
-    newlyDown.forEach(input => {
+    const newlyDown = this.downInputs.filter(
+      (i) => this.previousDownInputs.indexOf(i) < 0,
+    );
+    newlyDown.forEach((input) => {
       difference.push({
         inputType: input,
         inputDown: true,
       });
     });
 
-    const newlyUp = this.previousDownInputs.filter(i => this.downInputs.indexOf(i) < 0);
-    newlyUp.forEach(input => {
+    const newlyUp = this.previousDownInputs.filter(
+      (i) => this.downInputs.indexOf(i) < 0,
+    );
+    newlyUp.forEach((input) => {
       difference.push({
         inputType: input,
         inputDown: false,

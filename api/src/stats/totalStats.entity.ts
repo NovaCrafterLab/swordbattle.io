@@ -19,7 +19,7 @@ export class TotalStats {
 
   @Column({ default: 0 }) login_streak: number;
 
-  @OneToOne(() => Account, account => account.total_stats)
+  @OneToOne(() => Account, (account) => account.total_stats)
   @JoinColumn({ name: 'id' })
   account: Account;
 }

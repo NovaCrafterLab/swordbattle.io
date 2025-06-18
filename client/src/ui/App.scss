@@ -3,21 +3,19 @@
   margin: 8px;
   border-radius: 10px;
   background-color: rgb(34, 34, 34) !important;
-  box-shadow:  0 0 0 3px rgba(51, 51, 51, 0.98);
+  box-shadow: 0 0 0 3px rgba(51, 51, 51, 0.98);
   color: rgb(231, 231, 231);
   box-sizing: border-box;
 }
 
-.shop-btn{
+.shop-btn {
   position: absolute;
-
 
   // left
   left: 0%;
   top: 0%;
   transform-origin: left;
   cursor: pointer;
-
 
   img {
     height: auto;
@@ -32,16 +30,14 @@
   }
 }
 
-.leaderboard-btn{
+.leaderboard-btn {
   position: fixed;
-
 
   // left
   left: 0%;
   top: 85px;
   transform-origin: left;
   cursor: pointer;
-
 
   img {
     height: auto;
@@ -76,19 +72,17 @@ footer {
     text-decoration: underline;
     pointer-events: auto;
   }
-
 }
 
 .auth-buttons {
   position: absolute;
-  top:5px;
+  top: 5px;
   right: 5px;
   display: flex;
   flex-direction: column;
   transform-origin: top right;
 
   .dropdown {
-
     .dropdown-menu {
       background-color: #f9f9f9;
       padding: 12px 16px;
@@ -137,7 +131,13 @@ footer {
   }
 }
 
-*::-webkit-scrollbar, *::-webkit-scrollbar-button, *::-webkit-scrollbar-track, *::-webkit-scrollbar-track-piece, *::-webkit-scrollbar-thumb, *::-webkit-scrollbar-corner, *::-webkit-resizer {
+*::-webkit-scrollbar,
+*::-webkit-scrollbar-button,
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-track-piece,
+*::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-corner,
+*::-webkit-resizer {
   background: transparent;
 }
 *::-webkit-scrollbar {
@@ -165,10 +165,9 @@ footer {
   box-shadow: none;
 }
 
-
-input[type=text],
-input[type=email],
-input[type=password] {
+input[type='text'],
+input[type='email'],
+input[type='password'] {
   -webkit-touch-callout: text;
   -webkit-user-select: text;
   user-select: text;
@@ -182,18 +181,18 @@ input[type=password] {
   background-color: #e5e3e3;
   border-radius: 10px;
 }
-input[type=text][disabled],
-input[type=email][disabled],
-input[type=password][disabled] {
+input[type='text'][disabled],
+input[type='email'][disabled],
+input[type='password'][disabled] {
   cursor: not-allowed;
   opacity: 0.7;
 }
 
 .login-modal,
 .signup-modal {
-input {
-  font-size: 20px;
-}
+  input {
+    font-size: 20px;
+  }
 }
 
 a {
@@ -236,8 +235,6 @@ span {
   vertical-align: middle;
 }
 
-
-
 .mainMenu {
   background-color: rgb(44, 118, 22);
   position: absolute;
@@ -259,7 +256,6 @@ span {
   top: 45%;
   transform: translateY(-50%);
   pointer-events: auto;
-
 }
 
 #contentt {
@@ -311,7 +307,7 @@ span {
   padding: 6px;
   box-sizing: border-box;
   color: #fff;
-    background-color: rgb(22, 143, 22);
+  background-color: rgb(22, 143, 22);
   width: 100%;
   border-radius: 10px;
   cursor: pointer;
@@ -405,9 +401,9 @@ span {
   width: 1000px;
   height: 58px;
   position: fixed;
-    top: -6%;
-    left: 50%;
-    transform: translate(-50%, -100%);
+  top: -6%;
+  left: 50%;
+  transform: translate(-50%, -100%);
 }
 #menuCardHolder .menu .announcementCard .announcedate {
   color: #999999;

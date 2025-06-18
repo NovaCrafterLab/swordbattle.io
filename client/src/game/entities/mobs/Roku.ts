@@ -19,7 +19,9 @@ class RokuMob extends BaseEntity {
       width: this.shape.radius,
       height: 50,
     });
-    this.container = this.game.add.container(this.shape.x, this.shape.y, [this.body]).setScale(this.baseScale);
+    this.container = this.game.add
+      .container(this.shape.x, this.shape.y, [this.body])
+      .setScale(this.baseScale);
     return this.container;
   }
 }

@@ -86,16 +86,12 @@ class Game {
 
   //     let { player } = client;
 
-
-
   //     if (data.play && (!player || player.removed)) {
   //       if(getBannedIps().includes(client.ip)) {
   //         // close connection
   //         client.socket.close();
   //         return;
   //       }
-
-
 
   //       if(config.recaptchaSecretKey) {
   //         // verify recaptcha
@@ -155,23 +151,30 @@ class Game {
   //       }
   //     }
 
-
   //   }
 
   processClientMessage(client, data) {
     if (data.spectate && !client.spectator.isSpectating) {
-      if(config.recaptchaSecretKey && !client.captchaVerified && !data.captchaP1) {
-      // try {
+      if (
+        config.recaptchaSecretKey &&
+        !client.captchaVerified &&
+        !data.captchaP1
+      ) {
+        // try {
 
-      //     client.socket.close();
+        //     client.socket.close();
 
-      //   } catch(e) {
-      //   console.log(e)
-      //   }
-      //   return;
-      this.addSpectator(client);
-      client.captchaVerified = true;
-      } else if(config.recaptchaSecretKey && !client.captchaVerified && data.captchaP1) {
+        //   } catch(e) {
+        //   console.log(e)
+        //   }
+        //   return;
+        this.addSpectator(client);
+        client.captchaVerified = true;
+      } else if (
+        config.recaptchaSecretKey &&
+        !client.captchaVerified &&
+        data.captchaP1
+      ) {
         // const captchaAsText = helpers.importCaptcha(data);
         // const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${config.recaptchaSecretKey}&response=${captchaAsText}&remoteip=${client.ip}`;
 
@@ -183,8 +186,8 @@ class Game {
         //   },
         // }).then(res => res.json()).then(json => {
         //   if(json.success && json.score >= 0.1) {
-            this.addSpectator(client);
-            client.captchaVerified = true;
+        this.addSpectator(client);
+        client.captchaVerified = true;
         //   } else {
         //     console.log('disconnected reason: invalid recaptcha', json);
         //     try {
@@ -197,7 +200,7 @@ class Game {
         //   console.log(err);
         //   client.socket.close();
         // });
-      } else if(!config.recaptchaSecretKey || client.captchaVerified) {
+      } else if (!config.recaptchaSecretKey || client.captchaVerified) {
         this.addSpectator(client);
       }
 
@@ -212,11 +215,14 @@ class Game {
         client.socket.close();
         return;
       }
-      if(config.recaptchaSecretKey && !client.captchaVerified) {
-        console.log('disconnected reason: joining without recaptcha verification', client.ip);
+      if (config.recaptchaSecretKey && !client.captchaVerified) {
+        console.log(
+          'disconnected reason: joining without recaptcha verification',
+          client.ip,
+        );
         client.socket.close();
       }
-        player = this.addPlayer(client, data);
+      player = this.addPlayer(client, data);
     }
 
     if (!player) return;
@@ -324,14 +330,21 @@ class Game {
     const allViewportEntities = currentViewport.concat(previousViewport);
     for (const entityId of allViewportEntities) {
       const entity = this.entities.get(entityId);
-      if(!entity) {
-        const removedEntity = [...this.removedEntities].find(e => e.id === entityId);
+      if (!entity) {
+        const removedEntity = [...this.removedEntities].find(
+          (e) => e.id === entityId,
+        );
         changes[entityId] = {
           removed: true,
         };
-        if(removedEntity?.type === Types.Entity.Player && removedEntity?.client?.disconnectReason) {
-          changes[entityId].disconnectReasonMessage = removedEntity.client.disconnectReason.message;
-          changes[entityId].disconnectReasonType = removedEntity.client.disconnectReason.type;
+        if (
+          removedEntity?.type === Types.Entity.Player &&
+          removedEntity?.client?.disconnectReason
+        ) {
+          changes[entityId].disconnectReasonMessage =
+            removedEntity.client.disconnectReason.message;
+          changes[entityId].disconnectReasonType =
+            removedEntity.client.disconnectReason.type;
         }
         continue;
       }
@@ -340,10 +353,10 @@ class Game {
       entity.state.get(); // updates state
 
       // If player wasn't it previous viewport, it sends as new entity
-      if (previousViewport.findIndex(id => id === entity.id) === -1) {
+      if (previousViewport.findIndex((id) => id === entity.id) === -1) {
         changes[entity.id] = entity.state.get();
         // If entity was in previous viewport but it's not in current, it counts as removed entity
-      } else if (currentViewport.findIndex(id => id === entity.id) === -1) {
+      } else if (currentViewport.findIndex((id) => id === entity.id) === -1) {
         changes[entity.id] = {
           ...entity.state.getChanges(),
           removed: true,
@@ -366,10 +379,12 @@ class Game {
     // const name = client.player
     //   ? client.player.name
     //   : (client.account ? client.account.username : this.handleNickname(data.name || ''));
-    const name = client.account && client.account.username ? client.account.username : (
-      client.player && client.player.name ? client.player.name
-        : this.handleNickname(filter.clean(data.name) || '')
-    )
+    const name =
+      client.account && client.account.username
+        ? client.account.username
+        : client.player && client.player.name
+          ? client.player.name
+          : this.handleNickname(filter.clean(data.name) || '');
     if (data?.name && data.name !== name) {
       data.name = name;
     }
@@ -377,7 +392,10 @@ class Game {
     if (client.account && client.account.id) {
       // Make sure same account can't join twice
       for (const player of this.players) {
-        if (player?.client?.account && player.client.account?.id === client.account.id) {
+        if (
+          player?.client?.account &&
+          player.client.account?.id === client.account.id
+        ) {
           return;
         }
       }
@@ -453,7 +471,7 @@ class Game {
 
   handleNickname(nickname) {
     const nicknameLength = nickname.length >= 1 && nickname.length <= 20;
-    return nicknameLength ? nickname : 'Player'
+    return nicknameLength ? nickname : 'Player';
   }
 
   cleanup() {

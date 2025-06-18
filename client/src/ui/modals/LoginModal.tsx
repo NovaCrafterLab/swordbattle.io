@@ -13,7 +13,9 @@ function LoginModal({ onSuccess }: any) {
   const onLogin = () => {
     api.post(`${api.endpoint}/auth/login`, { username, password }, (data) => {
       if (data.message) {
-        window.alert(Array.isArray(data.message) ? data.message.join('\n') : data.message);
+        window.alert(
+          Array.isArray(data.message) ? data.message.join('\n') : data.message,
+        );
       } else {
         data.account.secret = data.secret;
 
@@ -21,18 +23,25 @@ function LoginModal({ onSuccess }: any) {
         onSuccess();
       }
     });
-  }
+  };
 
   return (
     <div className="login-modal">
       <h1>Log in</h1>
-      <input type="text" placeholder="Username"
+      <input
+        type="text"
+        placeholder="Username"
         onChange={(e) => setUsername(e.target.value)}
       />
-      <input type="password" placeholder="Password"
+      <input
+        type="password"
+        placeholder="Password"
         onChange={(e) => setPassword(e.target.value)}
       />
-      <p style={{marginTop: 5, marginBottom: 0}}>Forgot your password? Email support@swordbattle.io<br></br>(Note: NEVER share your password with others!)</p>
+      <p style={{ marginTop: 5, marginBottom: 0 }}>
+        Forgot your password? Email support@swordbattle.io<br></br>(Note: NEVER
+        share your password with others!)
+      </p>
       <button onClick={onLogin}>Login</button>
     </div>
   );
