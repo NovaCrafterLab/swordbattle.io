@@ -26,7 +26,8 @@
     "docker:ps": "docker compose ps",
     "docker:restart": "docker compose restart",
     "docker:down": "docker compose down",
-    "docker:clean": "docker compose down -v --rmi all --remove-orphans"
+    "docker:clean": "docker compose down -v --rmi all --remove-orphans",
+    "deps:check": "yarn dedupe && yarn npm audit --environment production --severity moderate"
   },
   "engines": {
     "node": "22.x"
