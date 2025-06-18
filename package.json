@@ -22,20 +22,19 @@
     "fmt": "prettier --config prettier.config.mjs --write '**/*.{js,jsx,ts,tsx,mjs,cjs,css,scss,md,html,yml,yaml}'",
     "prepare": "husky",
     "cz": "cz",
-    "docker:build": "DOCKER_BUILDKIT=1 docker compose build --no-cache",
-    "docker:up": "docker compose up -d",
     "docker:dev": "docker compose up -d --build",
+    "docker:up": "docker compose up -d",
+    "docker:build": "DOCKER_BUILDKIT=1 docker compose build",
+    "docker:build:nc": "DOCKER_BUILDKIT=1 docker compose build --no-cache",
     "docker:logs": "docker compose logs -f --tail=100",
     "docker:ps": "docker compose ps",
     "docker:restart": "docker compose restart",
     "docker:down": "docker compose down",
-    "docker:clean": "docker compose down -v --rmi all --remove-orphans",
+    "docker:clean": "docker compose down --rmi all --remove-orphans",
+    "docker:clean:all": "docker compose down -v --rmi all --remove-orphans",
+    "docker:rebuild": "yarn docker:clean:all && yarn docker:build:nc",
     "deps:check": "yarn dedupe && yarn npm audit --environment production --severity moderate"
   },
-  "engines": {
-    "node": "22.x"
-  },
-  "license": "ISC",
   "dependencies": {
     "http-proxy": "^1.18.1",
     "pm2": "^5.4.2"

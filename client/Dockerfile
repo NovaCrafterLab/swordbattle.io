@@ -16,10 +16,10 @@ ENV PUBLIC_URL=$PUBLIC_URL \
 # ---------- install & build ----------
 COPY package.json ./
 RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
-    yarn install --network-timeout 600000
+    yarn install --mode=skip-build --network-timeout 600000
 
 COPY . .
-RUN yarn build
+RUN yarn build --production=false
 
 ########################  runtime  ########################
 FROM nginx:1.27-alpine AS runtime
