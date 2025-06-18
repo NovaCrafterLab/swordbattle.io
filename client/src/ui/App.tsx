@@ -30,8 +30,14 @@ import ShopButton from './ShopButton';
 import LeaderboardButton from './LeaderboardButton';
 import ShopModal from './modals/ShopModal';
 import MigrationModal from './modals/MigrationModal';
-import { getCookies, playVideoAd } from '../helpers';
-import Ad from './Ad';
+
+import {
+  getCookies,
+  // playVideoAd
+} from '../helpers';
+
+// import Ad from './Ad';
+
 import { Settings } from '../game/Settings';
 import { getServerList, updatePing } from '../ServerList';
 import AccountCard from './AccountCard';
@@ -263,7 +269,6 @@ function App() {
 
   const openLeaderboard = () => {
     // TODO
-    // window.location.href = "https://swordbattle.io/leaderboard";
     navigate('leaderboard');
   };
 

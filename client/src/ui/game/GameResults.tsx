@@ -5,7 +5,10 @@ import PlayAgainImg from '../../assets/img/play-again.png';
 import HomeImg from '../../assets/img/home.png';
 import './GameResults.scss';
 import { DisconnectTypes } from '../../game/Types';
-import { calculateGemsXP, playVideoAd } from '../../helpers';
+import {
+  calculateGemsXP,
+  // playVideoAd
+} from '../../helpers';
 
 function GameResults({ onHome, results, game, isLoggedIn, adElement }: any) {
   const onHomeClick = () => {
