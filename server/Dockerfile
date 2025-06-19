@@ -6,7 +6,7 @@ WORKDIR /app
 
 # native toolchain (needed only to build native addons)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3 make g++ \
+    python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
 # install runtime deps without lockfile

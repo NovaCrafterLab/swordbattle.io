@@ -57,6 +57,7 @@ import ForumCard from './ForumCard';
 // import Game from '../game/scenes/Game';
 import titleImg from '../assets/img/final.png';
 import Leaderboard from './game/Leaderboard';
+import BSCWalletButton from './BSCWalletButton';
 
 let debugMode = false;
 try {
@@ -477,6 +478,9 @@ function App() {
           </div> */}
 
             <div className="auth-buttons" style={scale.styles}>
+              <div className="auth-btn">
+                <BSCWalletButton />
+              </div>
               {account.isLoggedIn ? (
                 <div className="dropdown">
                   {account.clan ? (
