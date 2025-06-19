@@ -1,87 +1,19 @@
 // server/src/game/components/Quadtree.js
 
-const { rectangleRectangle } = require('../collisions');
+const QuadTreeImpl = require('./QuadTreeLegacy');
+const SpatialHash = require('./SpatialHash');
 
-class QuadTree {
-  constructor(boundary, capacity = 10, maxLevel = 4, level = 0) {
-    this.boundary = boundary;
-    this.capacity = capacity;
-    this.maxLevel = maxLevel;
-    this.level = level;
+const USE_HASH = process.env.SPATIAL_HASH !== '0';
 
-    this.items = [];
-    this.nodes = [];
-  }
-
-  insert(rect) {
-    if (!rectangleRectangle(this.boundary, rect)) return;
-
-    if (this.nodes.length) {
-      for (const node of this.nodes) node.insert(rect);
-      return;
+class IndexProxy {
+    constructor(boundary, capacity, maxLevel, level) {
+        this.impl = USE_HASH
+            ? new SpatialHash(boundary)
+            : new QuadTreeImpl(boundary, capacity, maxLevel, level);
     }
-
-    this.items.push(rect);
-
-    if (
-      this.items.length > this.capacity &&
-      this.level < this.maxLevel &&
-      !this.nodes.length
-    ) {
-      this.subdivide();
-    }
-  }
-
-  subdivide() {
-    const { x, y, width, height } = this.boundary;
-    const hw = width / 2;
-    const hh = height / 2;
-    const next = this.level + 1;
-
-    this.nodes.push(
-      new QuadTree({ x: x + hw, y, width: hw, height: hh }, this.capacity, this.maxLevel, next),
-      new QuadTree({ x, y, width: hw, height: hh }, this.capacity, this.maxLevel, next),
-      new QuadTree({ x, y: y + hh, width: hw, height: hh }, this.capacity, this.maxLevel, next),
-      new QuadTree({ x: x + hw, y: y + hh, width: hw, height: hh }, this.capacity, this.maxLevel, next),
-    );
-
-    for (const item of this.items) {
-      for (const node of this.nodes) node.insert(item);
-    }
-    this.items = [];
-  }
-
-  get(rect) {
-    if (!rectangleRectangle(this.boundary, rect)) return [];
-
-    const seen = new Set();
-    const unique = [];
-    for (const itm of this.query(rect)) {
-      const key = itm.entity ? itm.entity.id : itm;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      unique.push(itm);
-    }
-    return unique;
-  }
-
-  query(rect) {
-    if (!rectangleRectangle(this.boundary, rect)) return [];
-
-    let found = this.items;
-
-    for (const node of this.nodes) {
-      const sub = node.query(rect);
-      if (sub.length) found = found.concat(sub);
-    }
-    return found;
-  }
-
-  clear() {
-    this.items = [];
-    for (const node of this.nodes) node.clear();
-    this.nodes = [];
-  }
+    insert(rect) { this.impl.insert(rect); }
+    get(rect) { return this.impl.get(rect); }
+    clear() { this.impl.clear(); }
 }
 
-module.exports = QuadTree;
+module.exports = IndexProxy;

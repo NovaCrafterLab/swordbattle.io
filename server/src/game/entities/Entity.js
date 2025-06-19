@@ -81,48 +81,56 @@ class Entity {
   }
 
   collidesWithForbidden(dt, collide = false) {
-    const response = new SAT.Response();
+    const response =
+      this._collisionResp ?? (this._collisionResp = new SAT.Response());
+    response.clear();
 
-    for (const biomeType of this.definition.forbiddenBiomes) {
-      for (const biome of this.game.map.biomes) {
-        if (biome.type !== biomeType) continue;
+    // Set O(1)
+    const forbiddenBiomes =
+      this._forbiddenBiomesSet ??
+      (this._forbiddenBiomesSet = new Set(this.definition.forbiddenBiomes));
+    const forbiddenEntities =
+      this._forbiddenEntitiesSet ??
+      (this._forbiddenEntitiesSet = new Set(this.definition.forbiddenEntities));
 
-        if (biome.shape.collides(this.shape, response)) {
-          if (!collide) return true;
+    for (const biome of this.game.map.biomes) {
+      if (!forbiddenBiomes.has(biome.type)) continue;
 
-          const mtv = this.shape.getCollisionOverlap(response);
-          if (Types.Groups.Mobs.includes(this.type)) {
-            this.velocity.add(mtv.scale(dt));
-            this.target = null; // if the this is targeting someone reset the target, coz he reached forbidden zone
-            this.angle = Math.atan2(mtv.y, mtv.x);
-          } else {
-            this.shape.applyCollision(mtv);
-          }
-        }
-      }
-    }
+      if (biome.shape.collides(this.shape, response)) {
+        if (!collide) return true;
 
-    // When we spawn entities on game initalize, quadtree is not ready yet
-    if (!this.game.entitiesQuadtree) return false;
-
-    for (const entityType of this.definition.forbiddenEntities) {
-      const targets = this.game.entitiesQuadtree
-        .get(this.shape.boundary)
-        .map((res) => res.entity);
-      for (const entity of targets) {
-        if (entity.type !== entityType) continue;
-
-        const collisionShape = entity.depthZone
-          ? entity.depthZone
-          : entity.shape;
-        if (collisionShape.collides(this.shape, response)) {
-          if (!collide) return true;
-
-          const mtv = this.shape.getCollisionOverlap(response);
+        const mtv = this.shape.getCollisionOverlap(response);
+        if (Types.Groups.Mobs.includes(this.type)) {
+          this.velocity.add(mtv.scale(dt));
+          this.target = null; // reached forbidden zone, reset target
+          this.angle = Math.atan2(mtv.y, mtv.x);
+        } else {
           this.shape.applyCollision(mtv);
         }
+        response.clear();
       }
     }
+
+    if (!this.game.entitiesQuadtree) return false;
+
+    const candidates = this.game.entitiesQuadtree
+      .get(this.shape.boundary)
+      .map((res) => res.entity);
+
+    for (let i = 0; i < candidates.length; i++) {
+      const entity = candidates[i];
+      if (!forbiddenEntities.has(entity.type)) continue;
+
+      const collisionShape = entity.depthZone ?? entity.shape;
+      if (collisionShape.collides(this.shape, response)) {
+        if (!collide) return true;
+
+        const mtv = this.shape.getCollisionOverlap(response);
+        this.shape.applyCollision(mtv);
+        response.clear();
+      }
+    }
+
     return false;
   }
 
@@ -157,7 +165,7 @@ class Entity {
     this.velocity.scale(0.9);
   }
 
-  processTargetsCollision(targetEntity, dt) {}
+  processTargetsCollision(targetEntity, dt) { }
 
   cleanup() {
     this.state.cleanup();

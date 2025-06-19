@@ -1,4 +1,12 @@
-// server/src/prof.js
+// server/src/prof.js  —— lightweight, prod-safe profiler
+
+const ENABLED = process.env.NODE_ENV !== 'production';
+
+if (!ENABLED) {
+  module.exports.prof = (lbl, fn) => fn();
+  return;
+}
+
 const bucket = new Map();
 let lastFlush = Date.now();
 
@@ -7,20 +15,26 @@ function prof(label, fn) {
   fn();
   const dt = Number(process.hrtime.bigint() - t0) / 1e6;
 
-  let b = bucket.get(label);
-  if (!b) { b = {sum:0,count:0,max:0}; bucket.set(label, b); }
-  b.sum += dt; b.count++; if (dt > b.max) b.max = dt;
+  let rec = bucket.get(label);
+  if (rec) {
+    rec.sum += dt;
+    rec.count++;
+    if (dt > rec.max) rec.max = dt;
+  } else {
+    bucket.set(label, { sum: dt, count: 1, max: dt });
+  }
 
   const now = Date.now();
   if (now - lastFlush >= 2000) {
     for (const [lbl, s] of bucket) {
       if (s.max >= 25) {
-        const avg = s.sum / s.count;
-        console.warn(`[prof] ${lbl}\t cnt ${s.count}\t avg ${avg.toFixed(1)} ms\t max ${s.max.toFixed(1)} ms`);
+        const avg = (s.sum / s.count).toFixed(1);
+        console.warn(`[prof] ${lbl.padEnd(16)} cnt ${s.count.toString().padEnd(4)} avg ${avg} ms  max ${s.max.toFixed(1)} ms`);
       }
     }
     bucket.clear();
     lastFlush = now;
   }
 }
+
 module.exports = { prof };

@@ -71,31 +71,34 @@ class Game {
   processCollisions(entity, dt) {
     const candidates = this.entitiesQuadtree.get(entity.shape.boundary);
 
-    if (!entity._targetsSet) {
-      entity._targetsSet = Array.isArray(entity.targets)
+    const targetsSet = entity._targetsSet ??
+      (entity._targetsSet = (Array.isArray(entity.targets)
         ? new Set(entity.targets)
-        : entity.targets;
-    }
+        : entity.targets));
+
+    const entityBoundary = entity.shape.boundary;
+    const entityCenter = entity.shape.center;
 
     let depth = 0;
-    for (const { entity: target } of candidates) {
+
+    for (let i = 0; i < candidates.length; i++) {
+      const target = candidates[i].entity;
       if (entity === target || target.removed) continue;
 
-      if (target.depthZone) {
-        const c = entity.shape.center;
-        if (target.depthZone.isPointInside(c.x, c.y)) depth = target.id;
+      if (target.depthZone && target.depthZone.isPointInside(entityCenter.x, entityCenter.y)) {
+        depth = target.id;
       }
 
-      if (!entity._targetsSet.has(target.type)) continue;
+      if (!targetsSet.has(target.type)) continue;
 
-      if (!rectangleRectangle(entity.shape.boundary, target.shape.boundary))
-        continue;
+      if (!rectangleRectangle(entityBoundary, target.shape.boundary)) continue;
 
       sharedResp.clear();
       if (target.shape.collides(entity.shape, sharedResp)) {
         entity.processTargetsCollision(target, sharedResp, dt);
       }
     }
+
     entity.depth = depth;
   }
 

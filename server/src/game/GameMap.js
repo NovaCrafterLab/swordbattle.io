@@ -40,6 +40,36 @@ const map = require('./maps/main');
 const helpers = require('../helpers');
 const config = require('../config');
 
+const ENTITY_CLASS_MAP = {
+  [Types.Entity.MossyRock]: MossyRock,
+  [Types.Entity.Pond]: Pond,
+  [Types.Entity.Bush]: Bush,
+  [Types.Entity.House1]: House1,
+  [Types.Entity.IceMound]: IceMound,
+  [Types.Entity.IcePond]: IcePond,
+  [Types.Entity.IceSpike]: IceSpike,
+  [Types.Entity.Rock]: Rock,
+  [Types.Entity.LavaRock]: LavaRock,
+  [Types.Entity.LavaPool]: LavaPool,
+  [Types.Entity.Chest]: Chest,
+  [Types.Entity.Coin]: Coin,
+  [Types.Entity.Wolf]: WolfMob,
+  [Types.Entity.Cat]: CatMob,
+  [Types.Entity.Bunny]: BunnyMob,
+  [Types.Entity.Moose]: MooseMob,
+  [Types.Entity.Fish]: FishMob,
+  [Types.Entity.AngryFish]: AngryFishMob,
+  [Types.Entity.Chimera]: ChimeraMob,
+  [Types.Entity.Yeti]: YetiMob,
+  [Types.Entity.Santa]: SantaMob,
+  [Types.Entity.Roku]: RokuMob,
+  [Types.Entity.Ancient]: AncientMob,
+  [Types.Entity.Fireball]: Fireball,
+  [Types.Entity.Boulder]: Boulder,
+  [Types.Entity.SwordProj]: SwordProj,
+  [Types.Entity.Snowball]: Snowball,
+};
+
 class GameMap {
   constructor(game) {
     this.game = game;
@@ -156,97 +186,14 @@ class GameMap {
   }
 
   addEntity(objectData) {
-    let ObjectClass;
-    switch (objectData.type) {
-      case Types.Entity.MossyRock:
-        ObjectClass = MossyRock;
-        break;
-      case Types.Entity.Pond:
-        ObjectClass = Pond;
-        break;
-      case Types.Entity.Bush:
-        ObjectClass = Bush;
-        break;
-      case Types.Entity.House1:
-        ObjectClass = House1;
-        break;
-      case Types.Entity.IceMound:
-        ObjectClass = IceMound;
-        break;
-      case Types.Entity.IcePond:
-        ObjectClass = IcePond;
-        break;
-      case Types.Entity.IceSpike:
-        ObjectClass = IceSpike;
-        break;
-      case Types.Entity.Rock:
-        ObjectClass = Rock;
-        break;
-      case Types.Entity.LavaRock:
-        ObjectClass = LavaRock;
-        break;
-      case Types.Entity.LavaPool:
-        ObjectClass = LavaPool;
-        break;
-      case Types.Entity.Chest:
-        ObjectClass = Chest;
-        break;
-      case Types.Entity.Coin:
-        ObjectClass = Coin;
-        break;
-      case Types.Entity.Wolf:
-        ObjectClass = WolfMob;
-        break;
-      case Types.Entity.Cat:
-        ObjectClass = CatMob;
-        break;
-      case Types.Entity.Bunny:
-        ObjectClass = BunnyMob;
-        break;
-      case Types.Entity.Moose:
-        ObjectClass = MooseMob;
-        break;
-      case Types.Entity.Fish:
-        ObjectClass = FishMob;
-        break;
-      case Types.Entity.AngryFish:
-        ObjectClass = AngryFishMob;
-        break;
-      case Types.Entity.Chimera:
-        ObjectClass = ChimeraMob;
-        break;
-      case Types.Entity.Yeti:
-        ObjectClass = YetiMob;
-        break;
-      case Types.Entity.Santa:
-        ObjectClass = SantaMob;
-        break;
-      case Types.Entity.Roku:
-        ObjectClass = RokuMob;
-        break;
-      case Types.Entity.Ancient:
-        ObjectClass = AncientMob;
-        break;
-      case Types.Entity.Fireball:
-        ObjectClass = Fireball;
-        break;
-      case Types.Entity.Boulder:
-        ObjectClass = Boulder;
-        break;
-      case Types.Entity.SwordProj:
-        ObjectClass = SwordProj;
-        break;
-      case Types.Entity.Snowball:
-        ObjectClass = Snowball;
-        break;
+    const ObjectClass = ENTITY_CLASS_MAP[objectData.type];
+    if (!ObjectClass) {
+      return console.warn('Unknown entity type:', objectData);
     }
-
-    if (!ObjectClass) return console.warn('Unknown entity type: ', objectData);
 
     const entity = new ObjectClass(this.game, objectData);
-    if (entity.isStatic) {
-      this.staticObjects.push(entity);
-    }
+    if (entity.isStatic) this.staticObjects.push(entity);
+
     this.game.addEntity(entity);
     return entity;
   }

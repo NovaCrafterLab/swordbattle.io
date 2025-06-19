@@ -1,4 +1,7 @@
+// server/src/game/entities/Player.js
 const SAT = require('sat');
+const filter = require('leo-profanity');
+
 const Inputs = require('../components/Inputs');
 const Entity = require('./Entity');
 const Circle = require('../shapes/Circle');
@@ -18,39 +21,8 @@ const config = require('../../config');
 const { clamp, calculateGemsXP } = require('../../helpers');
 const { skins } = require('../../cosmetics.json');
 
-// Check if any duplicate ids in cosmetics.json
-function checkForDuplicates() {
-  const ids = new Set();
-  for (const skin of Object.values(skins)) {
-    ids.add(skin.id);
-  }
-  if (ids.size !== Object.keys(skins).length) {
-    console.error('Duplicate skin ids found in cosmetics.json');
+const { prof } = require('../../prof');
 
-    // Find specific duplicates
-    const duplicates = {};
-    for (const skin of Object.values(skins)) {
-      if (duplicates[skin.id]) {
-        duplicates[skin.id].push(skin);
-      } else {
-        duplicates[skin.id] = [skin];
-      }
-    }
-    for (const id in duplicates) {
-      if (duplicates[id].length > 1) {
-        console.error(`Duplicate id: ${id}`);
-        for (const skin of duplicates[id]) {
-          console.error(`  ${skin.name}`);
-        }
-      }
-    }
-    process.exit(1);
-  }
-}
-
-checkForDuplicates();
-
-const filter = require('leo-profanity');
 
 class Player extends Entity {
   constructor(game, name) {
@@ -156,7 +128,7 @@ class Player extends Entity {
   }
 
   update(dt) {
-    this.applyBiomeEffects();
+    prof('player-biome', () => this.applyBiomeEffects());
     this.levels.applyBuffs();
     this.effects.forEach((effect) => effect.update(dt));
     this.health.update(dt);
@@ -186,31 +158,38 @@ class Player extends Entity {
   }
 
   applyBiomeEffects() {
-    let biomes = [];
-    const response = new SAT.Response();
+    let topBiome = null;
+    let topResponse = null;
+    let topZ = -Infinity;
+    let safezoneInside = false;
+    const sharedResp = new SAT.Response();
+
     for (const biome of this.game.map.biomes) {
-      if (biome.shape.collides(this.shape, response)) {
-        biomes.push([biome, response]);
-        biome.collides(this, response);
+      sharedResp.clear();
+      if (!biome.shape.collides(this.shape, sharedResp)) continue;
+
+      if (biome.type === Types.Biome.Safezone) safezoneInside = true;
+
+      biome.collides(this, sharedResp);
+
+      const allowed =
+        biome.type !== Types.Biome.Safezone || this.inSafezone;
+      if (allowed && biome.zIndex > topZ) {
+        topBiome = biome;
+        topZ = biome.zIndex;
+        topResponse = new SAT.Response();
+        Object.assign(topResponse, sharedResp);
+        topResponse.overlapN = sharedResp.overlapN.clone();
+        topResponse.overlapV = sharedResp.overlapV.clone();
       }
     }
 
-    // excludes safezone if this.inSafezone is false
-    biomes = biomes
-      .filter(
-        ([biome]) => biome.type !== Types.Biome.Safezone || this.inSafezone,
-      )
-      .sort((a, b) => b.zIndex - a.zIndex);
-    if (biomes[0]) {
-      const biome = biomes[0][0];
-      const response = biomes[0][1];
-      this.biome = biome.type;
-      biome.applyEffects(this, response);
+    if (topBiome) {
+      this.biome = topBiome.type;
+      topBiome.applyEffects(this, topResponse);
     }
 
-    if (!biomes.find(([biome]) => biome.type === Types.Biome.Safezone)) {
-      this.inSafezone = false;
-    }
+    if (!safezoneInside) this.inSafezone = false;
   }
 
   processTargetsCollision(entity, response) {
@@ -227,60 +206,48 @@ class Player extends Entity {
   }
 
   applyInputs(dt) {
-    const isMouseMovement = this.mouse !== null;
-
+    const mouse = this.mouse;
+    const modNoDiag = this.modifiers.disableDiagonalMovement;
     let speed = this.speed.value;
-    let dx = 0;
-    let dy = 0;
+    let dx = 0, dy = 0;
 
-    if (isMouseMovement) {
-      const mouseDistanceFullStrength = 150;
-      const mouseAngle = this.mouse.angle;
-      const mouseDistance = Math.min(
-        this.mouse.force,
-        mouseDistanceFullStrength,
-      );
-      speed *= mouseDistance / mouseDistanceFullStrength;
-      this.movementDirection = mouseAngle;
-      dx = speed * Math.cos(this.movementDirection);
-      dy = speed * Math.sin(this.movementDirection);
+    if (mouse) {
+      const FORCE_MAX = 150;
+      const ratio = Math.min(mouse.force, FORCE_MAX) / FORCE_MAX;
+      speed *= ratio;
 
-      if (this.modifiers.disableDiagonalMovement) {
+      const ang = mouse.angle;
+      const cos = Math.cos(ang);
+      const sin = Math.sin(ang);
+      dx = speed * cos;
+      dy = speed * sin;
+
+      if (modNoDiag && dx && dy) {
         if (Math.abs(dx) > Math.abs(dy)) {
-          dy = 0;
-          dx = dx > 0 ? speed : -speed;
+          dx = dx > 0 ? speed : -speed; dy = 0;
         } else {
-          dx = 0;
-          dy = dy > 0 ? speed : -speed;
+          dy = dy > 0 ? speed : -speed; dx = 0;
         }
       }
+      this.movementDirection = ang;
     } else {
-      let directionX = 0;
-      let directionY = 0;
+      const dirX = (this.inputs.isInputDown(Types.Input.Right) ? 1 : 0) -
+        (this.inputs.isInputDown(Types.Input.Left) ? 1 : 0);
+      const dirY = (this.inputs.isInputDown(Types.Input.Down) ? 1 : 0) -
+        (this.inputs.isInputDown(Types.Input.Up) ? 1 : 0);
 
-      if (this.inputs.isInputDown(Types.Input.Up)) {
-        directionY = -1;
-      } else if (this.inputs.isInputDown(Types.Input.Down)) {
-        directionY = 1;
-      }
+      if (dirX || dirY) {
+        const len = Math.hypot(dirX, dirY);
+        const nx = dirX / len;
+        const ny = dirY / len;
+        dx = speed * nx;
+        dy = speed * ny;
 
-      if (this.inputs.isInputDown(Types.Input.Right)) {
-        directionX = 1;
-      } else if (this.inputs.isInputDown(Types.Input.Left)) {
-        directionX = -1;
-      }
-
-      if (directionX !== 0 || directionY !== 0) {
-        this.movementDirection = Math.atan2(directionY, directionX);
-        dx = speed * Math.cos(this.movementDirection);
-        dy = speed * Math.sin(this.movementDirection);
-
-        if (this.modifiers.disableDiagonalMovement) {
-          if (directionX !== 0 && directionY !== 0) {
-            dy = directionY * speed;
-            dx = 0;
-          }
+        if (modNoDiag && dirX && dirY) {
+          dx = dirX ? 0 : dx;
+          dy = dirY ? speed * Math.sign(dirY) : 0;
         }
+        this.movementDirection = Math.atan2(dirY, dirX);
       } else {
         this.movementDirection = 0;
       }
@@ -290,40 +257,27 @@ class Player extends Entity {
     this.shape.y += this.velocity.y;
     this.velocity.scale(0.6);
 
-    const slide = this.movedDistance;
-    const friction = 1 - this.friction.value;
-    slide.scale(friction);
+    const frictionMul = 1 - this.friction.value;
+    dx += (this.movedDistance.x *= frictionMul);
+    dy += (this.movedDistance.y *= frictionMul);
 
-    dx += slide.x;
-    dy += slide.y;
-
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
-
-    if (absDx > speed) {
-      dx *= speed / absDx;
-    }
-    if (absDy > speed) {
-      dy *= speed / absDy;
+    const maxLen = speed;
+    const len2 = dx * dx + dy * dy;
+    if (len2 > maxLen * maxLen) {
+      const scale = maxLen / Math.sqrt(len2);
+      dx *= scale;
+      dy *= scale;
     }
 
     this.shape.x += dx * dt;
     this.shape.y += dy * dt;
-
     this.movedDistance.x = dx;
     this.movedDistance.y = dy;
 
-    // Clamp to map bounds
-    this.shape.x = clamp(
-      this.shape.x,
-      -this.game.map.width / 2,
-      this.game.map.width / 2,
-    );
-    this.shape.y = clamp(
-      this.shape.y,
-      -this.game.map.height / 2,
-      this.game.map.height / 2,
-    );
+    const halfW = this.game.map.width * 0.5;
+    const halfH = this.game.map.height * 0.5;
+    this.shape.x = clamp(this.shape.x, -halfW, halfW);
+    this.shape.y = clamp(this.shape.y, -halfH, halfH);
   }
 
   damaged(damage, entity = null) {
@@ -331,61 +285,37 @@ class Player extends Entity {
       this.health.damaged(damage);
     }
 
-    if (this.health.isDead) {
-      let reason = 'Unknown Entity';
-      if (entity) {
-        switch (entity.type) {
-          case Types.Entity.Player:
-            reason = entity.name;
-            break;
-          case Types.Entity.LavaPool:
-            reason = 'Lava';
-            break;
-          case Types.Entity.Wolf:
-            reason = 'A Wolf';
-            break;
-          case Types.Entity.Cat:
-            reason = 'A Cat';
-            break;
-          case Types.Entity.Moose:
-            reason = 'A Moose';
-            break;
-          case Types.Entity.AngryFish:
-            reason = 'A Fish';
-            break;
-          case Types.Entity.Yeti:
-            reason = 'A Yeti';
-            break;
-          case Types.Entity.Chimera:
-            reason = 'A Chimera';
-            break;
-          case Types.Entity.Roku:
-            reason = 'Roku';
-            break;
-          case Types.Entity.Snowball:
-            reason = 'Big Yeti';
-            break; // the yeti boss throws snowballs
-          case Types.Entity.Fireball:
-            reason = 'Roku';
-            break; // the roku throws fireballs
-          case Types.Entity.SwordProj:
-            reason = 'An Ancient Statue';
-            break; // the ancient statue throws swords
-          case Types.Entity.Ancient:
-            reason = 'An Ancient Statue';
-            break;
-          case Types.Entity.Boulder:
-            reason = 'An Ancient Statue';
-            break; // the ancient statue throws boulders
-        }
-      }
-      this.remove(
-        reason,
-        entity.type === Types.Entity.Player
-          ? Types.DisconnectReason.Player
-          : Types.DisconnectReason.Mob,
-      );
+    if (!this.health.isDead) return;
+
+    const DAMAGE_REASON = {
+      [Types.Entity.Player]: (e) => e.name,
+      [Types.Entity.LavaPool]: 'Lava',
+      [Types.Entity.Wolf]: 'A Wolf',
+      [Types.Entity.Cat]: 'A Cat',
+      [Types.Entity.Moose]: 'A Moose',
+      [Types.Entity.AngryFish]: 'A Fish',
+      [Types.Entity.Yeti]: 'A Yeti',
+      [Types.Entity.Chimera]: 'A Chimera',
+      [Types.Entity.Roku]: 'Roku',
+      [Types.Entity.Snowball]: 'Big Yeti',
+      [Types.Entity.Fireball]: 'Roku',
+      [Types.Entity.SwordProj]: 'An Ancient Statue',
+      [Types.Entity.Ancient]: 'An Ancient Statue',
+      [Types.Entity.Boulder]: 'An Ancient Statue',
+    };
+
+    let reason = 'Unknown Entity';
+    if (entity && DAMAGE_REASON[entity.type]) {
+      const r = DAMAGE_REASON[entity.type];
+      reason = typeof r === 'function' ? r(entity) : r;
     }
+
+    this.remove(
+      reason,
+      entity && entity.type === Types.Entity.Player
+        ? Types.DisconnectReason.Player
+        : Types.DisconnectReason.Mob,
+    );
   }
 
   addEffect(type, id, config) {
@@ -428,26 +358,36 @@ class Player extends Entity {
   }
 
   remove(message = 'Server', type = Types.DisconnectReason.Server) {
-    if (this.client) {
-      this.client.disconnectReason = {
-        message: message,
-        type: type,
-      };
-      const game = {
+    if (this.removed) return;
+
+    const c = this.client;
+    if (c) {
+      c.disconnectReason = { message, type };
+      c.saveGame({
         coins: this.levels.coins,
         kills: this.kills,
-        playtime: this.playtime,
-      };
-      this.client.saveGame(game);
+        playtime: this.playtime
+      });
     }
+
+    this.evolutions?.reset?.();
+    this.effects.clear();
+    this.tamedEntities.clear();
+
     super.remove();
 
+    if (this.evolutions) {
+      this.evolutions.possibleEvols.clear();
+      this.evolutions.skippedEvols.clear();
+    }
+
     if (this.name !== 'Update Testing Account') {
-      this.game.map.spawnCoinsInShape(
-        this.shape,
-        this.calculateDropAmount(),
-        this.client?.account?.id,
-      );
+      const drop = this.calculateDropAmount();
+      if (drop > 0) {
+        this.game.map.spawnCoinsInShape(
+          this.shape, drop, c?.account?.id,
+        );
+      }
     }
   }
 
@@ -456,10 +396,10 @@ class Player extends Entity {
     return coins < 13
       ? 10
       : Math.round(
-          coins < 25000
-            ? coins * 0.8
-            : Math.log10(coins) * 30000 - 111938.2002602,
-        );
+        coins < 25000
+          ? coins * 0.8
+          : Math.log10(coins) * 30000 - 111938.2002602,
+      );
   }
 
   cleanup() {
@@ -478,5 +418,28 @@ class Player extends Entity {
     ].forEach((property) => property.reset());
   }
 }
+
+
+// Check if any duplicate ids in cosmetics.json
+(function verifyCosmeticIds() {
+  const seen = new Map();
+  const duplicates = [];
+
+  for (const skin of Object.values(skins)) {
+    if (seen.has(skin.id)) {
+      duplicates.push({ id: skin.id, name: skin.name, first: seen.get(skin.id) });
+    } else {
+      seen.set(skin.id, skin.name);
+    }
+  }
+
+  if (duplicates.length) {
+    console.error('Duplicate skin ids found in cosmetics.json:');
+    duplicates.forEach(({ id, name, first }) =>
+      console.error(`  id=${id}  first="${first}"  duplicate="${name}"`),
+    );
+    process.exit(1);
+  }
+})();
 
 module.exports = Player;
