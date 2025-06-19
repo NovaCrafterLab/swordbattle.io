@@ -1,3 +1,5 @@
+// server/src/game/components/Quadtree.js
+
 const { rectangleRectangle } = require('../collisions');
 
 class QuadTree {
@@ -11,126 +13,73 @@ class QuadTree {
     this.nodes = [];
   }
 
-  insert(collisionRect) {
-    if (!rectangleRectangle(this.boundary, collisionRect)) {
+  insert(rect) {
+    if (!rectangleRectangle(this.boundary, rect)) return;
+
+    if (this.nodes.length) {
+      for (const node of this.nodes) node.insert(rect);
       return;
     }
 
-    if (this.nodes.length !== 0) {
-      for (const node of this.nodes) {
-        node.insert(collisionRect);
-      }
-      return;
-    }
-
-    this.items.push(collisionRect);
+    this.items.push(rect);
 
     if (
       this.items.length > this.capacity &&
       this.level < this.maxLevel &&
-      this.nodes.length === 0
+      !this.nodes.length
     ) {
       this.subdivide();
     }
   }
 
   subdivide() {
-    const { x, y } = this.boundary;
-    const subWidth = this.boundary.width / 2;
-    const subHeight = this.boundary.height / 2;
-    const nextLevel = this.level + 1;
+    const { x, y, width, height } = this.boundary;
+    const hw = width / 2;
+    const hh = height / 2;
+    const next = this.level + 1;
 
-    // Top-right
     this.nodes.push(
-      new QuadTree(
-        {
-          x: x + subWidth,
-          y,
-          width: subWidth,
-          height: subHeight,
-        },
-        this.capacity,
-        this.maxLevel,
-        nextLevel,
-      ),
-    );
-    // Top-left
-    this.nodes.push(
-      new QuadTree(
-        {
-          x,
-          y,
-          width: subWidth,
-          height: subHeight,
-        },
-        this.capacity,
-        this.maxLevel,
-        nextLevel,
-      ),
-    );
-    // Bottom-left
-    this.nodes.push(
-      new QuadTree(
-        {
-          x,
-          y: y + subHeight,
-          width: subWidth,
-          height: subHeight,
-        },
-        this.capacity,
-        this.maxLevel,
-        nextLevel,
-      ),
-    );
-    // Bottom-right
-    this.nodes.push(
-      new QuadTree(
-        {
-          x: x + subWidth,
-          y: y + subHeight,
-          width: subWidth,
-          height: subHeight,
-        },
-        this.capacity,
-        this.maxLevel,
-        nextLevel,
-      ),
+      new QuadTree({ x: x + hw, y, width: hw, height: hh }, this.capacity, this.maxLevel, next),
+      new QuadTree({ x, y, width: hw, height: hh }, this.capacity, this.maxLevel, next),
+      new QuadTree({ x, y: y + hh, width: hw, height: hh }, this.capacity, this.maxLevel, next),
+      new QuadTree({ x: x + hw, y: y + hh, width: hw, height: hh }, this.capacity, this.maxLevel, next),
     );
 
-    // Move all items in subnodes
     for (const item of this.items) {
-      for (const node of this.nodes) {
-        node.insert(item);
-      }
+      for (const node of this.nodes) node.insert(item);
     }
     this.items = [];
   }
 
-  get(collisionRect) {
-    const query = this.query(collisionRect);
-    // Remove duplicates
-    return query.filter((item, i) => query.indexOf(item) === i);
+  get(rect) {
+    if (!rectangleRectangle(this.boundary, rect)) return [];
+
+    const seen = new Set();
+    const unique = [];
+    for (const itm of this.query(rect)) {
+      const key = itm.entity ? itm.entity.id : itm;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(itm);
+    }
+    return unique;
   }
 
-  query(collisionRect) {
-    if (!rectangleRectangle(this.boundary, collisionRect)) {
-      return [];
-    }
+  query(rect) {
+    if (!rectangleRectangle(this.boundary, rect)) return [];
 
     let found = this.items;
 
     for (const node of this.nodes) {
-      const queried = node.query(collisionRect);
-      if (queried.length !== 0) {
-        found = found.concat(queried);
-      }
+      const sub = node.query(rect);
+      if (sub.length) found = found.concat(sub);
     }
-
     return found;
   }
 
   clear() {
     this.items = [];
+    for (const node of this.nodes) node.clear();
     this.nodes = [];
   }
 }
