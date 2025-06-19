@@ -1,3 +1,4 @@
+// server/src/game/Game.js
 const SAT = require('sat');
 const IdPool = require('./components/IdPool');
 const QuadTree = require('./components/Quadtree');
@@ -9,6 +10,10 @@ const config = require('../config');
 const filter = require('leo-profanity');
 const Types = require('./Types');
 const { getBannedIps } = require('../moderation');
+
+const { prof } = require('../prof');
+
+
 class Game {
   constructor() {
     this.entities = new Map();
@@ -31,24 +36,31 @@ class Game {
   }
 
   tick(dt) {
-    for (const [id, entity] of this.entities) {
-      // Not a sword
-      const entityType = entity.type;
-      if (entityType === Types.Entity.Sword) continue;
-      entity.update(dt);
-    }
-
-    this.updateQuadtree(this.entitiesQuadtree, this.entities);
-    const response = new SAT.Response();
-    for (const [id, entity] of this.entities) {
-      if (entity.removed) continue;
-
-      if (entity.isGlobal) {
-        this.globalEntities.entities.set(entity.id, entity);
+    prof('entities.update', () => {
+      for (const [id, entity] of this.entities) {
+        const entityType = entity.type;
+        if (entityType === Types.Entity.Sword) continue;
+        entity.update(dt);
       }
+    });
 
-      this.processCollisions(entity, response, dt);
-    }
+    prof('quadtree.rebuild', () => {
+      this.updateQuadtree(this.entitiesQuadtree, this.entities);
+    });
+
+    prof('collisions', () => {
+      const response = new SAT.Response();
+      for (const [id, entity] of this.entities) {
+        if (entity.removed) continue;
+
+        if (entity.isGlobal) {
+          this.globalEntities.entities.set(entity.id, entity);
+        }
+
+        this.processCollisions(entity, response, dt);
+      }
+    });
+
     this.map.update(dt);
   }
 

@@ -1,3 +1,7 @@
+// server/src/utilities/Loop.js
+
+const { prof } = require('../prof');
+
 const logSevereLag = (() => {
   let last = 0; // last log timestamp
   const PERIOD = 180_000; // 3 min in ms
@@ -13,10 +17,10 @@ const logSevereLag = (() => {
 
     console.log(
       `Server lagging severely... tick took ${ctx.tickTimeElapsed} ms. ` +
-        `Expecting <${ctx.interval} ms.\n` +
-        `Real player count: ${realPlayersCnt}; ` +
-        `Entities: ${ctx.entityCnt}; ` +
-        `Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
+      `Expecting <${ctx.interval} ms.\n` +
+      `Real player count: ${realPlayersCnt}; ` +
+      `Entities: ${ctx.entityCnt}; ` +
+      `Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
     );
   };
 })();
@@ -31,8 +35,8 @@ class Loop {
     this.lastSecond = this.lastTickTime[0];
     this.tickTimeElapsed = 0;
     this.game = game;
-    this.eventHandler = () => {};
-    this.onTpsUpdate = () => {};
+    this.eventHandler = () => { };
+    this.onTpsUpdate = () => { };
   }
 
   setEventHandler(eventHandler) {
@@ -63,21 +67,22 @@ class Loop {
 
   runLoop() {
     if (!this.isRunning) return;
+    prof('wholeTick', () => {
+      const currentTime = process.hrtime();
+      this.lastTickTime = currentTime;
+      const now = Date.now();
 
-    const currentTime = process.hrtime();
-    this.lastTickTime = currentTime;
-    const now = Date.now();
+      this.updateTPS(currentTime);
+      this.eventHandler();
+      this.tickTimeElapsed = Date.now() - now;
 
-    this.updateTPS(currentTime);
-    this.eventHandler();
-    this.tickTimeElapsed = Date.now() - now;
-
-    if (this.tickTimeElapsed > this.interval * 2) {
-      logSevereLag(this);
-    }
-    this.ticksThisSecond++;
-    const delay = this.interval - this.tickTimeElapsed;
-    setTimeout(() => this.runLoop(), delay);
+      if (this.tickTimeElapsed > this.interval * 2) {
+        logSevereLag(this);
+      }
+      this.ticksThisSecond++;
+      const delay = Math.max(0, this.interval - this.tickTimeElapsed);
+      setTimeout(() => this.runLoop(), delay);
+    });
   }
 
   updateTPS(currentTime) {
