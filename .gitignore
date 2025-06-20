@@ -194,3 +194,7 @@ dist
 
 # End of https://www.toptal.com/developers/gitignore/api/nextjs,web,node,yarn
 scripts/dev-start.sh
+
+# sonar
+.scannerwork
+sonar-project.properties
