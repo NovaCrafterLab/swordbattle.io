@@ -5,41 +5,48 @@ function ChangelogModal() {
     <div className="changelog">
       <h1 style={{ fontSize: 30, color: 'white' }}>What's new? (June 2025)</h1>
       <ul style={{ fontSize: 22, color: '#ffffcc' }}>
-        Team up with friends and create official alliances with other players
-        using Swordbattle's new{' '}
-        <span style={{ color: '#ffff00' }}>Clan Tags!</span>
+        🎮 <span style={{ color: '#ffff00' }}>Swordbattle.io</span> is now live on{' '}
+        <span style={{ color: '#00ff88' }}>Nova Crafter Lab</span>!
       </ul>
       <ul style={{ fontSize: 15, color: '#ffffee' }}>
-        - Log in to your account, hover over your name in the top right, and
-        click "Change Clan" to get your own!
+        - Welcome to our revolutionary Web3 gaming platform
       </ul>
       <ul style={{ fontSize: 15, color: '#ffffee' }}>
-        - This will be the only clan update for now, but clans will get more and
-        more features later on!
+        - Introducing <span style={{ color: '#00ff88' }}>Gameme</span> - where gaming meets meme culture
+      </ul>
+      <ul style={{ fontSize: 15, color: '#ffffee' }}>
+        - We're pioneering the fusion of viral memes with engaging gameplay
       </ul>
       <br></br>
-      <ul style={{ fontSize: 21, color: '#ff2222' }}>
-        New boss: <span style={{ color: '#aaaaaa' }}>Ancient Statue</span>
+      <ul style={{ fontSize: 18, color: '#77aaff' }}>
+        🚀 What is Gameme?
       </ul>
       <ul style={{ fontSize: 14, color: '#cccccc' }}>
-        - Ancient Statues throw player-flinging boulders and sharp, rocky
-        swords, and can ram into players to deal damage, too! They can be found
-        in the forest biome.
+        - Gameme combines the viral nature of memes with the addictive fun of gaming
       </ul>
       <ul style={{ fontSize: 14, color: '#cccccc' }}>
-        - Ancient Statues are weaker than the other bosses and drop less coins,
-        but up to 3 can spawn at once!
+        - Our platform leverages meme culture's spreadability to promote Web3 adoption
+      </ul>
+      <ul style={{ fontSize: 14, color: '#cccccc' }}>
+        - Experience games that are both entertaining and culturally relevant
       </ul>
       <br></br>
-      <ul style={{ fontSize: 16, color: '#cccccc' }}>
-        - New Mobs: <span style={{ color: '#77aaff' }}>Blue Fish</span> and{' '}
-        <span style={{ color: '#ffaa00' }}>Orange Fish</span>
+      <ul style={{ fontSize: 16, color: '#ffaa00' }}>
+        🎯 Our Mission
       </ul>
       <ul style={{ fontSize: 14, color: '#ffccff' }}>
-        - Blue fish will run away when hit, but orange fish will attack you!
-        Both are found in the river biome.
+        - Making Web3 accessible through the universal language of memes
+      </ul>
+      <ul style={{ fontSize: 14, color: '#ffccff' }}>
+        - Creating games that players love to share and discuss
+      </ul>
+      <ul style={{ fontSize: 14, color: '#ffccff' }}>
+        - Building a community where creativity meets blockchain innovation
       </ul>
       <br></br>
+      <ul style={{ fontSize: 16, color: '#ffff00' }}>
+        🔥 Get ready for the future of gaming!
+      </ul>
       {/* <p style={{fontSize: 16, color: 'lightblue'}}>Join the <a href="https://discord.com/invite/9A9dNTGWb9" className="primary-link" target="_blank" rel="nofollow">Swordbattle.io Discord Server</a> to learn more about these updates on the full changelog!</p> */}
     </div>
   );
