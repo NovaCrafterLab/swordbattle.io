@@ -1,0 +1,320 @@
+.rewards-modal-wrapper {
+  min-width: 500px;
+  max-width: 700px;
+  max-height: 80vh;
+  overflow-y: auto;
+  
+  .rewards-modal {
+    .rewards-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 15px;
+
+      h2 {
+        margin: 0;
+        color: #ffd700;
+        font-size: 1.6em;
+        font-weight: bold;
+      }
+
+      .player-address {
+        font-family: monospace;
+        color: rgba(255, 255, 255, 0.7);
+        background: rgba(255, 255, 255, 0.1);
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-size: 0.9em;
+      }
+    }
+
+    .not-connected {
+      text-align: center;
+      padding: 40px 20px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .rewards-stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+      margin-bottom: 30px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+
+      .stat-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+
+        label {
+          font-size: 0.85em;
+          color: rgba(255, 255, 255, 0.7);
+          text-transform: uppercase;
+          font-weight: 500;
+        }
+
+        .stat-value {
+          font-size: 1.2em;
+          font-weight: bold;
+          color: #fff;
+
+          &.unclaimed {
+            color: #ffc107;
+          }
+        }
+      }
+    }
+
+    .rewards-history {
+      h3 {
+        margin: 0 0 20px 0;
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 1.2em;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 10px;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 40px;
+        color: rgba(255, 255, 255, 0.7);
+      }
+
+      .no-rewards {
+        text-align: center;
+        padding: 40px 20px;
+        color: rgba(255, 255, 255, 0.7);
+
+        p {
+          margin: 10px 0;
+        }
+      }
+
+      .rewards-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-height: 300px;
+        overflow-y: auto;
+        padding-right: 5px;
+
+        .reward-item {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 15px;
+          border-radius: 8px;
+          border-left: 4px solid transparent;
+          background: rgba(255, 255, 255, 0.05);
+          transition: all 0.2s ease;
+
+          &.winner {
+            border-left-color: #34c759;
+            background: rgba(52, 199, 89, 0.1);
+          }
+
+          &.loser {
+            border-left-color: #8e8e93;
+            background: rgba(142, 142, 147, 0.05);
+          }
+
+          &:hover {
+            background: rgba(255, 255, 255, 0.1);
+          }
+
+          .reward-info {
+            flex: 1;
+
+            .game-info {
+              display: flex;
+              align-items: center;
+              gap: 15px;
+              margin-bottom: 8px;
+
+              .game-id {
+                font-weight: bold;
+                color: #fff;
+              }
+
+              .rank {
+                font-size: 0.9em;
+                color: #ffd700;
+                font-weight: 500;
+              }
+
+              .time {
+                font-size: 0.8em;
+                color: rgba(255, 255, 255, 0.5);
+              }
+            }
+
+            .game-stats {
+              display: flex;
+              align-items: center;
+              gap: 20px;
+
+              .score {
+                color: rgba(255, 255, 255, 0.8);
+                font-size: 0.9em;
+              }
+
+              .reward-amount {
+                font-weight: bold;
+                font-size: 1.1em;
+
+                &.positive {
+                  color: #34c759;
+                }
+
+                &.zero {
+                  color: rgba(255, 255, 255, 0.5);
+                }
+              }
+            }
+          }
+
+          .reward-actions {
+            display: flex;
+            align-items: center;
+
+            .claim-btn {
+              background: linear-gradient(45deg, #34c759, #00ff88);
+              color: white;
+              border: none;
+              padding: 8px 16px;
+              border-radius: 6px;
+              font-weight: bold;
+              cursor: pointer;
+              transition: all 0.2s ease;
+              text-transform: uppercase;
+              font-size: 0.85em;
+
+              &:hover:not(:disabled) {
+                transform: translateY(-1px);
+                box-shadow: 0 3px 10px rgba(52, 199, 89, 0.4);
+              }
+
+              &:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+                transform: none;
+              }
+            }
+
+            .claimed-badge {
+              color: #34c759;
+              font-size: 0.9em;
+              font-weight: 500;
+            }
+
+            .no-reward {
+              color: rgba(255, 255, 255, 0.5);
+              font-size: 0.9em;
+            }
+          }
+        }
+
+        // 自定义滚动条
+        &::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        &::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 3px;
+        }
+
+        &::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.3);
+          border-radius: 3px;
+
+          &:hover {
+            background: rgba(255, 255, 255, 0.5);
+          }
+        }
+      }
+    }
+
+    .rewards-actions {
+      display: flex;
+      justify-content: center;
+      margin-top: 25px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+      .close-btn {
+        padding: 12px 30px;
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-transform: uppercase;
+
+        &:hover {
+          background: rgba(255, 255, 255, 0.2);
+        }
+      }
+    }
+  }
+}
+
+// 响应式设计
+@media (max-width: 700px) {
+  .rewards-modal-wrapper {
+    min-width: 90vw;
+    max-width: 90vw;
+    
+    .rewards-modal {
+      .rewards-header {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+      }
+
+      .rewards-stats {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .rewards-history .rewards-list .reward-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 15px;
+
+        .reward-info .game-info {
+          justify-content: center;
+        }
+
+        .reward-actions {
+          justify-content: center;
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 500px) {
+  .rewards-modal-wrapper {
+    .rewards-modal .rewards-history .rewards-list .reward-item {
+      .reward-info {
+        .game-info {
+          flex-direction: column;
+          gap: 5px;
+        }
+
+        .game-stats {
+          justify-content: center;
+          gap: 10px;
+        }
+      }
+    }
+  }
+} 

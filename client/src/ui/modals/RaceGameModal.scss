@@ -1,0 +1,267 @@
+.race-game-modal-wrapper {
+  min-width: 450px;
+  max-width: 600px;
+  
+  .race-game-modal {
+    .race-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 15px;
+
+      h2 {
+        margin: 0;
+        color: #ffd700;
+        font-size: 1.5em;
+        font-weight: bold;
+      }
+
+      .race-server-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+
+        .server-url {
+          font-size: 0.9em;
+          color: rgba(255, 255, 255, 0.7);
+          font-family: monospace;
+        }
+
+        .race-badge {
+          background: linear-gradient(45deg, #ff6b6b, #ffd93d);
+          color: #000;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 0.7em;
+          font-weight: bold;
+          text-transform: uppercase;
+        }
+      }
+    }
+
+    .race-content {
+      .game-status {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding: 15px;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+
+        .status-indicator {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+
+          .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            
+            &.orange { background-color: #ff9500; }
+            &.blue { background-color: #007aff; }
+            &.green { background-color: #34c759; }
+            &.yellow { background-color: #ffcc00; }
+            &.gray { background-color: #8e8e93; }
+          }
+
+          .status-text {
+            font-weight: 500;
+          }
+        }
+
+        .game-id {
+          font-family: monospace;
+          color: rgba(255, 255, 255, 0.7);
+          font-size: 0.9em;
+        }
+      }
+
+      .game-info {
+        margin-bottom: 20px;
+
+        .info-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 15px;
+
+          .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+
+            label {
+              font-size: 0.85em;
+              color: rgba(255, 255, 255, 0.7);
+              text-transform: uppercase;
+              font-weight: 500;
+            }
+
+            span {
+              font-size: 1.1em;
+              font-weight: bold;
+              color: #ffd700;
+            }
+          }
+        }
+      }
+
+      .wallet-info {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: rgba(0, 255, 0, 0.05);
+        border: 1px solid rgba(0, 255, 0, 0.2);
+        border-radius: 8px;
+
+        .wallet-header {
+          font-weight: bold;
+          margin-bottom: 10px;
+          color: #00ff88;
+        }
+
+        .balance-info {
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+
+          span {
+            font-size: 0.9em;
+            color: rgba(255, 255, 255, 0.8);
+          }
+        }
+      }
+
+      .error-message {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: rgba(255, 0, 0, 0.1);
+        border: 1px solid rgba(255, 0, 0, 0.3);
+        border-radius: 8px;
+        color: #ff6b6b;
+        font-size: 0.9em;
+      }
+
+      .tx-status {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: rgba(255, 193, 7, 0.1);
+        border: 1px solid rgba(255, 193, 7, 0.3);
+        border-radius: 8px;
+        color: #ffc107;
+        text-align: center;
+        font-weight: 500;
+      }
+    }
+
+    .race-actions {
+      display: flex;
+      gap: 15px;
+      margin-top: 25px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+      .race-btn {
+        flex: 1;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 8px;
+        font-size: 1em;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+
+        &:disabled {
+          cursor: not-allowed;
+          opacity: 0.6;
+        }
+
+        &.race-btn-primary {
+          background: linear-gradient(45deg, #007aff, #00c7ff);
+          color: white;
+          
+          &:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 122, 255, 0.4);
+          }
+        }
+
+        &.race-btn-secondary {
+          background: rgba(255, 255, 255, 0.1);
+          color: white;
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          
+          &:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.2);
+          }
+        }
+
+        &.race-btn-success {
+          background: linear-gradient(45deg, #34c759, #00ff88);
+          color: white;
+          
+          &:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 199, 89, 0.4);
+          }
+        }
+
+        &.race-btn-warning {
+          background: linear-gradient(45deg, #ff9500, #ffc107);
+          color: white;
+          
+          &:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 149, 0, 0.4);
+          }
+        }
+
+        &.race-btn-disabled {
+          background: rgba(142, 142, 147, 0.3);
+          color: rgba(255, 255, 255, 0.5);
+          cursor: not-allowed;
+        }
+      }
+    }
+  }
+}
+
+// 响应式设计
+@media (max-width: 600px) {
+  .race-game-modal-wrapper {
+    min-width: 90vw;
+    max-width: 90vw;
+    
+    .race-game-modal {
+      .race-header {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+      }
+
+      .race-content {
+        .game-info .info-grid {
+          grid-template-columns: 1fr;
+        }
+        
+        .wallet-info .balance-info {
+          span {
+            font-size: 0.8em;
+          }
+        }
+      }
+
+      .race-actions {
+        flex-direction: column;
+        
+        .race-btn {
+          width: 100%;
+        }
+      }
+    }
+  }
+} 
