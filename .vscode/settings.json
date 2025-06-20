@@ -1,5 +1,8 @@
 {
   "files.associations": {
-    ".env.*":       "properties"
+    ".env.development": "properties",
+    ".env.production": "properties",
+    ".env.example": "properties",
+    ".env.*": "properties"
   }
 }

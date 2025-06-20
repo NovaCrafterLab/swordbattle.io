@@ -1,0 +1,32 @@
+# ./docker-compose.prod.yml
+services:
+  db:
+    env_file:
+      - ./env/api.env.production
+    volumes:
+      - db_data:/var/lib/postgresql/data:rw
+    restart: always
+
+  api:
+    env_file:
+      - ./env/api.env.production
+    build:
+      context: ./api
+      args:
+        NODE_ENV: production
+    restart: always
+
+  server:
+    env_file:
+      - ./env/server.env.production
+    restart: always
+
+  client:
+    env_file:
+      - ./env/client.env.production
+    build:
+      context: ./client
+      target: runtime
+      args:
+        NODE_ENV: production
+    restart: always

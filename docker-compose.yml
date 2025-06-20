@@ -1,11 +1,10 @@
 version: '3.9'
 
-########################  SERVICES  ########################
 services:
-  # ---------- Database ----------
   db:
     image: postgres:16-alpine
-    env_file: .env
+    env_file:
+      - ./env/api.env.development
     environment:
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -19,12 +18,12 @@ services:
     restart: unless-stopped
     networks: [backnet]
 
-  # ---------- REST API ----------
   api:
     build:
       context: ./api
       target: runtime
-    env_file: .env
+    env_file:
+      - ./env/api.env.development
     environment:
       - API_PORT
       - DB_URL
@@ -39,12 +38,12 @@ services:
     restart: unless-stopped
     networks: [backnet]
 
-  # ---------- WebSocket Game Server ----------
   server:
     build:
       context: ./server
       target: runtime
-    env_file: .env
+    env_file:
+      - ./env/server.env.development
     environment:
       - SERVER_PORT
       - API_ENDPOINT
@@ -59,7 +58,6 @@ services:
     restart: unless-stopped
     networks: [backnet]
 
-  # ---------- Frontend (Static Client) ----------
   client:
     build:
       context: ./client
@@ -68,7 +66,8 @@ services:
         REACT_APP_API: ${REACT_APP_API}
         REACT_APP_ENDPOINT_DEV: ${REACT_APP_ENDPOINT_DEV}
         REACT_APP_ENDPOINT_TEST: ${REACT_APP_ENDPOINT_TEST}
-    env_file: .env
+    env_file:
+      - ./env/client.env.development
     ports:
       - '3000:80'
     depends_on:
@@ -76,7 +75,6 @@ services:
     restart: unless-stopped
     networks: [backnet]
 
-########################  VOLUMES & NETWORKS  ########################
 volumes:
   db_data:
 
