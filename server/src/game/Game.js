@@ -1,3 +1,4 @@
+// server/src/game/Game.js
 const SAT = require('sat');
 const IdPool = require('./components/IdPool');
 const QuadTree = require('./components/Quadtree');
@@ -9,6 +10,13 @@ const config = require('../config');
 const filter = require('leo-profanity');
 const Types = require('./Types');
 const { getBannedIps } = require('../moderation');
+const { rectangleRectangle } = require('./collisions');
+
+const { prof } = require('../prof');
+
+
+const sharedResp = new SAT.Response();
+
 class Game {
   constructor() {
     this.entities = new Map();
@@ -21,6 +29,8 @@ class Game {
 
     this.entitiesQuadtree = null;
     this.tps = 0;
+
+    this._qtTick = 0;
   }
 
   initialize() {
@@ -31,127 +41,66 @@ class Game {
   }
 
   tick(dt) {
-    for (const [id, entity] of this.entities) {
-      // Not a sword
-      const entityType = entity.type;
-      if (entityType === Types.Entity.Sword) continue;
-      entity.update(dt);
-    }
-
-    this.updateQuadtree(this.entitiesQuadtree, this.entities);
-    const response = new SAT.Response();
-    for (const [id, entity] of this.entities) {
-      if (entity.removed) continue;
-
-      if (entity.isGlobal) {
-        this.globalEntities.entities.set(entity.id, entity);
+    prof('entities.update', () => {
+      for (const entity of this.entities.values()) {
+        if (entity.type === Types.Entity.Sword) continue;
+        entity.update(dt);
       }
+    });
 
-      this.processCollisions(entity, response, dt);
+    const needRebuild = ++this._qtTick === 2 || this.newEntities.size > 0;
+    if (needRebuild) {
+      this._qtTick = 0;
+      prof('quadtree.rebuild', () => {
+        this.updateQuadtree(this.entitiesQuadtree, this.entities);
+      });
+      this.newEntities.clear();
     }
+
+    prof('collisions', () => {
+      for (const entity of this.entities.values()) {
+        if (entity.removed) continue;
+        if (entity.isGlobal) this.globalEntities.entities.set(entity.id, entity);
+        this.processCollisions(entity, dt);
+      }
+    });
+
     this.map.update(dt);
   }
 
-  processCollisions(entity, response, dt) {
-    const quadtreeSearch = this.entitiesQuadtree.get(entity.shape.boundary);
+  processCollisions(entity, dt) {
+    const candidates = this.entitiesQuadtree.get(entity.shape.boundary);
+
+    const targetsSet = entity._targetsSet ??
+      (entity._targetsSet = (Array.isArray(entity.targets)
+        ? new Set(entity.targets)
+        : entity.targets));
+
+    const entityBoundary = entity.shape.boundary;
+    const entityCenter = entity.shape.center;
 
     let depth = 0;
-    for (const { entity: targetEntity } of quadtreeSearch) {
-      if (entity === targetEntity) continue;
-      if (targetEntity.removed) continue;
 
-      // Update entity depth (buildings)
-      if (targetEntity.depthZone) {
-        const center = entity.shape.center;
-        if (targetEntity.depthZone.isPointInside(center.x, center.y)) {
-          depth = targetEntity.id;
-        }
+    for (let i = 0; i < candidates.length; i++) {
+      const target = candidates[i].entity;
+      if (entity === target || target.removed) continue;
+
+      if (target.depthZone && target.depthZone.isPointInside(entityCenter.x, entityCenter.y)) {
+        depth = target.id;
       }
 
-      if (!entity.targets.includes(targetEntity.type)) continue;
+      if (!targetsSet.has(target.type)) continue;
 
-      response.clear();
-      if (targetEntity.shape.collides(entity.shape, response)) {
-        entity.processTargetsCollision(targetEntity, response, dt);
+      if (!rectangleRectangle(entityBoundary, target.shape.boundary)) continue;
+
+      sharedResp.clear();
+      if (target.shape.collides(entity.shape, sharedResp)) {
+        entity.processTargetsCollision(target, sharedResp, dt);
       }
     }
+
     entity.depth = depth;
   }
-
-  //   processClientMessage(client, data) {
-  //     if (data.spectate && !client.spectator.isSpectating) {
-  //       this.addSpectator(client, data);
-  //       return;
-  //     }
-
-  //     let { player } = client;
-
-  //     if (data.play && (!player || player.removed)) {
-  //       if(getBannedIps().includes(client.ip)) {
-  //         // close connection
-  //         client.socket.close();
-  //         return;
-  //       }
-
-  //       if(config.recaptchaSecretKey) {
-  //         // verify recaptcha
-  //         if(!data.captchaP1) return client.socket.close();
-  //         const captchaAsText = helpers.importCaptcha(data);
-  // const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${config.recaptchaSecretKey}&response=${captchaAsText}&remoteip=${client.ip}`;
-
-  //         fetch(verifyUrl, {
-  //           method: 'post',
-  //           headers: {
-  //             Accept: 'application/json',
-  //             'Content-Type': 'application/json',
-  //           },
-  //         }).then(res => res.json()).then(json => {
-  //           console.log(json);
-  //           if(json.success) {
-  //             player = this.addPlayer(client, data);
-  //           } else {
-  //             client.socket.close();
-  //           }
-  //         }).catch(err => {
-  //           console.log(err);
-  //           client.socket.close();
-  //         });
-  //       } else {
-  //       player = this.addPlayer(client, data);
-  //       }
-  //     } else {
-  //       if (!player) return;
-  //       if (data.inputs) {
-  //         for (const input of data.inputs) {
-  //           if (player.inputDown) {
-  //             player.inputs.inputDown(input.inputType);
-  //           } else {
-  //             player.inputs.inputUp(input.inputType);
-  //           }
-  //         }
-  //       }
-  //       if (data.angle && !isNaN(data.angle)) {
-  //         player.angle = Number(data.angle);
-  //       }
-  //       if (data.mouse) {
-  //         if (data.mouse.force === 0) {
-  //           player.mouse = null;
-  //         } else {
-  //           player.mouse = data.mouse;
-  //         }
-  //       }
-  //       if (data.selectedEvolution) {
-  //         player.evolutions.upgrade(data.selectedEvolution);
-  //       }
-  //       if (data.selectedBuff) {
-  //         player.levels.addBuff(data.selectedBuff);
-  //       }
-  //       if (data.chatMessage && typeof data.chatMessage === 'string') {
-  //         player.addChatMessage(data.chatMessage);
-  //       }
-  //     }
-
-  //   }
 
   processClientMessage(client, data) {
     if (data.spectate && !client.spectator.isSpectating) {
@@ -160,14 +109,6 @@ class Game {
         !client.captchaVerified &&
         !data.captchaP1
       ) {
-        // try {
-
-        //     client.socket.close();
-
-        //   } catch(e) {
-        //   console.log(e)
-        //   }
-        //   return;
         this.addSpectator(client);
         client.captchaVerified = true;
       } else if (
@@ -175,31 +116,8 @@ class Game {
         !client.captchaVerified &&
         data.captchaP1
       ) {
-        // const captchaAsText = helpers.importCaptcha(data);
-        // const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${config.recaptchaSecretKey}&response=${captchaAsText}&remoteip=${client.ip}`;
-
-        // fetch(verifyUrl, {
-        //   method: 'post',
-        //   headers: {
-        //     Accept: 'application/json',
-        //     'Content-Type': 'application/json',
-        //   },
-        // }).then(res => res.json()).then(json => {
-        //   if(json.success && json.score >= 0.1) {
         this.addSpectator(client);
         client.captchaVerified = true;
-        //   } else {
-        //     console.log('disconnected reason: invalid recaptcha', json);
-        //     try {
-        //     client.socket.close();
-        //     } catch(e) {
-        //       console.log(e);
-        //     }
-        //   }
-        // }).catch(err => {
-        //   console.log(err);
-        //   client.socket.close();
-        // });
       } else if (!config.recaptchaSecretKey || client.captchaVerified) {
         this.addSpectator(client);
       }
@@ -256,6 +174,7 @@ class Game {
       player.addChatMessage(data.chatMessage);
     }
   }
+
   createPayload(client) {
     const { spectator } = client;
     const entity = spectator.isSpectating ? spectator : client.player;

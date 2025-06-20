@@ -218,27 +218,27 @@ export function getCookies() {
   return cookies;
 }
 
-export function findCoinCollector(coin: Coin, players: Player[]) {
-  const errorThreshold = 1.1;
-  const coinRadius = coin.shape.radius * coin.container.scale * errorThreshold;
-  const coinX = coin.shape.x;
-  const coinY = coin.shape.y;
+export function findCoinCollector(
+  coin: Coin,
+  players: Player[],
+): Player | null {
+  const ERR  = 1.1;
+  const cRad = coin.shape.radius * coin.container.scale * ERR;
+  const cX   = coin.shape.x;
+  const cY   = coin.shape.y;
 
-  let entity = null;
-  players.forEach((player: Player) => {
-    const playerRadius = player.shape.radius * 2 * errorThreshold;
-    if (playerRadius > coinRadius) {
-      const distance = Math.sqrt(
-        Math.pow(player.shape.x - coinX, 2) +
-          Math.pow(player.shape.y - coinY, 2),
-      );
-      if (distance < playerRadius) {
-        entity = player;
-      }
-    }
-  });
-  return entity;
+  for (let i = 0, len = players.length; i < len; i++) {
+    const p     = players[i];
+    const pRad  = p.shape.radius * 2 * ERR;
+    if (pRad < cRad) continue;
+
+    const dx = p.shape.x - cX;
+    const dy = p.shape.y - cY;
+    if (dx * dx + dy * dy < pRad * pRad) return p;
+  }
+  return null;
 }
+
 
 // export const playVideoAd = () => {
 //   const windowAny = window as any;

@@ -157,12 +157,14 @@ class LevelSystem {
       ? levels[this.level].coins
       : this.nextLevelCoins * 2.2;
     this.upgradePoints += 1;
-    this.player.evolutions.checkForEvolutions();
 
-    let sizeBuffsNeeded =
-      levels[this.level].scale - levels[this.level - 1].scale;
-    if (!sizeBuffsNeeded) sizeBuffsNeeded = 0;
-    this.addBuff(Types.Buff.Size, false, sizeBuffsNeeded);
+    const sizeNeed = Math.max(
+      0,
+      levels[this.level].scale - levels[this.level - 1].scale,
+    );
+    if (sizeNeed) this.addBuff(Types.Buff.Size, false, sizeNeed);
+
+    this.player.evolutions.checkForEvolutions();
   }
 }
 

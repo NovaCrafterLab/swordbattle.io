@@ -1,59 +1,60 @@
-const logSevereLag = (() => {
-  let last = 0; // last log timestamp
-  const PERIOD = 180_000; // 3 min in ms
+// server/src/utilities/Loop.js
 
-  return (ctx /* this */) => {
+const { prof } = require('../prof');
+
+const NS_PER_MS = 1_000_000n;
+const NS_PER_SEC = 1_000_000_000n;
+
+/* throttle severe-lag logs to once every 3 min */
+const logSevereLag = (() => {
+  let last = 0; // ms timestamp
+  const PERIOD = 180_000; // 3 min
+
+  return (ctx) => {
     const now = Date.now();
-    if (now - last < PERIOD) return; // skip if inside throttle window
+    if (now - last < PERIOD) return;
     last = now;
 
-    const realPlayersCnt = [...ctx.game.players.values()].filter(
-      (p) => !p.isBot,
-    ).length;
+    const realPlayersCnt = ctx.game.realPlayersCnt ??
+      [...ctx.game.players.values()].filter((p) => !p.isBot).length;
 
-    console.log(
-      `Server lagging severely... tick took ${ctx.tickTimeElapsed} ms. ` +
-        `Expecting <${ctx.interval} ms.\n` +
-        `Real player count: ${realPlayersCnt}; ` +
-        `Entities: ${ctx.entityCnt}; ` +
-        `Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
+    console.warn(
+      `Server lagging... tick ${ctx.tickTimeElapsed} ms (> ${ctx.interval} ms)\n` +
+      `Players: ${realPlayersCnt}, Entities: ${ctx.entityCnt}, ` +
+      `Heap: ${Math.round(process.memoryUsage().heapUsed / 1048576)} MB`,
     );
   };
 })();
 
 class Loop {
   constructor(interval = 50, game) {
+    this.interval = interval;          // target frame in ms
+    this.game = game;                  // world reference
+
     this.entityCnt = 0;
-    this.interval = interval;
     this.isRunning = false;
+
     this.ticksThisSecond = 0;
-    this.lastTickTime = process.hrtime();
-    this.lastSecond = this.lastTickTime[0];
+    this.lastSecond = Number(process.hrtime.bigint() / NS_PER_SEC);
     this.tickTimeElapsed = 0;
-    this.game = game;
+
     this.eventHandler = () => {};
     this.onTpsUpdate = () => {};
+
+    /* pre-bind to avoid per-frame closure allocation */
+    this._runLoop = this.runLoop.bind(this);
   }
 
-  setEventHandler(eventHandler) {
-    this.eventHandler = eventHandler;
-  }
+  /* external hooks */
+  setEventHandler(fn) { this.eventHandler = fn; }
+  setOnTpsUpdate(fn) { this.onTpsUpdate = fn; }
+  setEntityCnt(n) { this.entityCnt = n; }
 
-  setOnTpsUpdate(onTpsUpdate) {
-    this.onTpsUpdate = onTpsUpdate;
-  }
-
-  setEntityCnt(entityCnt) {
-    this.entityCnt = entityCnt;
-  }
-
+  /* lifecycle */
   start() {
-    if (this.isRunning) {
-      console.trace('Loop is already running.');
-      return;
-    }
+    if (this.isRunning) return console.trace('Loop already running.');
     this.isRunning = true;
-    this.runLoop();
+    setImmediate(this._runLoop); // first frame asap, but after current stack
   }
 
   stop() {
@@ -61,31 +62,30 @@ class Loop {
     this.ticksThisSecond = 0;
   }
 
+  /* main loop */
   runLoop() {
     if (!this.isRunning) return;
+    prof('wholeTick', () => {
+      const start = process.hrtime.bigint();
 
-    const currentTime = process.hrtime();
-    this.lastTickTime = currentTime;
-    const now = Date.now();
+      this.updateTPS(start);
+      this.eventHandler();
 
-    this.updateTPS(currentTime);
-    this.eventHandler();
-    this.tickTimeElapsed = Date.now() - now;
+      const elapsedNs = process.hrtime.bigint() - start;
+      this.tickTimeElapsed = Number(elapsedNs / NS_PER_MS);
 
-    if (this.tickTimeElapsed > this.interval * 2) {
-      logSevereLag(this);
-    }
-    this.ticksThisSecond++;
-    const delay = this.interval - this.tickTimeElapsed;
-    setTimeout(() => this.runLoop(), delay);
+      if (this.tickTimeElapsed > this.interval * 2) logSevereLag(this);
+      this.ticksThisSecond++;
+
+      const delay = Math.max(0, this.interval - this.tickTimeElapsed);
+      setTimeout(this._runLoop, delay);
+    });
   }
 
-  updateTPS(currentTime) {
-    const currentSecond = currentTime[0];
+  /* TPS & diagnostics */
+  updateTPS(nowNs) {
+    const currentSecond = Number(nowNs / NS_PER_SEC);
     if (currentSecond !== this.lastSecond) {
-      const memoryUsage = process.memoryUsage();
-      const memoryUsageReadable = `${Math.round((memoryUsage.heapUsed / 1024 / 1024) * 100) / 100}MB`;
-      // console.log(`tps: ${this.ticksThisSecond} | expected tps: ${1000 / this.interval} | tick time: ${this.tickTimeElapsed}ms | entities: ${this.entityCnt} | time per 100 entities: ${(Math.round(this.tickTimeElapsed * 10000 / this.entityCnt) / 100)}ms | memory usage: ${memoryUsageReadable}`);
       this.onTpsUpdate(this.ticksThisSecond);
       this.ticksThisSecond = 0;
       this.lastSecond = currentSecond;
