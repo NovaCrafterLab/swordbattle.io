@@ -1,4 +1,8 @@
-require('dotenv').config();
+require('dotenv').config({
+  path: process.env.NODE_ENV === 'production' 
+    ? '../env/api.env.production'
+    : '../env/api.env.development'
+});
 
 interface ConfigProps {
   isProduction: boolean;
@@ -14,6 +18,21 @@ interface ConfigProps {
   clanWaitTime: number;
   clanLength: [number, number];
 }
+
+// 调试信息：显示环境变量状态
+console.log('=== API Configuration Debug ===');
+console.log('Environment Variables:');
+console.log('  NODE_ENV:', process.env.NODE_ENV);
+console.log('  API_PORT:', process.env.API_PORT);
+console.log('  PORT:', process.env.PORT);
+console.log('  DB_URL:', process.env.DB_URL);
+console.log('  DB_USERNAME:', process.env.DB_USERNAME);
+console.log('  DB_PASSWORD:', process.env.DB_PASSWORD ? '***' : 'undefined');
+console.log('  DB_HOST:', process.env.DB_HOST);
+console.log('  DB_PORT:', process.env.DB_PORT);
+console.log('  USE_SSL:', process.env.USE_SSL);
+console.log('  APP_SECRET:', process.env.APP_SECRET ? '***' : 'undefined');
+console.log('  SERVER_SECRET:', process.env.SERVER_SECRET ? '***' : 'undefined');
 
 export const config: ConfigProps = {
   isProduction: process.env.NODE_ENV === 'production',
@@ -34,3 +53,13 @@ export const config: ConfigProps = {
   clanWaitTime: 7 * 24 * 60 * 60 * 1000, // 3 days
   clanLength: [0, 5],
 };
+
+// 调试信息：显示最终配置
+console.log('Final Configuration:');
+console.log('  isProduction:', config.isProduction);
+console.log('  port:', config.port);
+console.log('  databaseURL:', config.databaseURL);
+console.log('  useSSL:', config.useSSL);
+console.log('  appSecret:', config.appSecret ? '***' : 'undefined');
+console.log('  serverSecret:', config.serverSecret ? '***' : 'undefined');
+console.log('===============================');

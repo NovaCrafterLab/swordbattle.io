@@ -9,13 +9,13 @@ import ERC20ABI from './ERC20.json';
 const ENV = process.env.REACT_APP_NODE_ENV || 'development'; // 默认为开发环境
 export const isDev = ENV === 'development';
 export const isRelease = ENV === 'release';
-
+console.log(ENV);
 // 合约地址配置 - 根据环境选择
 export const CONTRACTS = isDev
   ? {
       // BSC测试网合约地址
-      SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_TESTNET || '0x0000000000000000000000000000000000000000',
-      USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_TESTNET || '0x0000000000000000000000000000000000000000',
+      SWORD_BATTLE: '0x8306be4db9071eaeeaa772fe52b5338990f90ec9',
+      USD1_TOKEN: '0x73b8C8c5c81F257832e86A7329123035477C12fA',
     }
   : {
       // BSC主网合约地址

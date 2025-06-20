@@ -757,5 +757,20 @@ module.exports = function (webpackEnv) {
     // Turn off performance processing because we utilize
     // our own hints via the FileSizeReporter
     performance: false,
+    // 在配置末尾添加，忽略 source map 警告
+    ignoreWarnings: [
+      {
+        module: /node_modules\/@reown/,
+        message: /Failed to parse source map/,
+      },
+      {
+        module: /node_modules\/superstruct/,
+        message: /Failed to parse source map/,
+      },
+      {
+        module: /node_modules\/qr/,
+        message: /Failed to parse source map/,
+      },
+    ],
   };
 };
