@@ -23,7 +23,8 @@
     "fmt": "prettier --config prettier.config.mjs --write '**/*.{js,jsx,ts,tsx,mjs,cjs,css,scss,md,html,yml,yaml}'",
     "prepare": "husky",
     "cz": "cz",
-    "docker:dev": "docker compose up -d --build",
+    "docker:dev": "cross-env NODE_ENV=development DOCKER_BUILDKIT=1 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build",
+    "docker:prod": "cross-env NODE_ENV=production DOCKER_BUILDKIT=1 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build",
     "docker:up": "docker compose up -d",
     "docker:build": "DOCKER_BUILDKIT=1 docker compose build",
     "docker:build:nc": "DOCKER_BUILDKIT=1 docker compose build --no-cache",
@@ -34,7 +35,8 @@
     "docker:clean": "docker compose down --rmi all --remove-orphans",
     "docker:clean:all": "docker compose down -v --rmi all --remove-orphans",
     "docker:rebuild": "yarn docker:clean:all && yarn docker:build:nc",
-    "deps:check": "yarn dedupe && yarn npm audit --environment production --severity moderate"
+    "deps:check": "yarn dedupe && yarn npm audit --environment production --severity moderate",
+    "generate:env": "node tools/gen-env.js"
   },
   "dependencies": {
     "http-proxy": "^1.18.1",
@@ -44,6 +46,7 @@
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "commitizen": "^4.3.1",
+    "cross-env": "^7.0.3",
     "cz-conventional-changelog": "^3.3.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.2",
