@@ -243,9 +243,14 @@ class Player extends Entity {
         dx = speed * nx;
         dy = speed * ny;
 
-        if (modNoDiag && dirX && dirY) {
-          dx = dirX ? 0 : dx;
-          dy = dirY ? speed * Math.sign(dirY) : 0;
+        if (modNoDiag && dx && dy) {
+          if (Math.abs(dx) > Math.abs(dy)) {
+            dy = 0;
+            dx = speed * Math.sign(dx);
+          } else {
+            dx = 0;
+            dy = speed * Math.sign(dy);
+          }
         }
         this.movementDirection = Math.atan2(dirY, dirX);
       } else {
