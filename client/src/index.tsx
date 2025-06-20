@@ -66,7 +66,7 @@ try {
 const root = ReactDOM.createRoot(document.getElementById('root') as Element);
 document.addEventListener('contextmenu', function (e) {
   e.preventDefault();
-  });
+});
 
 // RainbowKit/Wagmi 配置
 const createFallbackTransport = (rpcUrls: readonly string[]) => {
@@ -80,7 +80,9 @@ const createFallbackTransport = (rpcUrls: readonly string[]) => {
     )
   );
 };
+
 const supportedChains = ENVIRONMENT.isDev ? [bscTestnet] : [bsc];
+
 const wagmiConfig = getDefaultConfig({
   appName: 'Swordbattle.io',
   projectId: 'demo', // 无需 WalletConnect Project ID
@@ -89,11 +91,11 @@ const wagmiConfig = getDefaultConfig({
     ? { [bscTestnet.id]: createFallbackTransport(BSC_TESTNET_RPC_POOL) }
     : { [bsc.id]: createFallbackTransport(BSC_MAINNET_RPC_POOL) },
 });
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 3,
-     
       staleTime: 5 * 60 * 1000,
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,

@@ -128,6 +128,32 @@ footer {
       cursor: pointer;
       transform: scale(1.05);
     }
+
+    .rewards-btn {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(45deg, #ffd700, #ffb347);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+
+      &:hover {
+        background: linear-gradient(45deg, #ffed4e, #ffc947);
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(255, 215, 0, 0.4);
+      }
+
+      &:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+      }
+    }
   }
 }
 

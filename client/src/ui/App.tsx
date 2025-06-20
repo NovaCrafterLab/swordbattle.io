@@ -21,6 +21,8 @@ import ChangelogModal from './modals/ChangelogModal';
 import LoginModal from './modals/LoginModal';
 import SignupModal from './modals/SignupModal';
 import ConnectionError from './modals/ConnectionError';
+import RaceGameModal from './modals/RaceGameModal';
+import RewardsModal from './modals/RewardsModal';
 
 import {
   clearAccount,
@@ -232,17 +234,31 @@ function App() {
     if (!isConnected) {
       alert('Not connected yet');
       return;
+    }
+
+    // 检查是否为比赛服务器
+    const selectedServer = servers.find(s => s.value === server);
+    const isRaceServer = selectedServer?.value === 'race';
+    
+    if (isRaceServer) {
+      // 显示比赛游戏模态框
+      const serverUrl = `${window.location.protocol}//${selectedServer.address}`;
+      setModal(
+        <RaceGameModal
+          serverUrl={serverUrl}
+          onClose={closeModal}
+          onJoinGame={() => {
+            setGameStarted(true);
+            window.phaser_game?.events.emit('startGame', name);
+          }}
+        />
+      );
     } else {
+      // 普通游戏流程
       const go = () => {
         setGameStarted(true);
         window.phaser_game?.events.emit('startGame', name);
       };
-      // playVideoAd().then(() => {
-      //   go();
-      // }).catch((e) => {
-      //   console.log('Error playing video ad', e);
-      //   go();
-      // });
       go();
     }
   };
@@ -308,6 +324,11 @@ function App() {
       onStart();
     }
   }, [loadingProgress]);
+
+  const openRewards = () => {
+    setModal(<RewardsModal onClose={closeModal} />);
+  };
+
   const isLoaded = loadingProgress === 100;
   return (
     <div className="App">
@@ -480,6 +501,15 @@ function App() {
             <div className="auth-buttons" style={scale.styles}>
               <div className="auth-btn">
                 <BSCWalletButton />
+              </div>
+              <div className="auth-btn">
+                <button 
+                  className="rewards-btn"
+                  onClick={openRewards}
+                  title="View Race Game Rewards"
+                >
+                  🏆 Rewards
+                </button>
               </div>
               {account.isLoggedIn ? (
                 <div className="dropdown">

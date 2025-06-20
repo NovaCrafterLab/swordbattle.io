@@ -18,6 +18,7 @@ try {
 
 const servers: Server[] = [
   { value: 'test', name: 'TEST', address: config.serverTest, ping: 0 },
+  { value: 'race', name: 'Race', address: 'localhost:8000', ping: 0 },
   // { value: 'eu', name: 'Europe', address: config.serverEU, ping: 0 },
   // { value: 'us', name: 'USA', address: config.serverUS, ping: 0 },
   // { value: 'usbackup', name: 'USA Unblocked', address: config.serverUSBackup, ping: 0 },

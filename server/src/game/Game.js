@@ -128,7 +128,6 @@ class Game {
     let { player } = client;
     if (data.play && (!player || player.removed)) {
       if (getBannedIps().includes(client.ip)) {
-        // close connection
         console.log('disconnected reason: banned ip', client.ip);
         client.socket.close();
         return;
@@ -230,7 +229,6 @@ class Game {
   getAllEntities(player) {
     const entities = {};
     for (const entityId of player.getEntitiesInViewport()) {
-      // const entity = [...this.entities].find(e => e.id === entityId);
       const entity = this.entities.get(entityId);
       if (!entity) continue;
       if (entity.isStatic) {
@@ -295,9 +293,6 @@ class Game {
   }
 
   addPlayer(client, data) {
-    // const name = client.player
-    //   ? client.player.name
-    //   : (client.account ? client.account.username : this.handleNickname(data.name || ''));
     const name =
       client.account && client.account.username
         ? client.account.username
@@ -320,25 +315,174 @@ class Game {
       }
     }
 
-    // if (this.isNameReserved(name)) return;
+    // 区块链玩家验证（仅在比赛服务器模式下）
+    if (config.isRaceServer && config.blockchain.enabled && this.blockchainService) {
+      // 检查是否提供了钱包地址
+      if (!data.walletAddress) {
+        console.log(`❌ Player ${name} rejected: No wallet address provided for race server`);
+        client.socket.close();
+        return;
+      }
 
+      // 异步验证玩家注册状态
+      this.verifyAndAddPlayer(client, data, name);
+      return; // 异步处理，不直接返回player
+    }
+
+    // 正常模式直接添加玩家
+    return this.createAndAddPlayer(client, data, name);
+  }
+
+  /**
+   * 异步验证并添加玩家（区块链模式）
+   */
+  async verifyAndAddPlayer(client, data, name) {
+    try {
+      const walletAddress = data.walletAddress;
+      console.log(`🔍 Verifying player ${name} with wallet ${walletAddress}...`);
+
+      // 验证玩家是否已在链上注册
+      const isRegistered = await this.verifyPlayerRegistration(walletAddress);
+      
+      if (!isRegistered) {
+        console.log(`❌ Player ${name} rejected: Not registered for current game`);
+        // 发送错误消息给客户端
+        client.socket.send(JSON.stringify({
+          type: 'error',
+          message: 'You must join the game on-chain first. Please pay the entry fee to participate.',
+        }));
+        client.socket.close();
+        return;
+      }
+
+      // 检查玩家是否已经在游戏中
+      for (const player of this.players) {
+        if (player.client?.walletAddress?.toLowerCase() === walletAddress.toLowerCase()) {
+          console.log(`❌ Player ${name} rejected: Already in game with this wallet`);
+          client.socket.close();
+          return;
+        }
+      }
+
+      // 验证通过，创建玩家
+      console.log(`✅ Player ${name} verified and joining game`);
+      const player = this.createAndAddPlayer(client, data, name);
+      
+      // 保存钱包地址到客户端
+      client.walletAddress = walletAddress;
+      
+      return player;
+    } catch (error) {
+      console.error(`❌ Error verifying player ${name}:`, error);
+      client.socket.send(JSON.stringify({
+        type: 'error',
+        message: 'Failed to verify blockchain registration. Please try again.',
+      }));
+      client.socket.close();
+    }
+  }
+
+  /**
+   * 创建并添加玩家到游戏
+   */
+  createAndAddPlayer(client, data, name) {
     const player = new Player(this, name);
     client.spectator.isSpectating = false;
     client.fullSync = true;
     client.player = player;
     player.client = client;
+    
     if (client.account) {
       const account = client.account;
       if (account.skins && account.skins.equipped) {
         player.skin = account.skins.equipped;
         player.sword.skin = player.skin;
-      } else {
       }
     }
+    
     this.players.add(player);
     this.map.spawnPlayer(player);
     this.addEntity(player);
+    
+    // 在比赛模式下，检查是否可以开始游戏
+    if (config.isRaceServer && config.blockchain.enabled && this.gamePhase === 'waiting') {
+      this.checkGameStart();
+    }
+    
     return player;
+  }
+
+  /**
+   * 检查是否可以开始游戏
+   */
+  checkGameStart() {
+    const registeredCount = this.registeredPlayers.size;
+    const activeCount = this.players.size;
+    
+    console.log(`🎮 Game status: ${activeCount}/${registeredCount} players joined`);
+    
+    // 可以添加更多开始游戏的条件，比如最小玩家数、时间限制等
+    if (activeCount >= Math.min(2, registeredCount)) { // 至少2个玩家或所有注册玩家都加入
+      if (this.gamePhase === 'waiting') {
+        this.gamePhase = 'active';
+        console.log('🚀 Game started! All players are ready.');
+        
+        // 设置游戏超时定时器
+        this.startGameTimeout();
+        
+        // 可以在这里添加游戏开始的特殊逻辑
+        this.broadcastGameStart();
+      }
+    }
+  }
+
+  /**
+   * 开始游戏超时计时
+   */
+  startGameTimeout() {
+    if (this.gameTimeoutTimer) {
+      clearTimeout(this.gameTimeoutTimer);
+    }
+
+    this.gameTimeoutTimer = setTimeout(() => {
+      console.log('⏰ Game timeout reached, ending game automatically');
+      this.endBlockchainGame('timeout');
+    }, this.maxGameDuration);
+
+    console.log(`⏱️ Game timeout set for ${this.maxGameDuration / 1000 / 60} minutes`);
+  }
+
+  /**
+   * 清除游戏超时定时器
+   */
+  clearGameTimeout() {
+    if (this.gameTimeoutTimer) {
+      clearTimeout(this.gameTimeoutTimer);
+      this.gameTimeoutTimer = null;
+      console.log('⏱️ Game timeout cleared');
+    }
+  }
+
+  /**
+   * 广播游戏开始消息
+   */
+  broadcastGameStart() {
+    const message = {
+      type: 'gameStart',
+      gameId: this.blockchainGameId,
+      phase: this.gamePhase,
+      playerCount: this.players.size,
+    };
+
+    for (const player of this.players) {
+      if (player.client && player.client.socket) {
+        try {
+          player.client.socket.send(JSON.stringify(message));
+        } catch (error) {
+          console.error('Error sending game start message to player:', error);
+        }
+      }
+    }
   }
 
   isNameReserved(name) {
@@ -401,6 +545,287 @@ class Game {
     this.newEntities.clear();
     this.removedEntities.clear();
     this.globalEntities.cleanup();
+  }
+
+  // ============ 区块链相关方法 ============
+
+  /**
+   * 初始化区块链游戏
+   * 在服务器启动时调用，创建链上游戏
+   */
+  async initializeBlockchainGame() {
+    if (!config.isRaceServer || !config.blockchain.enabled || !this.blockchainService) {
+      return;
+    }
+
+    if (this.isGameCreationInProgress) {
+      console.log('⏳ Game creation already in progress...');
+      return;
+    }
+
+    try {
+      this.isGameCreationInProgress = true;
+      this.gamePhase = 'initializing';
+      
+      console.log('🚀 Creating blockchain game...');
+      
+      // 调用合约创建游戏
+      const txHash = await this.blockchainService.createGame();
+      console.log(`✅ Game creation transaction sent: ${txHash}`);
+      
+      // 监听GameCreated事件获取gameId
+      await this.waitForGameCreated();
+      
+    } catch (error) {
+      console.error('❌ Failed to create blockchain game:', error);
+      this.gamePhase = 'error';
+      this.isGameCreationInProgress = false;
+    }
+  }
+
+  /**
+   * 等待GameCreated事件
+   */
+  async waitForGameCreated() {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Game creation timeout'));
+      }, 60000); // 60秒超时
+
+      // 这里需要监听合约事件，暂时用轮询替代
+      const checkGameCreated = async () => {
+        try {
+          const gameCounter = await this.blockchainService.getGameCounter();
+          if (this.blockchainGameId === null && gameCounter > 0) {
+            this.blockchainGameId = gameCounter;
+            this.gamePhase = 'waiting';
+            this.gameStartTime = Date.now();
+            
+            console.log(`🎮 Blockchain game created with ID: ${this.blockchainGameId}`);
+            console.log('⏳ Waiting for players to join...');
+            
+            clearTimeout(timeout);
+            this.isGameCreationInProgress = false;
+            resolve();
+          } else {
+            setTimeout(checkGameCreated, 2000); // 2秒后重试
+          }
+        } catch (error) {
+          clearTimeout(timeout);
+          reject(error);
+        }
+      };
+
+      checkGameCreated();
+    });
+  }
+
+  /**
+   * 验证玩家是否已加入链上游戏
+   */
+  async verifyPlayerRegistration(playerAddress) {
+    if (!this.blockchainService || !this.blockchainGameId) {
+      return false;
+    }
+
+    try {
+      // 检查玩家是否在链上游戏中
+      const players = await this.blockchainService.getGamePlayers(this.blockchainGameId);
+      const isRegistered = players.includes(playerAddress.toLowerCase());
+      
+      if (isRegistered) {
+        this.registeredPlayers.add(playerAddress.toLowerCase());
+        console.log(`✅ Player ${playerAddress} verified as registered`);
+        return true;
+      } else {
+        console.log(`❌ Player ${playerAddress} not registered for game ${this.blockchainGameId}`);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error verifying player registration:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 收集玩家最终分数
+   */
+  collectPlayerScores() {
+    this.finalScores.clear();
+    
+    for (const player of this.players) {
+      if (player.removed) continue;
+      
+      // 收集玩家分数数据
+      const score = {
+        playerId: player.id,
+        playerName: player.name,
+        kills: player.kills || 0,
+        coins: player.levels?.coins || 0,
+        playtime: player.playtime || 0,
+        // 可以根据需要添加更多分数计算逻辑
+        finalScore: this.calculatePlayerScore(player),
+        walletAddress: player.client?.walletAddress || null
+      };
+      
+      this.finalScores.set(player.id, score);
+    }
+    
+    console.log(`📊 Collected scores for ${this.finalScores.size} players`);
+    return this.finalScores;
+  }
+
+  /**
+   * 计算玩家最终分数
+   */
+  calculatePlayerScore(player) {
+    // 简单的分数计算逻辑，可以根据需要调整
+    const kills = player.kills || 0;
+    const coins = player.levels?.coins || 0;
+    const playtime = player.playtime || 0;
+    
+    // 分数 = 击杀数 * 100 + 金币数 * 10 + 游戏时间（秒）
+    return kills * 100 + coins * 10 + Math.floor(playtime / 1000);
+  }
+
+  /**
+   * 结束区块链游戏
+   */
+  async endBlockchainGame(reason = 'normal') {
+    if (!config.isRaceServer || !config.blockchain.enabled || !this.blockchainService) {
+      return;
+    }
+
+    if (this.gamePhase === 'ending' || this.gamePhase === 'ended') {
+      console.log('⚠️ Game already ending or ended');
+      return;
+    }
+
+    try {
+      // 清除游戏超时定时器
+      this.clearGameTimeout();
+      
+      this.gamePhase = 'ending';
+      this.gameEndTime = Date.now();
+      
+      console.log(`🏁 Ending blockchain game (reason: ${reason})`);
+      
+      // 收集所有玩家分数
+      const scores = this.collectPlayerScores();
+      
+      // 为每个玩家的分数进行签名（通过API服务器）
+      await this.submitPlayerScores(scores);
+      
+      // 调用合约结束游戏
+      const txHash = await this.blockchainService.endGame(this.blockchainGameId);
+      console.log(`✅ Game end transaction sent: ${txHash}`);
+      
+      this.gamePhase = 'ended';
+      
+      // 可选：重新开始新游戏
+      setTimeout(() => {
+        this.initializeBlockchainGame();
+      }, 10000); // 10秒后创建新游戏
+      
+    } catch (error) {
+      console.error('❌ Failed to end blockchain game:', error);
+    }
+  }
+
+  /**
+   * 提交玩家分数到合约
+   */
+  async submitPlayerScores(scores) {
+    if (!scores || scores.size === 0) {
+      console.log('⚠️ No scores to submit');
+      return;
+    }
+
+    console.log('📤 Submitting player scores to contract...');
+    
+    for (const [playerId, scoreData] of scores) {
+      if (!scoreData.walletAddress) {
+        console.log(`⚠️ Skipping player ${scoreData.playerName} - no wallet address`);
+        continue;
+      }
+
+      try {
+        // 获取玩家nonce
+        const nonce = await this.blockchainService.getPlayerNonce(scoreData.walletAddress);
+        
+        // 通过API服务器获取签名
+        const signature = await this.getScoreSignature(
+          this.blockchainGameId,
+          scoreData.walletAddress,
+          scoreData.finalScore,
+          nonce
+        );
+
+        // 调用合约提交分数
+        const txHash = await this.blockchainService.submitScore(
+          this.blockchainGameId,
+          scoreData.finalScore,
+          nonce,
+          signature
+        );
+
+        console.log(`✅ Score submitted for ${scoreData.playerName}: ${scoreData.finalScore} (tx: ${txHash})`);
+        this.playerScoreSubmitted.add(playerId);
+        
+      } catch (error) {
+        console.error(`❌ Failed to submit score for ${scoreData.playerName}:`, error);
+      }
+    }
+  }
+
+  /**
+   * 通过API服务器获取分数签名
+   */
+  async getScoreSignature(gameId, playerAddress, score, nonce) {
+    try {
+      const response = await fetch(`${config.apiEndpoint}/blockchain/sign-score`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          gameId,
+          playerAddress,
+          score,
+          nonce,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        return data.data.signature;
+      } else {
+        throw new Error(data.error || 'Failed to get signature');
+      }
+    } catch (error) {
+      console.error('Error getting score signature:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取区块链游戏状态
+   */
+  getBlockchainGameStatus() {
+    if (!config.isRaceServer || !config.blockchain.enabled) {
+      return null;
+    }
+
+    return {
+      gameId: this.blockchainGameId,
+      phase: this.gamePhase,
+      registeredPlayersCount: this.registeredPlayers.size,
+      activePlayersCount: this.players.size,
+      gameStartTime: this.gameStartTime,
+      gameEndTime: this.gameEndTime,
+      finalScoresCount: this.finalScores.size,
+      scoresSubmittedCount: this.playerScoreSubmitted.size,
+    };
   }
 }
 

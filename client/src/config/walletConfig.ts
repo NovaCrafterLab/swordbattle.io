@@ -1,6 +1,9 @@
 // RainbowKit/Wagmi/Viem 钱包相关配置
 // 适配 BSC 主网与测试网，预留 ABI 路径与类型声明
 
+// ABI导入
+import DeploySwordABI from './DeploySword.json';
+import ERC20ABI from './ERC20.json';
 
 // 环境变量检查
 const ENV = process.env.REACT_APP_NODE_ENV || 'development'; // 默认为开发环境
@@ -10,13 +13,38 @@ export const isRelease = ENV === 'release';
 // 合约地址配置 - 根据环境选择
 export const CONTRACTS = isDev
   ? {
+      // BSC测试网合约地址
+      SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_TESTNET || '0x0000000000000000000000000000000000000000',
+      USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_TESTNET || '0x0000000000000000000000000000000000000000',
     }
   : {
+      // BSC主网合约地址
+      SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_MAINNET || '0x0000000000000000000000000000000000000000',
+      USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_MAINNET || '0x0000000000000000000000000000000000000000',
     } as const;
 
 // ABI导入
 export const ABIS = {
+  SWORD_BATTLE: DeploySwordABI as readonly any[],
+  USD1_TOKEN: ERC20ABI.abi as readonly any[],
 } as const;
+
+// 合约配置类型
+export type ContractConfig = {
+  address: `0x${string}`;
+  abi: readonly any[];
+};
+
+// 导出合约配置
+export const getSwordBattleContract = (): ContractConfig => ({
+  address: CONTRACTS.SWORD_BATTLE as `0x${string}`,
+  abi: ABIS.SWORD_BATTLE,
+});
+
+export const getUSD1TokenContract = (): ContractConfig => ({
+  address: CONTRACTS.USD1_TOKEN as `0x${string}`,
+  abi: ABIS.USD1_TOKEN,
+});
 
 // BSC主网RPC池配置
 export const BSC_MAINNET_RPC_POOL = [

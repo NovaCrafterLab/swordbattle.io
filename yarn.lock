@@ -4399,6 +4399,7 @@ __metadata:
     typeorm: "npm:^0.3.17"
     typescript: "npm:^5.1.3"
     uuid: "npm:^9.0.1"
+    viem: "npm:^2.31.3"
   languageName: unknown
   linkType: soft
 
@@ -4499,15 +4500,16 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@swordbattle/server@workspace:server"
   dependencies:
-    dotenv: "npm:^16.1.4"
+    dotenv: "npm:^16.4.5"
     leo-profanity: "npm:^1.7.0"
     nodemon: "npm:^3.1.10"
     poly-decomp: "npm:^0.3.0"
     protobufjs: "npm:^7.2.5"
     rimraf: "npm:^6.0.1"
     sat: "npm:^0.9.0"
-    uWebSockets.js: "uNetworking/uWebSockets.js#v20.49.0"
+    uWebSockets.js: "github:uNetworking/uWebSockets.js#v20.44.0"
     uuid: "npm:^9.0.0"
+    viem: "npm:^2.0.0"
   languageName: unknown
   linkType: soft
 
@@ -9172,7 +9174,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"dotenv@npm:^16.1.4, dotenv@npm:^16.3.1, dotenv@npm:^16.4.7":
+"dotenv@npm:^16.3.1, dotenv@npm:^16.4.5, dotenv@npm:^16.4.7":
   version: 16.5.0
   resolution: "dotenv@npm:16.5.0"
   checksum: 10c0/5bc94c919fbd955bf0ba44d33922a1e93d1078e64a1db5c30faeded1d996e7a83c55332cb8ea4fae5a9ca4d0be44cbceb95c5811e70f9f095298df09d1997dd9
@@ -19348,10 +19350,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"uWebSockets.js@uNetworking/uWebSockets.js#v20.49.0":
-  version: 20.49.0
-  resolution: "uWebSockets.js@https://github.com/uNetworking/uWebSockets.js.git#commit=442087c0a01bf146acb7386910739ec81df06700"
-  checksum: 10c0/a404642ffaddc274127a44c9b47f4fd1dc604d833f1bce6aa63f7598b0d90762c3cd85bbe9e834b2b63fcb9d8b62bf888825a54762ebc35c6cfb90a4c9febb0a
+"uWebSockets.js@github:uNetworking/uWebSockets.js#v20.44.0":
+  version: 20.44.0
+  resolution: "uWebSockets.js@https://github.com/uNetworking/uWebSockets.js.git#commit=8fa05571bf6ea95be8966ad313d9d39453e381ae"
+  checksum: 10c0/48c64a0da5c92caf7e982fc61f937b7a93db346b4c9006f1f01e62b8da410bb72abf03b108ea11d2089d01bf82a2ff385a88d7a5ccdc3cc3943b73bf189ffe16
   languageName: node
   linkType: hard
 
@@ -19853,7 +19855,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"viem@npm:>=2.29.0, viem@npm:^2.1.1, viem@npm:^2.31.3":
+"viem@npm:>=2.29.0, viem@npm:^2.0.0, viem@npm:^2.1.1, viem@npm:^2.31.3":
   version: 2.31.3
   resolution: "viem@npm:2.31.3"
   dependencies:

@@ -394,6 +394,46 @@ class Player extends Entity {
         );
       }
     }
+
+    // 区块链游戏结束检查（仅在比赛服务器模式下）
+    if (config.isRaceServer && config.blockchain.enabled && this.game.blockchainService) {
+      this.checkBlockchainGameEnd();
+    }
+  }
+
+  /**
+   * 检查是否需要结束区块链游戏
+   */
+  checkBlockchainGameEnd() {
+    // 延迟检查，给其他玩家死亡事件时间处理
+    setTimeout(() => {
+      try {
+        const alivePlayers = [...this.game.players].filter(player => !player.removed);
+        const registeredPlayers = this.game.registeredPlayers ? this.game.registeredPlayers.size : 0;
+        
+        console.log(`🔍 Checking game end condition: ${alivePlayers.length} alive, ${registeredPlayers} registered`);
+        
+        // 如果只剩下1个或0个玩家，结束游戏
+        if (alivePlayers.length <= 1) {
+          console.log('🏁 Game ending: Only 1 or 0 players remaining');
+          this.game.endBlockchainGame('last_player_standing');
+        }
+        // 如果所有注册玩家都死了，也结束游戏
+        else if (registeredPlayers > 0) {
+          const aliveRegisteredPlayers = alivePlayers.filter(player => 
+            player.client?.walletAddress && 
+            this.game.registeredPlayers?.has(player.client.walletAddress.toLowerCase())
+          );
+          
+          if (aliveRegisteredPlayers.length === 0) {
+            console.log('🏁 Game ending: No registered players remaining');
+            this.game.endBlockchainGame('no_registered_players');
+          }
+        }
+      } catch (error) {
+        console.error('Error checking blockchain game end:', error);
+      }
+    }, 1000); // 1秒延迟
   }
 
   calculateDropAmount() {

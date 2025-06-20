@@ -6,6 +6,7 @@ import { config } from './config';
 import { GamesModule } from './games/games.module';
 import { StatsModule } from './stats/stats.module';
 import { AuthService } from './auth/auth.service';
+import { BlockchainModule } from './blockchain/blockchain.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AuthService } from './auth/auth.service';
     AccountsModule,
     GamesModule,
     StatsModule,
+    BlockchainModule,
   ],
   providers: [AuthService],
 })
