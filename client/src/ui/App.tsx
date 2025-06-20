@@ -508,7 +508,7 @@ function App() {
                   onClick={openRewards}
                   title="View Race Game Rewards"
                 >
-                  🏆 Rewards
+                  Rewards
                 </button>
               </div>
               {account.isLoggedIn ? (

@@ -133,15 +133,26 @@ footer {
       width: 100%;
       height: 100%;
       background: linear-gradient(45deg, #ffd700, #ffb347);
-      color: #000;
       border: none;
       border-radius: 8px;
-      font-size: 16px;
-      font-weight: bold;
       cursor: pointer;
       transition: all 0.2s ease;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+
+      /* —— 新增文字样式 —— */
+      font-family: 'Arial Black', Arial, sans-serif;
+      font-size: 22px;
+      font-weight: bold;
+      color: #fff;
+      -webkit-text-stroke: 1px rgba(0, 0, 0, 0.4);
+      text-shadow:
+          /* 四个方向的黑色“轮廓” */
+        -1px -1px 0 #000,
+        1px -1px 0 #000,
+        -1px 1px 0 #000,
+        1px 1px 0 #000,
+        /* 额外一点柔和阴影增加立体感 */ 0 2px 4px rgba(0, 0, 0, 0.3);
 
       &:hover {
         background: linear-gradient(45deg, #ffed4e, #ffc947);
