@@ -66,14 +66,6 @@ try {
 const root = ReactDOM.createRoot(document.getElementById('root') as Element);
 document.addEventListener('contextmenu', function (e) {
   e.preventDefault();
-<<<<<<< Updated upstream
-});
-root.render(
-  <Provider store={store}>
-    <RouterProvider router={router} />
-  </Provider>,
-);
-=======
   });
 
 // RainbowKit/Wagmi 配置
@@ -120,4 +112,3 @@ root.render(
     </QueryClientProvider>
   </WagmiProvider>
 );
->>>>>>> Stashed changes
