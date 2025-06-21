@@ -45,12 +45,19 @@ class Spectator {
 
   updatePoint() {
     this.timer.renew();
-
     const angle = helpers.random(-Math.PI, Math.PI);
     this.startX = this.toX;
     this.startY = this.toY;
     this.toX += this.distance * Math.cos(angle);
     this.toY += this.distance * Math.sin(angle);
+
+    // 限制范围在地图边界内，留一些边距避免太靠近边缘
+    const MAP_MARGIN = 2000; // 距离地图边缘的边距
+    const MAX_X = (this.game.map.width / 2) - MAP_MARGIN;
+    const MAX_Y = (this.game.map.height / 2) - MAP_MARGIN;
+    
+    this.toX = Math.max(-MAX_X, Math.min(MAX_X, this.toX));
+    this.toY = Math.max(-MAX_Y, Math.min(MAX_Y, this.toY));
   }
 
   update(dt) {
