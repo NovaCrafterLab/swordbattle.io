@@ -1,3 +1,5 @@
+// server/src/game/GameMap.js
+
 const SAT = require('sat');
 const Polygon = require('./shapes/Polygon');
 const Biome = require('./biomes/Biome');
@@ -275,6 +277,7 @@ class GameMap {
   }
 
   processBorderCollision(entity, dt) {
+    if (entity.type === Types.Entity.Coin) return;
     entity.collidesWithForbidden(dt, true);
 
     const bounds = entity.shape.boundary;

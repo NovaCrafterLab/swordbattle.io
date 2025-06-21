@@ -62,7 +62,7 @@ class Game {
       }
     });
 
-    const needRebuild = ++this._qtTick === 2 || this.newEntities.size > 0;
+    const needRebuild = ++this._qtTick === 4 || this.newEntities.size > 0;
     if (needRebuild) {
       this._qtTick = 0;
       prof('quadtree.rebuild', () => {
