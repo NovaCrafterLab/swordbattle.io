@@ -4,7 +4,7 @@ import config from '../../game/PhaserConfig';
 import Leaderboard from './Leaderboard';
 import GameResults from './GameResults';
 import './GameComponent.scss';
-import Ad from '../Ad';
+// import Ad from '../Ad';
 
 declare global {
   interface Window {
@@ -59,19 +59,19 @@ function GameComponent({
             game={game}
             results={gameResults}
             isLoggedIn={loggedIn}
-            adElement={
-              <Ad
-                screenW={dimensions.width}
-                screenH={dimensions.height}
-                types={[
-                  [728, 90],
-                  [970, 90],
-                  [970, 250],
-                ]}
-                centerOnOverflow={600}
-                horizThresh={0.2}
-              />
-            }
+            // adElement={
+            //   <Ad
+            //     screenW={dimensions.width}
+            //     screenH={dimensions.height}
+            //     types={[
+            //       [728, 90],
+            //       [970, 90],
+            //       [970, 250],
+            //     ]}
+            //     centerOnOverflow={600}
+            //     horizThresh={0.2}
+            //   />
+            // }
           />
         </>
       )}
