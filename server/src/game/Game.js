@@ -762,8 +762,14 @@ class Game {
       // 收集所有玩家分数
       const scores = this.collectPlayerScores();
       
-      // 为每个玩家的分数进行签名（通过API服务器）
-      await this.submitPlayerScores(scores);
+      // 尝试为每个玩家的分数进行签名（通过API服务器）
+      // 但不要让分数提交失败阻止游戏结束
+      try {
+        await this.submitPlayerScores(scores);
+      } catch (scoreError) {
+        console.error('❌ Failed to submit player scores, but continuing with game end:', scoreError);
+        // 继续执行游戏结束流程，不让分数提交失败阻止游戏结束
+      }
       
       // 调用合约结束游戏
       const txHash = await this.blockchainService.endGame(this.blockchainGameId);
@@ -778,6 +784,8 @@ class Game {
       
     } catch (error) {
       console.error('❌ Failed to end blockchain game:', error);
+      // 即使出错也要尝试设置状态，避免游戏卡在ending状态
+      this.gamePhase = 'error';
     }
   }
 
@@ -792,25 +800,40 @@ class Game {
 
     console.log('📤 Submitting player scores to contract...');
     
+    let totalPlayers = 0;
+    let playersWithWallet = 0;
+    let successfulSubmissions = 0;
+    let failedSubmissions = 0;
+    
     for (const [playerId, scoreData] of scores) {
+      totalPlayers++;
+      
       if (!scoreData.walletAddress) {
         console.log(`⚠️ Skipping player ${scoreData.playerName} - no wallet address`);
         continue;
       }
 
+      playersWithWallet++;
+      console.log(`🔄 Processing score for ${scoreData.playerName} (${scoreData.walletAddress}): ${scoreData.finalScore}`);
+
       try {
         // 获取玩家nonce
+        console.log(`📋 Getting nonce for player ${scoreData.walletAddress}...`);
         const nonce = await this.blockchainService.getPlayerNonce(scoreData.walletAddress);
+        console.log(`📋 Player nonce: ${nonce}`);
         
         // 通过API服务器获取签名
+        console.log(`✍️ Getting signature from API server...`);
         const signature = await this.getScoreSignature(
           this.blockchainGameId,
           scoreData.walletAddress,
           scoreData.finalScore,
           nonce
         );
+        console.log(`✍️ Signature obtained: ${signature.substring(0, 20)}...`);
 
         // 调用合约提交分数
+        console.log(`📊 Submitting score to blockchain...`);
         const txHash = await this.blockchainService.submitScore(
           this.blockchainGameId,
           scoreData.finalScore,
@@ -820,11 +843,20 @@ class Game {
 
         console.log(`✅ Score submitted for ${scoreData.playerName}: ${scoreData.finalScore} (tx: ${txHash})`);
         this.playerScoreSubmitted.add(playerId);
+        successfulSubmissions++;
         
       } catch (error) {
         console.error(`❌ Failed to submit score for ${scoreData.playerName}:`, error);
+        console.error(`❌ Error details: ${error.message}`);
+        failedSubmissions++;
       }
     }
+    
+    console.log(`📊 Score submission summary:`);
+    console.log(`   Total players: ${totalPlayers}`);
+    console.log(`   Players with wallet: ${playersWithWallet}`);
+    console.log(`   Successful submissions: ${successfulSubmissions}`);
+    console.log(`   Failed submissions: ${failedSubmissions}`);
   }
 
   /**
@@ -832,20 +864,50 @@ class Game {
    */
   async getScoreSignature(gameId, playerAddress, score, nonce) {
     try {
+      // 验证参数
+      console.log(`🔍 Signature request parameters:`);
+      console.log(`   gameId: ${gameId} (type: ${typeof gameId})`);
+      console.log(`   playerAddress: ${playerAddress} (type: ${typeof playerAddress})`);
+      console.log(`   score: ${score} (type: ${typeof score})`);
+      console.log(`   nonce: ${nonce} (type: ${typeof nonce})`);
+      
+      if (gameId === undefined || gameId === null) {
+        throw new Error('gameId is undefined or null');
+      }
+      if (playerAddress === undefined || playerAddress === null || playerAddress === '') {
+        throw new Error('playerAddress is undefined, null or empty');
+      }
+      if (score === undefined || score === null) {
+        throw new Error('score is undefined or null');
+      }
+      if (nonce === undefined || nonce === null) {
+        throw new Error('nonce is undefined or null');
+      }
+
+      // 将BigInt转换为字符串以避免JSON序列化问题
+      const requestBody = {
+        gameId: typeof gameId === 'bigint' ? gameId.toString() : String(gameId),
+        playerAddress: String(playerAddress),
+        score: typeof score === 'bigint' ? score.toString() : String(score),
+        nonce: typeof nonce === 'bigint' ? nonce.toString() : String(nonce),
+      };
+      
+      console.log(`📤 Sending request to ${config.apiEndpoint}/blockchain/sign-score`);
+      console.log(`📤 Request body: ${JSON.stringify(requestBody)}`);
+
       const response = await fetch(`${config.apiEndpoint}/blockchain/sign-score`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          gameId,
-          playerAddress,
-          score,
-          nonce,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log(`📨 Response status: ${response.status}`);
+      
       const data = await response.json();
+      console.log(`📨 Response data: ${JSON.stringify(data)}`);
+      
       if (data.success) {
         return data.data.signature;
       } else {

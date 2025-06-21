@@ -353,7 +353,7 @@ class BlockchainService {
    */
   async getPlayerNonce(playerAddress) {
     const contract = this.getSwordBattleContract();
-    return await this.readContract(contract, 'playerNonce', [playerAddress]);
+    return await this.readContract(contract, 'getPlayerNonce', [playerAddress]);
   }
 
   // ============ 区块链交易方法 ============

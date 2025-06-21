@@ -2,7 +2,7 @@
 // 提供区块链相关的业务逻辑
 
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { createPublicClient, createWalletClient, http, formatEther, parseEther } from 'viem';
+import { createPublicClient, createWalletClient, http, formatEther, parseEther, getAddress } from 'viem';
 import { bsc, bscTestnet } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { BlockchainConfig, defaultBlockchainConfig, validateBlockchainConfig } from './blockchain.config';
@@ -300,7 +300,7 @@ export class BlockchainService implements OnModuleInit {
         name: 'SwordBattle',
         version: '1',
         chainId: await this.publicClient.getChainId(),
-        verifyingContract: this.config.contracts.swordBattle as `0x${string}`,
+        verifyingContract: getAddress(this.config.contracts.swordBattle as `0x${string}`),
       };
 
       // 消息类型定义
@@ -316,7 +316,7 @@ export class BlockchainService implements OnModuleInit {
       // 消息数据
       const message = {
         gameId: BigInt(gameId),
-        player: playerAddress as `0x${string}`,
+        player: getAddress(playerAddress as `0x${string}`),
         score: BigInt(score),
         nonce: BigInt(nonce),
       };

@@ -2,14 +2,22 @@
 // 提供区块链相关的API端点
 
 import { Controller, Get, Post, Param, Body, Query, HttpException, HttpStatus } from '@nestjs/common';
+import { IsString, IsNumberString, IsEthereumAddress } from 'class-validator';
 import { BlockchainService } from './blockchain.service';
 
 // 数据传输对象
 export class SignScoreDto {
-  gameId: number;
+  @IsNumberString()
+  gameId: string;
+
+  @IsEthereumAddress()
   playerAddress: string;
-  score: number;
-  nonce: number;
+
+  @IsNumberString()
+  score: string;
+
+  @IsNumberString()
+  nonce: string;
 }
 
 @Controller('blockchain')
@@ -147,15 +155,40 @@ export class BlockchainController {
   @Post('sign-score')
   async signScoreSubmission(@Body() signScoreDto: SignScoreDto) {
     try {
+      console.log('Received sign-score request:', signScoreDto);
+      
       const { gameId, playerAddress, score, nonce } = signScoreDto;
+      
+      // 直接转换字符串为整数
+      const gameIdNum = parseInt(gameId);
+      const scoreNum = parseInt(score);
+      const nonceNum = parseInt(nonce);
+      
+      console.log('Parsed parameters:', { gameIdNum, scoreNum, nonceNum, playerAddress });
+      
+      // 验证转换结果
+      if (isNaN(gameIdNum) || isNaN(scoreNum) || isNaN(nonceNum)) {
+        console.error('Invalid numeric parameters:', { gameIdNum, scoreNum, nonceNum });
+        throw new Error(`Invalid numeric parameters: gameId=${gameIdNum}, score=${scoreNum}, nonce=${nonceNum}`);
+      }
+      
+      if (!playerAddress) {
+        throw new Error('Invalid player address');
+      }
+      
+      console.log('Calling blockchain service with:', { gameIdNum, playerAddress, scoreNum, nonceNum });
+      
       const signature = await this.blockchainService.signScoreSubmission(
-        gameId,
+        gameIdNum,
         playerAddress,
-        score,
-        nonce,
+        scoreNum,
+        nonceNum,
       );
+      
+      console.log('Signature generated successfully');
       return { success: true, data: { signature } };
     } catch (error) {
+      console.error('Error in sign-score endpoint:', error);
       throw new HttpException(
         { success: false, error: error.message },
         HttpStatus.BAD_REQUEST,

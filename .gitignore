@@ -198,3 +198,4 @@ scripts/dev-start.sh
 # sonar
 .scannerwork
 sonar-project.properties
+env/api.env.development

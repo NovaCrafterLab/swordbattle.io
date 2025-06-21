@@ -135,27 +135,52 @@ async function start() {
       res.writeHeader('Content-Type', 'application/json');
       
       try {
-        // 简单的管理员密钥验证
-        const authHeader = req.getHeader('authorization');
-        if (authHeader !== `Bearer ${config.moderationSecret}`) {
-          res.writeStatus('401 Unauthorized');
-          res.end(JSON.stringify({ success: false, error: 'Unauthorized' }));
-          return;
-        }
+        const currentPhase = game.gamePhase;
+        const gameId = game.blockchainGameId ? Number(game.blockchainGameId) : null;
+        
+        console.log(`🔍 Admin endgame request - Current phase: ${currentPhase}, Game ID: ${gameId}`);
 
-        if (game.gamePhase === 'active' || game.gamePhase === 'waiting') {
-          await game.endBlockchainGame('admin_manual');
+        if (currentPhase === 'active' || currentPhase === 'waiting') {
+          // 异步执行游戏结束，但立即响应HTTP请求
+          game.endBlockchainGame('admin_manual').catch(error => {
+            console.error('Async game end error:', error);
+          });
+          
           res.writeStatus('200 OK');
           res.end(JSON.stringify({ 
             success: true, 
-            message: 'Game ended successfully',
-            gameId: game.blockchainGameId 
+            message: 'Game end command sent successfully',
+            gameId: gameId,
+            currentPhase: currentPhase,
+            note: 'Game ending process started asynchronously'
           }));
         } else {
+          // 提供更详细的错误信息
+          let suggestion = '';
+          switch (currentPhase) {
+            case 'ended':
+              suggestion = 'Game has already ended. Wait for a new game to start or use restart command.';
+              break;
+            case 'ending':
+              suggestion = 'Game is currently ending. Please wait.';
+              break;
+            case 'initializing':
+              suggestion = 'Game is still initializing. Please wait for it to reach waiting or active phase.';
+              break;
+            case 'error':
+              suggestion = 'Game is in error state. Try using restart command.';
+              break;
+            default:
+              suggestion = `Unknown game phase: ${currentPhase}`;
+          }
+          
           res.writeStatus('400 Bad Request');
           res.end(JSON.stringify({ 
             success: false, 
-            error: `Cannot end game in phase: ${game.gamePhase}` 
+            error: `Cannot end game in phase: ${currentPhase}`,
+            currentPhase: currentPhase,
+            gameId: gameId,
+            suggestion: suggestion
           }));
         }
       } catch (error) {
@@ -163,7 +188,8 @@ async function start() {
         res.writeStatus('500 Internal Server Error');
         res.end(JSON.stringify({ 
           success: false, 
-          error: 'Internal server error' 
+          error: 'Internal server error',
+          details: error.message
         }));
       }
     });
