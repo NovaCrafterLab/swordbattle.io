@@ -111,8 +111,8 @@ export const usePlayerData = () => {
       setIsLoading(true);
       setError(null);
 
-      // 刷新基础数据
-      await Promise.all([
+      // 刷新基础数据并等待结果
+      const [balanceResult, allowanceResult, nonceResult] = await Promise.all([
         refetchBalance(),
         refetchAllowance(),
         refetchNonce(),
@@ -128,14 +128,19 @@ export const usePlayerData = () => {
       const winCount = gameHistory.filter(game => game.isWinner).length;
       const winRate = totalGamesPlayed > 0 ? (winCount / totalGamesPlayed) * 100 : 0;
 
-      const usd1BalanceBigInt = typeof usd1Balance === 'bigint' ? usd1Balance : BigInt(String(usd1Balance || 0));
-      const allowanceBigInt = typeof allowance === 'bigint' ? allowance : BigInt(String(allowance || 0));
+      // 使用最新获取的数据
+      const latestBalance = balanceResult.data || BigInt(0);
+      const latestAllowance = allowanceResult.data || BigInt(0);
+      const latestNonce = nonceResult.data || 0;
+
+      const usd1BalanceBigInt = typeof latestBalance === 'bigint' ? latestBalance : BigInt(String(latestBalance || 0));
+      const allowanceBigInt = typeof latestAllowance === 'bigint' ? latestAllowance : BigInt(String(latestAllowance || 0));
 
       const profile: PlayerProfile = {
         address,
         usd1Balance: usd1BalanceBigInt,
         allowance: allowanceBigInt,
-        nonce: playerNonce ? Number(playerNonce) : 0,
+        nonce: latestNonce ? Number(latestNonce) : 0,
         gameHistory,
         totalRewards,
         totalGamesPlayed,
@@ -149,7 +154,7 @@ export const usePlayerData = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [address, refetchBalance, refetchAllowance, refetchNonce, usd1Balance, allowance, playerNonce]);
+  }, [address, refetchBalance, refetchAllowance, refetchNonce]);
 
   /**
    * 检查是否需要授权USD1代币

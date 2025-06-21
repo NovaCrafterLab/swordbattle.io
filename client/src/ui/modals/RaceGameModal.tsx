@@ -10,7 +10,7 @@ import './RaceGameModal.scss';
 interface RaceGameModalProps {
   serverUrl: string;
   onClose: () => void;
-  onJoinGame: () => void;
+  onJoinGame: (walletAddress?: string) => void;
 }
 
 const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoinGame }) => {
@@ -31,6 +31,17 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
   // 检查是否需要授权
   const needsApproval = playerData.needsApproval(entryFeeAmount);
   const hasSufficientBalance = playerData.hasSufficientBalance(entryFeeAmount);
+
+  // 组件挂载时立即刷新数据
+  useEffect(() => {
+    console.log('🎯 RaceGameModal mounted, refreshing data...');
+    gameState.refreshGameData();
+  }, []);
+
+  // 监听 gameId 变化
+  useEffect(() => {
+    console.log('🎮 GameId changed:', gameState.gameId);
+  }, [gameState.gameId]);
 
   /**
    * 连接钱包
@@ -72,13 +83,30 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
    * 加入游戏
    */
   const handleJoinGame = async () => {
-    if (!address || !gameState.gameId) return;
+    if (!address) {
+      console.error('❌ No wallet address available');
+      return;
+    }
+    
+    if (gameState.gameId === null || gameState.gameId === undefined) {
+      console.error('❌ No game ID available');
+      return;
+    }
 
     try {
       setIsJoining(true);
       setTxStep('joining');
       
-      blockchain.joinGame(gameState.gameId);
+      console.log(`🎮 Joining game ${gameState.gameId} with address ${address}`);
+      console.log(`📊 Current server game info:`, {
+        gameId: gameState.gameId,
+        registeredCount: gameState.gameState.registeredCount,
+        totalPrize: gameState.gameState.totalPrize,
+        serverUrl: serverUrl
+      });
+      
+      const txResult = await blockchain.joinGame(gameState.gameId);
+      console.log(`✅ Join game transaction sent:`, txResult);
       
     } catch (error) {
       console.error('Failed to join game:', error);
@@ -93,8 +121,14 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
     if (blockchain.isConfirmed && txStep !== 'idle') {
       if (txStep === 'approving') {
         // 授权完成，刷新数据
-        playerData.refreshPlayerData();
-        setTxStep('idle');
+        console.log('🔄 Approval confirmed, refreshing player data...');
+        playerData.refreshPlayerData().then(() => {
+          console.log('✅ Player data refreshed after approval');
+          setTxStep('idle');
+        }).catch((error) => {
+          console.error('❌ Error refreshing player data:', error);
+          setTxStep('idle');
+        });
       } else if (txStep === 'joining') {
         // 加入游戏完成
         gameState.refreshGameData();
@@ -102,7 +136,13 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
         
         // 进入游戏
         setTimeout(() => {
-          onJoinGame();
+          console.log('🚀 Entering game after transaction confirmation...', {
+            address,
+            isConnected,
+            addressExists: !!address,
+            txStep,
+          });
+          onJoinGame(address);
           onClose();
         }, 1000);
       }
@@ -113,6 +153,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
    * 获取按钮状态和文本
    */
   const getActionButton = () => {
+    // 添加调试信息
     if (!isConnected) {
       return (
         <button className="race-btn race-btn-primary" onClick={handleConnectWallet}>
@@ -121,33 +162,33 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
       );
     }
 
+    // 简化状态判断：只检查服务器是否为比赛服务器且区块链已启用
     if (!gameState.isRaceServer) {
       return (
         <button className="race-btn race-btn-disabled" disabled>
-          SERVER NOT AVAILABLE
+          {gameState.error ? 'CONNECTION ERROR' : 'CONNECTING...'}
         </button>
       );
     }
 
-    if (gameState.phase !== 'waiting') {
-      return (
-        <button className="race-btn race-btn-disabled" disabled>
-          {gameState.phase === 'initializing' ? 'Game Initializing...' : 
-           gameState.phase === 'active' ? 'Game In Progress' :
-           gameState.phase === 'ending' ? 'Game Ending...' :
-           gameState.phase === 'ended' ? 'Game Ended' : 'Game Not Available'}
-        </button>
-      );
-    }
-
+    // 如果玩家已加入游戏
     if (gameState.isPlayerJoined) {
       return (
-        <button className="race-btn race-btn-success" onClick={() => { onJoinGame(); onClose(); }}>
+        <button className="race-btn race-btn-success" onClick={() => { 
+          console.log('🚀 Player already joined, entering game...', {
+            address,
+            isConnected,
+            addressExists: !!address,
+          });
+          onJoinGame(address); 
+          onClose(); 
+        }}>
           Enter Game (Joined)
         </button>
       );
     }
 
+    // 检查余额
     if (!hasSufficientBalance) {
       return (
         <button className="race-btn race-btn-disabled" disabled>
@@ -156,6 +197,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
       );
     }
 
+    // 检查授权
     if (needsApproval) {
       return (
         <button 
@@ -170,15 +212,18 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
       );
     }
 
+    // 默认：显示加入游戏按钮
+    const isDisabled = isJoining || blockchain.isWritePending || (gameState.gameId === null || gameState.gameId === undefined);
+
     return (
       <button 
         className="race-btn race-btn-primary" 
         onClick={handleJoinGame}
-        disabled={isJoining || blockchain.isWritePending}
+        disabled={isDisabled}
       >
         {isJoining || (blockchain.isWritePending && txStep === 'joining') 
           ? 'Joining...' 
-          : `Join Game (${formatEther(entryFeeAmount)} USD1)`}
+          : `Join Game`}
       </button>
     );
   };
@@ -200,12 +245,28 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
             <span 
               className={`status-dot ${gameState.getGameStatusColor()}`}
             ></span>
-            <span className="status-text">{gameState.getGameStatusText()}</span>
+            <span className="status-text">
+              {gameState.isRaceServer 
+                ? `Race Server Ready • ${gameState.gameState.registeredCount} players joined`
+                : gameState.error || 'Connecting to server...'}
+            </span>
           </div>
           
-          {gameState.gameId && (
-            <div className="game-id">Game #{gameState.gameId}</div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {gameState.gameId !== null && gameState.gameId !== undefined && (
+              <div className="game-id">Game #{gameState.gameId}</div>
+            )}
+            <button 
+              onClick={() => {
+                console.log('🔄 Manual refresh triggered');
+                gameState.refreshGameData();
+              }}
+              className="race-btn race-btn-secondary"
+              style={{ fontSize: '12px', padding: '4px 8px' }}
+            >
+              Refresh
+            </button>
+          </div>
         </div>
 
         {/* 游戏信息 */}
@@ -273,7 +334,9 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
     </div>
   );
 
-  return <Modal child={modalContent} close={onClose} className="race-game-modal-wrapper" />;
+  return (
+    <Modal child={modalContent} close={onClose} className="race-game-modal-wrapper" />
+  );
 };
 
-export default RaceGameModal; 
+export default RaceGameModal;

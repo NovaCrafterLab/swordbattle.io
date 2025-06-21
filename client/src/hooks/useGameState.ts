@@ -59,15 +59,38 @@ export const useGameState = (serverUrl?: string) => {
   // 获取当前游戏ID
   const { data: gameCounter } = blockchain.useGameCounter();
   
+  // 添加gameCounter调试信息
+  console.log('🎯 GameCounter debug:', {
+    gameCounter,
+    gameCounterType: typeof gameCounter,
+    gameCounterValue: gameCounter,
+    isNumber: typeof gameCounter === 'number',
+    isBigInt: typeof gameCounter === 'bigint',
+    isGreaterEqualZero: (typeof gameCounter === 'number' && gameCounter >= 0) || (typeof gameCounter === 'bigint' && gameCounter >= 0n),
+    condition: (gameCounter !== null && gameCounter !== undefined),
+  });
+  
   // 获取入场费
   const { data: entryFee } = blockchain.useEntryFee();
 
   // 获取游戏信息
-  const currentGameId = gameCounter ? Number(gameCounter) : 0;
-  const { data: gameInfo, refetch: refetchGameInfo } = blockchain.useGameInfo(currentGameId);
+  const currentGameId = (() => {
+    if (gameCounter === null || gameCounter === undefined) return null;
+    if (typeof gameCounter === 'number') return gameCounter;
+    if (typeof gameCounter === 'bigint') return Number(gameCounter);
+    return null;
+  })();
+  
+  console.log('🎮 CurrentGameId calculation:', {
+    gameCounter,
+    currentGameId,
+    gameCounterType: typeof gameCounter,
+  });
+  
+  const { data: gameInfo, refetch: refetchGameInfo } = blockchain.useGameInfo(currentGameId || 0);
   
   // 获取游戏玩家列表
-  const { data: gamePlayers, refetch: refetchPlayers } = blockchain.useGamePlayers(currentGameId);
+  const { data: gamePlayers, refetch: refetchPlayers } = blockchain.useGamePlayers(currentGameId || 0);
 
   // 检查玩家是否已加入
   const isPlayerJoined = address && gamePlayers && Array.isArray(gamePlayers) ? 
@@ -90,9 +113,9 @@ export const useGameState = (serverUrl?: string) => {
 
       const info: ServerInfo = await response.json();
       setServerInfo(info);
-
       // 更新游戏状态
       if (info.gameStatus) {
+        console.log('🎮 Server returned gameStatus:', info.gameStatus);
         setGameState(prev => ({
           ...prev,
           gameId: info.gameStatus.gameId,
@@ -119,18 +142,39 @@ export const useGameState = (serverUrl?: string) => {
     const playersArray = Array.isArray(gamePlayers) ? gamePlayers : [];
     const entryFeeBigInt = typeof entryFee === 'bigint' ? entryFee : BigInt(String(entryFee || 0));
 
+    // 简化状态逻辑：主要依赖区块链数据
+    const phase: GamePhase = (() => {
+      if (serverInfo?.gameStatus?.phase) {
+        return serverInfo.gameStatus.phase;
+      }
+      // 如果服务器连通且是比赛服务器，默认为等待状态
+      if (serverInfo?.isRaceServer && serverInfo?.blockchainEnabled) {
+        return 'waiting';
+      }
+      return 'initializing';
+    })();
+
     const newGameState: GameState = {
       gameId: currentGameId,
-      phase: serverInfo?.gameStatus?.phase || 'initializing',
+      phase,
       playerCount: serverInfo?.playerCnt || 0,
       registeredCount: playersArray.length,
       entryFee: entryFeeBigInt,
       totalPrize: entryFeeBigInt * BigInt(playersArray.length),
       isPlayerJoined,
-      canJoin: !isPlayerJoined && (serverInfo?.gameStatus?.phase === 'waiting'),
+      canJoin: !isPlayerJoined && (phase === 'waiting'),
       timeRemaining: 0, // TODO: 计算剩余时间
       lastUpdated: Date.now(),
     };
+
+    console.log('🎮 Game state updated:', {
+      gameCounter,
+      currentGameId,
+      gameId: newGameState.gameId,
+      phase: newGameState.phase,
+      isRaceServer: serverInfo?.isRaceServer,
+      blockchainEnabled: serverInfo?.blockchainEnabled,
+    });
 
     setGameState(newGameState);
   }, [gameCounter, entryFee, currentGameId, serverInfo, gamePlayers, isPlayerJoined]);
@@ -139,11 +183,18 @@ export const useGameState = (serverUrl?: string) => {
    * 刷新游戏数据
    */
   const refreshGameData = useCallback(async () => {
-    await Promise.all([
+    console.log('🔄 Refreshing game data...');
+    
+    // 强制刷新区块链数据
+    const refreshPromises = [
       refetchGameInfo(),
       refetchPlayers(),
       fetchServerInfo(),
-    ]);
+    ].filter(Boolean);
+
+    await Promise.all(refreshPromises);
+    
+    console.log('✅ Game data refreshed');
   }, [refetchGameInfo, refetchPlayers, fetchServerInfo]);
 
   /**
@@ -195,11 +246,24 @@ export const useGameState = (serverUrl?: string) => {
   useEffect(() => {
     if (!serverUrl) return;
 
+    // 立即获取一次数据
     fetchServerInfo();
-    const interval = setInterval(fetchServerInfo, 5000); // 每5秒刷新一次
+    
+    // 然后定期刷新
+    const interval = setInterval(() => {
+      fetchServerInfo();
+    }, 3000); // 改为3秒刷新一次，更频繁
 
     return () => clearInterval(interval);
   }, [fetchServerInfo]);
+
+  // 在 modal 首次打开时立即刷新所有数据
+  useEffect(() => {
+    if (serverUrl) {
+      console.log('🎯 Initial data fetch for modal...');
+      refreshGameData();
+    }
+  }, [serverUrl, refreshGameData]);
 
   // 更新游戏状态
   useEffect(() => {

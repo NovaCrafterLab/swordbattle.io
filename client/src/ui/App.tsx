@@ -247,17 +247,53 @@ function App() {
         <RaceGameModal
           serverUrl={serverUrl}
           onClose={closeModal}
-          onJoinGame={() => {
+          onJoinGame={(walletAddress?: string) => {
+            // 确定使用的用户名：已登录用户使用 account.username，否则使用 name
+            let playerName = account.isLoggedIn ? account.username : name;
+            
+            // 如果用户名为空，使用钱包地址的简短版本作为默认名称
+            if (!playerName && walletAddress) {
+              playerName = `Player_${walletAddress.slice(-6)}`;
+            } else if (!playerName) {
+              playerName = `Player_${Math.random().toString(36).substring(2, 8)}`;
+            }
+            
+            console.log('🎮 App.tsx onJoinGame called with:', {
+              walletAddress,
+              walletAddressExists: !!walletAddress,
+              name,
+              accountUsername: account.username,
+              isLoggedIn: account.isLoggedIn,
+              finalPlayerName: playerName,
+              playerNameExists: !!playerName,
+            });
             setGameStarted(true);
-            window.phaser_game?.events.emit('startGame', name);
+            // 比赛模式下传递钱包地址
+            window.phaser_game?.events.emit('startGame', playerName, walletAddress);
           }}
         />
       );
     } else {
       // 普通游戏流程
       const go = () => {
+        // 确定使用的用户名：已登录用户使用 account.username，否则使用 name
+        let playerName = account.isLoggedIn ? account.username : name;
+        
+        // 如果用户名为空，提供默认名称
+        if (!playerName) {
+          playerName = `Player_${Math.random().toString(36).substring(2, 8)}`;
+        }
+        
+        console.log('🎮 Normal game mode starting with:', {
+          name,
+          accountUsername: account.username,
+          isLoggedIn: account.isLoggedIn,
+          finalPlayerName: playerName,
+          playerNameExists: !!playerName,
+        });
+        
         setGameStarted(true);
-        window.phaser_game?.events.emit('startGame', name);
+        window.phaser_game?.events.emit('startGame', playerName);
       };
       go();
     }

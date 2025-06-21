@@ -10,6 +10,7 @@ export interface ClientMessage {
   isPing?: boolean;
   token?: string;
   name?: string;
+  walletAddress?: string;
   captchaP0?: string;
   captchaP1?: string;
   captchaP2?: string;
@@ -112,38 +113,45 @@ function _encodeClientMessage(message: ClientMessage, bb: ByteBuffer): void {
     writeString(bb, $name);
   }
 
-  // optional string captchaP0 = 12;
+  // optional string walletAddress = 12;
+  let $walletAddress = message.walletAddress;
+  if ($walletAddress !== undefined) {
+    writeVarint32(bb, 98);
+    writeString(bb, $walletAddress);
+  }
+
+  // optional string captchaP0 = 13;
   let $captchaP0 = message.captchaP0;
   if ($captchaP0 !== undefined) {
-    writeVarint32(bb, 98);
+    writeVarint32(bb, 106);
     writeString(bb, $captchaP0);
   }
 
-  // optional string captchaP1 = 13;
+  // optional string captchaP1 = 14;
   let $captchaP1 = message.captchaP1;
   if ($captchaP1 !== undefined) {
-    writeVarint32(bb, 106);
+    writeVarint32(bb, 114);
     writeString(bb, $captchaP1);
   }
 
-  // optional string captchaP2 = 14;
+  // optional string captchaP2 = 15;
   let $captchaP2 = message.captchaP2;
   if ($captchaP2 !== undefined) {
-    writeVarint32(bb, 114);
+    writeVarint32(bb, 122);
     writeString(bb, $captchaP2);
   }
 
-  // optional string captchaP3 = 15;
+  // optional string captchaP3 = 16;
   let $captchaP3 = message.captchaP3;
   if ($captchaP3 !== undefined) {
-    writeVarint32(bb, 122);
+    writeVarint32(bb, 130);
     writeString(bb, $captchaP3);
   }
 
-  // optional string captchaP4 = 16;
+  // optional string captchaP4 = 17;
   let $captchaP4 = message.captchaP4;
   if ($captchaP4 !== undefined) {
-    writeVarint32(bb, 130);
+    writeVarint32(bb, 138);
     writeString(bb, $captchaP4);
   }
 
@@ -240,32 +248,38 @@ function _decodeClientMessage(bb: ByteBuffer): ClientMessage {
         break;
       }
 
-      // optional string captchaP0 = 12;
+      // optional string walletAddress = 12;
       case 12: {
+        message.walletAddress = readString(bb, readVarint32(bb));
+        break;
+      }
+
+      // optional string captchaP0 = 13;
+      case 13: {
         message.captchaP0 = readString(bb, readVarint32(bb));
         break;
       }
 
-      // optional string captchaP1 = 13;
-      case 13: {
+      // optional string captchaP1 = 14;
+      case 14: {
         message.captchaP1 = readString(bb, readVarint32(bb));
         break;
       }
 
-      // optional string captchaP2 = 14;
-      case 14: {
+      // optional string captchaP2 = 15;
+      case 15: {
         message.captchaP2 = readString(bb, readVarint32(bb));
         break;
       }
 
-      // optional string captchaP3 = 15;
-      case 15: {
+      // optional string captchaP3 = 16;
+      case 16: {
         message.captchaP3 = readString(bb, readVarint32(bb));
         break;
       }
 
-      // optional string captchaP4 = 16;
-      case 16: {
+      // optional string captchaP4 = 17;
+      case 17: {
         message.captchaP4 = readString(bb, readVarint32(bb));
         break;
       }

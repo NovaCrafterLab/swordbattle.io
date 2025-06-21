@@ -48,6 +48,7 @@ export const useBlockchain = () => {
       functionName: 'gameCounter',
       query: {
         enabled: true,
+        refetchInterval: 3000, // 每3秒自动刷新
       },
     });
   };
@@ -74,7 +75,7 @@ export const useBlockchain = () => {
       functionName: 'games',
       args: [BigInt(gameId)],
       query: {
-        enabled: gameId > 0,
+        enabled: gameId >= 0,
       },
     });
   };
@@ -88,7 +89,7 @@ export const useBlockchain = () => {
       functionName: 'getGamePlayers',
       args: [BigInt(gameId)],
       query: {
-        enabled: gameId > 0,
+        enabled: gameId >= 0,
       },
     });
   };
@@ -116,7 +117,7 @@ export const useBlockchain = () => {
       functionName: 'playerScores',
       args: [BigInt(gameId), playerAddress as `0x${string}`],
       query: {
-        enabled: gameId > 0 && !!playerAddress,
+        enabled: gameId >= 0 && !!playerAddress,
       },
     });
   };
@@ -130,7 +131,7 @@ export const useBlockchain = () => {
       functionName: 'playerRewards',
       args: [BigInt(gameId), playerAddress as `0x${string}`],
       query: {
-        enabled: gameId > 0 && !!playerAddress,
+        enabled: gameId >= 0 && !!playerAddress,
       },
     });
   };
@@ -144,7 +145,7 @@ export const useBlockchain = () => {
       functionName: 'hasClaimed',
       args: [BigInt(gameId), playerAddress as `0x${string}`],
       query: {
-        enabled: gameId > 0 && !!playerAddress,
+        enabled: gameId >= 0 && !!playerAddress,
       },
     });
   };

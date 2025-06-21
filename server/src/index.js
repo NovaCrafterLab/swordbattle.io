@@ -21,10 +21,10 @@ const app = config.useSSL
   })
   : uws.App();
 
-app.listen('0.0.0.0', config.port, (tok) => {
+app.listen('0.0.0.0', config.port, async (tok) => {
   if (!tok) { console.error('Port busy'); process.exit(1); }
   listenToken = tok;
-  start();
+  await start();
   console.log(`Game started on port ${config.port}.`);
 });
 
@@ -45,30 +45,51 @@ app.get('/ping', (res) => {
 });
 
 // ---------- Bootstrap ----------
-function start() {
+async function start() {
+  // 首先初始化区块链服务（如果需要）
+  await initializeBlockchainService();
+  
   const game = new Game();
   game.initialize();
+  
+  // 调试信息：显示当前配置状态
+  console.log('=== Server Configuration Debug ===');
+  console.log('SERVER_TYPE:', process.env.SERVER_TYPE);
+  console.log('BLOCKCHAIN_ENABLED:', process.env.BLOCKCHAIN_ENABLED);
+  console.log('config.isRaceServer:', config.isRaceServer);
+  console.log('config.blockchain.enabled:', config.blockchain.enabled);
+  console.log('global.blockchainService exists:', !!global.blockchainService);
+  console.log('==================================');
   
   // Attach blockchain service to game if available
   if (global.blockchainService) {
     game.blockchainService = global.blockchainService;
-    console.log('Blockchain service attached to game instance');
+    console.log('✅ Blockchain service attached to game instance');
     
     // 自动初始化区块链游戏（仅在比赛服务器模式下）
     if (config.isRaceServer && config.blockchain.enabled) {
       console.log('🚀 Starting blockchain game initialization...');
+      console.log('⏱️ Waiting 5 seconds for server to fully start...');
       
       // 延迟初始化以确保服务器完全启动
       setTimeout(async () => {
         try {
+          console.log('🎮 Starting new game creation process...');
           await game.initializeBlockchainGame();
-          console.log('✅ Blockchain game initialization completed');
+          console.log('🎉 Blockchain game initialization completed successfully');
         } catch (error) {
           console.error('❌ Failed to initialize blockchain game:', error);
-          console.error('Race server will continue but blockchain features may not work');
+          console.error('🔧 Race server will continue but blockchain features may not work');
+          console.error('💡 Try restarting the server or check your blockchain configuration');
         }
       }, 5000); // 5秒延迟
+    } else {
+      console.log('❌ Blockchain initialization skipped:');
+      console.log('   - isRaceServer:', config.isRaceServer);
+      console.log('   - blockchain.enabled:', config.blockchain.enabled);
     }
+  } else {
+    console.log('❌ No blockchain service available - check initialization logs above');
   }
   
   const server = new Server(game);
@@ -76,6 +97,18 @@ function start() {
 
   app.get('/serverinfo', (res) => {
     setCors(res);
+    
+    // 安全获取区块链游戏状态
+    let gameStatus = null;
+    try {
+      if (config.isRaceServer && config.blockchain.enabled) {
+        gameStatus = game.getBlockchainGameStatus();
+      }
+    } catch (error) {
+      console.error('Error getting blockchain game status:', error);
+      gameStatus = null;
+    }
+    
     res.writeHeader('Content-Type', 'application/json').end(
       JSON.stringify({
         // 基础服务器信息
@@ -83,6 +116,14 @@ function start() {
         entityCnt: game.entities.size,
         playerCnt: game.players.size,
         realPlayers: [...game.players.values()].filter((p) => !p.isBot).length,
+        
+        // 服务器类型信息
+        serverType: config.serverType,
+        isRaceServer: config.isRaceServer,
+        blockchainEnabled: config.blockchain.enabled,
+        
+        // 区块链游戏状态（仅在比赛服务器模式下）
+        gameStatus,
       }),
     );
   });
@@ -90,7 +131,7 @@ function start() {
   // 管理员控制端点（仅比赛服务器）
   if (config.isRaceServer && config.blockchain.enabled) {
     app.post('/admin/endgame', async (res, req) => {
-      setCorsHeaders(res);
+      setCors(res);
       res.writeHeader('Content-Type', 'application/json');
       
       try {
@@ -128,7 +169,7 @@ function start() {
     });
 
     app.post('/admin/restart', async (res, req) => {
-      setCorsHeaders(res);
+      setCors(res);
       res.writeHeader('Content-Type', 'application/json');
       
       try {
@@ -199,9 +240,20 @@ function start() {
   loop.start();
 
   // ---------- Graceful shutdown ----------
-  function stop(reason) {
+  async function stop(reason) {
     try {
       console.log('Stopping game...', reason);
+      
+      // 如果是比赛服务器且区块链服务可用，先结束游戏
+      if (global.blockchainService && game.blockchainGameId) {
+        try {
+          console.log('🏁 Ending blockchain game before server shutdown...');
+          await game.endBlockchainGame('server_shutdown');
+        } catch (error) {
+          console.error('❌ Failed to end blockchain game during shutdown:', error);
+        }
+      }
+      
       if (listenToken) uws.us_listen_socket_close(listenToken);
 
       for (const client of server.clients.values()) {
@@ -224,4 +276,61 @@ function start() {
   process.on('SIGTERM', () => stop('SIGTERM'));
   process.on('uncaughtException', (e) => { console.error(e); stop('uncaughtException'); });
   process.on('unhandledRejection', (r, p) => { console.error(r, p); stop('unhandledRejection'); });
+}
+
+// 初始化区块链服务
+async function initializeBlockchainService() {
+  if (!config.isRaceServer || !config.blockchain.enabled) {
+    console.log('⚠️ Blockchain service disabled - not a race server or blockchain not enabled');
+    return null;
+  }
+
+  try {
+    console.log('🔗 Initializing blockchain service...');
+    
+    const BlockchainService = require('./blockchain/BlockchainService');
+    const blockchainService = new BlockchainService(config.blockchain);
+    
+    await blockchainService.initialize();
+    
+    // 验证区块链连接和配置
+    console.log('🔍 Verifying blockchain connection...');
+    
+    // 检查连接状态
+    const isConnected = await blockchainService.isConnected();
+    if (!isConnected) {
+      throw new Error('Failed to connect to blockchain network');
+    }
+    console.log('✅ Blockchain connection verified');
+    
+    // 检查合约配置
+    if (!config.blockchain.contracts?.swordBattle) {
+      throw new Error('SwordBattle contract address not configured');
+    }
+    console.log('✅ Contract configuration verified');
+    
+    // 检查钱包配置（用于创建游戏）
+    if (!config.blockchain.trustedSigner) {
+      throw new Error('Trusted signer private key not configured');
+    }
+    console.log('✅ Wallet configuration verified');
+    
+    // 测试读取游戏计数器
+    try {
+      const gameCounter = await blockchainService.getGameCounter();
+      console.log(`✅ Current game counter: ${gameCounter}`);
+    } catch (error) {
+      console.error('⚠️ Warning: Failed to read game counter:', error.message);
+    }
+    
+    // 设置到全局作用域
+    global.blockchainService = blockchainService;
+    
+    console.log('✅ Blockchain service initialized and verified successfully');
+    return blockchainService;
+  } catch (error) {
+    console.error('❌ Failed to initialize blockchain service:', error);
+    console.error('💡 Please check your blockchain configuration in environment variables');
+    return null;
+  }
 }

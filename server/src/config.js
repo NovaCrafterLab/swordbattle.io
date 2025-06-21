@@ -1,30 +1,6 @@
 // Load environment variables from a .env file
 require('dotenv').config();
 
-/*
- * 环境变量配置说明：
- * 
- * 基础服务器配置：
- * - SERVER_PORT: 服务器端口，默认 8000
- * - USE_SSL: 是否启用SSL，设置为 'TRUE' 启用
- * - SSL_KEY: SSL私钥文件路径
- * - SSL_CERT: SSL证书文件路径
- * - DEBUG: 调试模式，设置为 'TRUE' 启用
- * - SERVER_SECRET: 服务器密钥，默认 'server-secret'
- * - MODERATION_SECRET: 审核密钥，默认 'moderation-secret'
- * - API_ENDPOINT: API服务器地址，默认 'http://localhost:8080'
- * - RECAPTCHA_SECRET_KEY: ReCAPTCHA密钥
- * 
- * 比赛服务器配置：
- * - NODE_ENV: 环境类型，'development' 或 'production'
- * - SERVER_TYPE: 服务器类型，'NORMAL' 或 'RACE'
- * - BLOCKCHAIN_ENABLED: 是否启用区块链功能，设置为 'true' 启用
- * - BLOCKCHAIN_RPC_URL: 区块链RPC地址（可选，会使用内置RPC池）
- * - SWORD_BATTLE_CONTRACT: SwordBattle合约地址
- * - USD1_TOKEN_CONTRACT: USD1代币合约地址
- * - TRUSTED_SIGNER_PRIVATE_KEY: 可信签名者私钥（用于EIP-712签名）
- */
-
 // 环境判断逻辑与前端保持一致
 const ENV = process.env.NODE_ENV || 'development';
 const isDev = ENV === 'development';

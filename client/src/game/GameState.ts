@@ -101,12 +101,31 @@ class GameState {
     this.interval = setInterval(() => this.tick(), 1000 / 20);
   }
 
-  start(name: string) {
+  start(name: string, walletAddress?: string) {
+    console.log('🎯 GameState.start called with:', {
+      name,
+      nameExists: !!name,
+      walletAddress,
+      walletAddressExists: !!walletAddress,
+      walletAddressLength: walletAddress?.length,
+    });
+    
     const afterSent = () => {
       if (!this.game.hud.buffsSelect.minimized)
         this.game.hud.buffsSelect.toggleMinimize();
     };
-    Socket.emit({ play: true, name });
+    
+    const gameData: any = { play: true, name };
+    
+    // 如果提供了钱包地址，包含在请求中（用于区块链比赛服务器）
+    if (walletAddress) {
+      gameData.walletAddress = walletAddress;
+      console.log('✅ Adding walletAddress to gameData:', gameData);
+    } else {
+      console.log('⚠️ No walletAddress provided, sending without it:', gameData);
+    }
+    
+    Socket.emit(gameData);
     afterSent();
   }
 

@@ -12,11 +12,12 @@ message ClientMessage {
   bool isPing = 9;
   string token = 10;
   string name = 11;
-  string captchaP0 = 12;
-  string captchaP1 = 13;
-  string captchaP2 = 14;
-  string captchaP3 = 15;
-  string captchaP4 = 16;
+  string walletAddress = 12;
+  string captchaP0 = 13;
+  string captchaP1 = 14;
+  string captchaP2 = 15;
+  string captchaP3 = 16;
+  string captchaP4 = 17;
   string captchaP5 = 43;
 }
 message InputData {

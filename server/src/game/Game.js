@@ -31,6 +31,20 @@ class Game {
     this.tps = 0;
 
     this._qtTick = 0;
+    
+    // 区块链游戏相关属性初始化
+    this.blockchainGameId = null;
+    this.gamePhase = 'initializing';
+    this.gameStartTime = null;
+    this.gameEndTime = null;
+    this.registeredPlayers = new Set();
+    this.finalScores = new Map();
+    this.playerScoreSubmitted = new Set();
+    this.isGameCreationInProgress = false;
+    this.gameTimeout = null;
+    
+    // 游戏最大持续时间 (30分钟)
+    this.maxGameDuration = 30 * 60 * 1000; // 30分钟 = 1800000毫秒
   }
 
   initialize() {
@@ -469,7 +483,7 @@ class Game {
   broadcastGameStart() {
     const message = {
       type: 'gameStart',
-      gameId: this.blockchainGameId,
+      gameId: this.blockchainGameId ? Number(this.blockchainGameId) : null,
       phase: this.gamePhase,
       playerCount: this.players.size,
     };
@@ -553,7 +567,7 @@ class Game {
    * 初始化区块链游戏
    * 在服务器启动时调用，创建链上游戏
    */
-  async initializeBlockchainGame() {
+  async initializeBlockchainGame(retryCount = 0) {
     if (!config.isRaceServer || !config.blockchain.enabled || !this.blockchainService) {
       return;
     }
@@ -563,60 +577,86 @@ class Game {
       return;
     }
 
+    const maxRetries = 3;
+    const currentAttempt = retryCount + 1;
+
     try {
       this.isGameCreationInProgress = true;
       this.gamePhase = 'initializing';
       
-      console.log('🚀 Creating blockchain game...');
+      console.log(`🚀 Creating blockchain game... (Attempt ${currentAttempt}/${maxRetries})`);
+      
+      // 在创建游戏前记录初始计数器
+      const initialCounter = await this.blockchainService.getGameCounter();
+      console.log(`📊 Current game counter before creation: ${initialCounter}`);
       
       // 调用合约创建游戏
-      const txHash = await this.blockchainService.createGame();
-      console.log(`✅ Game creation transaction sent: ${txHash}`);
+      const createResult = await this.blockchainService.createGame();
+      console.log(`✅ Game creation transaction sent: ${createResult.txHash}`);
+      console.log(`📊 Transaction details: Initial counter = ${createResult.initialCounter}, Timestamp = ${new Date(createResult.timestamp).toISOString()}`);
       
-      // 监听GameCreated事件获取gameId
-      await this.waitForGameCreated();
+      // 监听GameCreated事件获取gameId，传递初始计数器
+      await this.waitForGameCreated(initialCounter);
+      
+      console.log(`✅ Blockchain game initialization completed successfully on attempt ${currentAttempt}`);
       
     } catch (error) {
-      console.error('❌ Failed to create blockchain game:', error);
+      console.error(`❌ Failed to create blockchain game (attempt ${currentAttempt}/${maxRetries}):`, error);
       this.gamePhase = 'error';
       this.isGameCreationInProgress = false;
+      
+      // 如果还有重试次数，等待5秒后重试
+      if (retryCount < maxRetries - 1) {
+        console.log(`🔄 Retrying game creation in 5 seconds... (${maxRetries - currentAttempt} attempts remaining)`);
+        setTimeout(() => {
+          this.initializeBlockchainGame(retryCount + 1);
+        }, 5000);
+      } else {
+        console.error(`💥 Failed to create blockchain game after ${maxRetries} attempts. Server will continue but blockchain features may not work.`);
+      }
     }
   }
 
   /**
    * 等待GameCreated事件
    */
-  async waitForGameCreated() {
+  async waitForGameCreated(initialCounter) {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error('Game creation timeout'));
       }, 60000); // 60秒超时
 
-      // 这里需要监听合约事件，暂时用轮询替代
       const checkGameCreated = async () => {
         try {
-          const gameCounter = await this.blockchainService.getGameCounter();
-          if (this.blockchainGameId === null && gameCounter > 0) {
-            this.blockchainGameId = gameCounter;
+          const currentCounter = await this.blockchainService.getGameCounter();
+          console.log(`📊 Checking game counter: ${currentCounter} (initial: ${initialCounter})`);
+          
+          // 检查计数器是否增加了（表示新游戏创建成功）
+          if (currentCounter > initialCounter) {
+            this.blockchainGameId = currentCounter;
             this.gamePhase = 'waiting';
             this.gameStartTime = Date.now();
             
-            console.log(`🎮 Blockchain game created with ID: ${this.blockchainGameId}`);
+            console.log(`🎮 NEW blockchain game created with ID: ${this.blockchainGameId} (previous: ${initialCounter})`);
             console.log('⏳ Waiting for players to join...');
             
             clearTimeout(timeout);
             this.isGameCreationInProgress = false;
             resolve();
           } else {
-            setTimeout(checkGameCreated, 2000); // 2秒后重试
+            console.log(`⏳ Waiting for new game creation... counter still: ${currentCounter}`);
+            setTimeout(checkGameCreated, 2000);
           }
         } catch (error) {
+          console.error('❌ Error checking game creation:', error);
           clearTimeout(timeout);
+          this.isGameCreationInProgress = false;
           reject(error);
         }
       };
 
-      checkGameCreated();
+      // 开始检查前稍等一下，让createGame交易有时间处理
+      setTimeout(checkGameCreated, 3000);
     });
   }
 
@@ -625,13 +665,20 @@ class Game {
    */
   async verifyPlayerRegistration(playerAddress) {
     if (!this.blockchainService || !this.blockchainGameId) {
+      console.log(`❌ Verification failed - blockchainService: ${!!this.blockchainService}, gameId: ${this.blockchainGameId}`);
       return false;
     }
 
     try {
+      console.log(`🔍 Verifying player ${playerAddress} for game ${this.blockchainGameId}:`);
+      
       // 检查玩家是否在链上游戏中
       const players = await this.blockchainService.getGamePlayers(this.blockchainGameId);
-      const isRegistered = players.includes(playerAddress.toLowerCase());
+      console.log(`📋 Found ${players.length} players in game ${this.blockchainGameId}:`);
+      console.log(`   Players: ${players.map(p => p.toLowerCase()).join(', ')}`);
+      console.log(`   Looking for: ${playerAddress.toLowerCase()}`);
+      
+      const isRegistered = players.map(p => p.toLowerCase()).includes(playerAddress.toLowerCase());
       
       if (isRegistered) {
         this.registeredPlayers.add(playerAddress.toLowerCase());
@@ -639,6 +686,8 @@ class Game {
         return true;
       } else {
         console.log(`❌ Player ${playerAddress} not registered for game ${this.blockchainGameId}`);
+        console.log(`   Available players: [${players.map(p => p.toLowerCase()).join(', ')}]`);
+        console.log(`   Searched for: ${playerAddress.toLowerCase()}`);
         return false;
       }
     } catch (error) {
@@ -817,7 +866,7 @@ class Game {
     }
 
     return {
-      gameId: this.blockchainGameId,
+      gameId: this.blockchainGameId ? Number(this.blockchainGameId) : null,
       phase: this.gamePhase,
       registeredPlayersCount: this.registeredPlayers.size,
       activePlayersCount: this.players.size,
