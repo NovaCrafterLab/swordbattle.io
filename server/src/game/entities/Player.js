@@ -405,9 +405,21 @@ class Player extends Entity {
    * 检查是否需要结束区块链游戏
    */
   checkBlockchainGameEnd() {
+    // 检查游戏是否已经结束或正在结束
+    if (this.game.gamePhase === 'ending' || this.game.gamePhase === 'ended') {
+      console.log(`🔍 Game already in ${this.game.gamePhase} phase, skipping end check`);
+      return;
+    }
+
     // 延迟检查，给其他玩家死亡事件时间处理
     setTimeout(() => {
       try {
+        // 再次检查游戏状态（因为有延迟）
+        if (this.game.gamePhase === 'ending' || this.game.gamePhase === 'ended') {
+          console.log(`🔍 Game changed to ${this.game.gamePhase} phase during delay, skipping end check`);
+          return;
+        }
+
         const alivePlayers = [...this.game.players].filter(player => !player.removed);
         const registeredPlayers = this.game.registeredPlayers ? this.game.registeredPlayers.size : 0;
         

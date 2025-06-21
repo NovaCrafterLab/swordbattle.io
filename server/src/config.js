@@ -1,10 +1,36 @@
-// Load environment variables from a .env file
-require('dotenv').config();
+// Load environment variables from unified env files
+const path = require('path');
+const fs = require('fs');
 
 // 环境判断逻辑与前端保持一致
 const ENV = process.env.NODE_ENV || 'development';
 const isDev = ENV === 'development';
 const isRelease = ENV === 'production';
+
+// 环境文件加载优先级（从高到低）
+const envFiles = [
+  // 项目根目录的统一环境配置文件（优先）
+  path.resolve(__dirname, '..', '..', 'env', `server.env.${ENV}`),
+  path.resolve(__dirname, '..', '..', 'env', 'server.env'),
+  // 服务器目录下的传统.env文件（备用）
+  path.resolve(__dirname, '..', '.env'),
+].filter(Boolean);
+
+console.log('🔍 Loading server environment configuration...');
+envFiles.forEach((envFile, index) => {
+  if (fs.existsSync(envFile)) {
+    console.log(`   ${index + 1}. Loading: ${envFile} ✅`);
+    require('dotenv-expand')(
+      require('dotenv').config({
+        path: envFile,
+      }),
+    );
+  } else {
+    console.log(`   ${index + 1}. Skipping: ${envFile} ❌`);
+  }
+});
+
+console.log('✅ Environment configuration loaded\n');
 
 // Export configuration object for the application
 module.exports = {

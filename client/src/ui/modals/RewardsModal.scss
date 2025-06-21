@@ -71,18 +71,79 @@
     }
 
     .rewards-history {
-      h3 {
-        margin: 0 0 20px 0;
-        color: rgba(255, 255, 255, 0.9);
-        font-size: 1.2em;
+      .history-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        padding-bottom: 10px;
+        padding-bottom: 15px;
+
+        h3 {
+          margin: 0;
+          color: rgba(255, 255, 255, 0.9);
+          font-size: 1.2em;
+        }
+
+        .filter-options {
+          display: flex;
+          gap: 8px;
+
+          .filter-btn {
+            padding: 6px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.7);
+            border-radius: 20px;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            
+            &:hover {
+              background: rgba(255, 255, 255, 0.1);
+              color: rgba(255, 255, 255, 0.9);
+            }
+
+            &.active {
+              background: linear-gradient(45deg, #34c759, #00ff88);
+              color: white;
+              border-color: transparent;
+            }
+          }
+        }
       }
 
       .loading {
         text-align: center;
         padding: 40px;
         color: rgba(255, 255, 255, 0.7);
+      }
+
+      .error-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: rgba(255, 255, 255, 0.7);
+
+        p {
+          margin: 0 0 15px 0;
+          color: #ff6b6b;
+        }
+
+        .retry-btn {
+          padding: 8px 16px;
+          background: linear-gradient(45deg, #34c759, #00ff88);
+          color: white;
+          border: none;
+          border-radius: 6px;
+          font-weight: bold;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          
+          &:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(52, 199, 89, 0.4);
+          }
+        }
       }
 
       .no-rewards {
@@ -317,4 +378,43 @@
       }
     }
   }
+}
+
+// 加载状态样式
+.rewards-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  padding: 40px 20px;
+
+  .loading-content {
+    text-align: center;
+    max-width: 300px;
+
+    .loading-spinner {
+      font-size: 32px;
+      animation: spin 2s linear infinite;
+      margin-bottom: 16px;
+    }
+
+    h3 {
+      color: #fff;
+      margin-bottom: 8px;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    p {
+      color: #ccc;
+      margin-bottom: 8px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 } 

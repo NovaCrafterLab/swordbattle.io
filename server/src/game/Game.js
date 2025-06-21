@@ -777,6 +777,9 @@ class Game {
       
       this.gamePhase = 'ended';
       
+      // 清理当前游戏状态
+      this.cleanupCurrentGame();
+      
       // 可选：重新开始新游戏
       setTimeout(() => {
         this.initializeBlockchainGame();
@@ -937,6 +940,37 @@ class Game {
       finalScoresCount: this.finalScores.size,
       scoresSubmittedCount: this.playerScoreSubmitted.size,
     };
+  }
+
+  /**
+   * 清理当前游戏状态
+   */
+  cleanupCurrentGame() {
+    console.log('🧹 Cleaning up current game...');
+    
+    // 清理区块链相关状态
+    this.blockchainGameId = null;
+    this.registeredPlayers.clear();
+    this.finalScores.clear();
+    this.playerScoreSubmitted.clear();
+    
+    // 重置游戏时间
+    this.gameStartTime = null;
+    this.gameEndTime = null;
+    
+    // 移除所有玩家（让他们重新连接到新游戏）
+    const playersToRemove = [...this.players];
+    for (const player of playersToRemove) {
+      if (player.client) {
+        player.client.disconnectReason = { 
+          message: 'Game ended', 
+          type: 'GameEnd' 
+        };
+      }
+      this.removeEntity(player);
+    }
+    
+    console.log(`🧹 Game cleanup completed. Removed ${playersToRemove.length} players.`);
   }
 }
 

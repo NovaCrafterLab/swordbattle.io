@@ -198,24 +198,49 @@ export class BlockchainController {
 
   // 获取最新游戏列表（可选：用于前端显示）
   @Get('games')
-  async getGames(@Query('limit') limit?: string) {
+  async getRecentGames(@Query('limit') limit?: string) {
     try {
+      const maxGames = limit ? parseInt(limit) : 10;
       const gameCounter = await this.blockchainService.getGameCounter();
-      const limitNum = limit ? parseInt(limit) : 10;
-      const startId = Math.max(1, gameCounter - limitNum + 1);
       
       const games = [];
-      for (let i = startId; i <= gameCounter; i++) {
+      for (let i = gameCounter; i > 0 && games.length < maxGames; i--) {
         try {
           const gameInfo = await this.blockchainService.getGameInfo(i);
-          games.push(gameInfo);
+          games.push({ gameId: i, ...gameInfo });
         } catch (error) {
-          // 跳过无法获取的游戏
-          console.warn(`Failed to get game ${i}:`, error.message);
+          // 跳过有问题的游戏
+          continue;
         }
       }
       
-      return { success: true, data: games.reverse() }; // 最新的在前面
+      return { success: true, data: games };
+    } catch (error) {
+      throw new HttpException(
+        { success: false, error: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  // 获取玩家游戏历史
+  @Get('players/:playerAddress/history')
+  async getPlayerGameHistory(
+    @Param('playerAddress') playerAddress: string, 
+    @Query('limit') limit?: string
+  ) {
+    try {
+      const maxGames = limit ? parseInt(limit) : 20;
+      const gameHistory = await this.blockchainService.getPlayerGameHistory(playerAddress, maxGames);
+      
+      return { 
+        success: true, 
+        data: {
+          playerAddress,
+          totalGames: gameHistory.length,
+          games: gameHistory
+        }
+      };
     } catch (error) {
       throw new HttpException(
         { success: false, error: error.message },

@@ -278,12 +278,83 @@ export class BlockchainService implements OnModuleInit {
         address: this.config.contracts.swordBattle as `0x${string}`,
         abi: SWORD_BATTLE_ABI,
         functionName: 'gameCounter',
-        args: [],
       });
 
       return Number(counter);
     } catch (error) {
       this.logger.error('Failed to get game counter:', error);
+      throw error;
+    }
+  }
+
+  // 获取玩家游戏历史
+  async getPlayerGameHistory(playerAddress: string, maxGames: number = 50) {
+    if (!this.isAvailable()) {
+      throw new Error('Blockchain service not available');
+    }
+
+    try {
+      this.logger.log(`Getting game history for player: ${playerAddress}`);
+      
+      // 获取当前游戏计数器，从最新的游戏开始查找
+      const currentGameId = await this.getGameCounter();
+      
+      const gameHistory = [];
+      let foundGames = 0;
+      
+      // 从最新的游戏往前查找，直到找到足够多的游戏或检查完所有游戏
+      for (let gameId = currentGameId; gameId >= 1 && foundGames < maxGames; gameId--) {
+        try {
+          // 检查玩家是否参与了这个游戏
+          const players = await this.getGamePlayers(gameId);
+          const playerLowerCase = playerAddress.toLowerCase();
+          
+          if (players.some(p => p.toLowerCase() === playerLowerCase)) {
+            // 获取玩家在这个游戏中的详细信息
+            const playerInfo = await this.getPlayerInfo(gameId, playerAddress);
+            const gameInfo = await this.getGameInfo(gameId);
+            
+            // 获取排名
+            let rank = 0;
+            let isWinner = false;
+            
+            try {
+              const rankings = await this.getGameRankings(gameId);
+              const playerIndex = rankings.findIndex(p => p.toLowerCase() === playerLowerCase);
+              
+              if (playerIndex >= 0) {
+                rank = playerIndex + 1;
+                // 假设前3名为获胜者，并且奖励大于0
+                isWinner = rank <= 3 && parseFloat(playerInfo.reward) > 0;
+              }
+            } catch (error) {
+              this.logger.warn(`Failed to get rankings for game ${gameId}:`, error);
+            }
+            
+            gameHistory.push({
+              gameId,
+              score: playerInfo.score,
+              reward: playerInfo.reward,
+              hasClaimed: playerInfo.claimed,
+              rank,
+              isWinner,
+              timestamp: gameInfo.endedAt > 0 ? gameInfo.endedAt * 1000 : gameInfo.createdAt * 1000,
+              gameEnded: gameInfo.ended,
+            });
+            
+            foundGames++;
+          }
+        } catch (error) {
+          // 跳过有问题的游戏，继续查找
+          this.logger.warn(`Error processing game ${gameId}:`, error);
+          continue;
+        }
+      }
+      
+      this.logger.log(`Found ${gameHistory.length} games for player ${playerAddress}`);
+      return gameHistory;
+    } catch (error) {
+      this.logger.error(`Failed to get player game history for ${playerAddress}:`, error);
       throw error;
     }
   }

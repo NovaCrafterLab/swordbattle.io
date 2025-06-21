@@ -38,6 +38,14 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
     gameState.refreshGameData();
   }, []);
 
+  // 监听钱包连接状态，主动刷新玩家数据
+  useEffect(() => {
+    if (isConnected && address) {
+      console.log('💰 Wallet connected, refreshing player data...', address);
+      playerData.refreshPlayerData();
+    }
+  }, [isConnected, address]);
+
   // 监听 gameId 变化
   useEffect(() => {
     console.log('🎮 GameId changed:', gameState.gameId);
@@ -260,6 +268,9 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
               onClick={() => {
                 console.log('🔄 Manual refresh triggered');
                 gameState.refreshGameData();
+                if (isConnected && address) {
+                  playerData.refreshPlayerData();
+                }
               }}
               className="race-btn race-btn-secondary"
               style={{ fontSize: '12px', padding: '4px 8px' }}
@@ -300,11 +311,28 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
               <span>Wallet: {address?.slice(0, 6)}...{address?.slice(-4)}</span>
             </div>
             <div className="balance-info">
-              <span>USD1 Balance: {formatEther(playerData.usd1Balance)}</span>
+              <span>
+                USD1 Balance: {
+                  playerData.isBalanceLoading 
+                    ? '⏳ Loading...' 
+                    : formatEther(typeof playerData.usd1Balance === 'bigint' ? playerData.usd1Balance : BigInt(0))
+                }
+              </span>
               {gameState.isRaceServer && (
-                <span>Allowance: {formatEther(playerData.allowance)}</span>
+                <span>
+                  Allowance: {
+                    playerData.isAllowanceLoading 
+                      ? '⏳ Loading...' 
+                      : formatEther(typeof playerData.allowance === 'bigint' ? playerData.allowance : BigInt(0))
+                  }
+                </span>
               )}
             </div>
+            {(playerData.isBalanceLoading || playerData.isAllowanceLoading) && (
+              <div className="loading-hint" style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                💡 First-time loading may take a few seconds...
+              </div>
+            )}
           </div>
         )}
 

@@ -26,56 +26,79 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
   const playerData = usePlayerData();
 
   const [gameRewards, setGameRewards] = useState<GameReward[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [claimingGameId, setClaimingGameId] = useState<number | null>(null);
+  const [showFilter, setShowFilter] = useState<'all' | 'claimable'>('all');
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [retryTrigger, setRetryTrigger] = useState(0);
 
-  /**
-   * 获取玩家历史奖励数据
-   * TODO: 这里需要从合约事件或后端API获取完整的历史数据
-   */
-  const fetchRewardsHistory = async () => {
-    if (!address) return;
+  // 重试函数
+  const handleRetry = () => {
+    console.log('🔄 Retry triggered...');
+    setRetryTrigger(prev => prev + 1);
+  };
 
-    setIsLoading(true);
-    try {
-      // 模拟数据 - 实际应该从链上事件或后端API获取
-      const mockRewards: GameReward[] = [
-        {
-          gameId: 3,
-          score: 1250,
-          reward: BigInt('50000000000000000000'), // 50 USD1
-          hasClaimed: true,
-          rank: 1,
-          isWinner: true,
-          timestamp: Date.now() - 86400000 * 2, // 2天前
-        },
-        {
-          gameId: 2,
-          score: 890,
-          reward: BigInt('20000000000000000000'), // 20 USD1
-          hasClaimed: false,
-          rank: 3,
-          isWinner: true,
-          timestamp: Date.now() - 86400000 * 5, // 5天前
-        },
-        {
-          gameId: 1,
-          score: 450,
-          reward: BigInt('0'), // 0 USD1
-          hasClaimed: false,
-          rank: 8,
-          isWinner: false,
-          timestamp: Date.now() - 86400000 * 7, // 7天前
-        },
-      ];
-
-      setGameRewards(mockRewards);
-    } catch (error) {
-      console.error('Failed to fetch rewards history:', error);
-    } finally {
+  // 组件挂载时立即刷新playerData
+  useEffect(() => {
+    console.log('🔍 RewardsModal: Component mounted, triggering immediate refresh');
+    if (address && isConnected) {
+      // 立即检查是否已有缓存的数据
+      if (playerData.playerProfile?.gameHistory && playerData.playerProfile.gameHistory.length > 0) {
+        console.log('🔍 RewardsModal: Found existing data on mount, using immediately');
+        const gameRewardsData: GameReward[] = playerData.playerProfile.gameHistory.map(game => ({
+          gameId: game.gameId,
+          score: game.score,
+          reward: game.reward,
+          hasClaimed: game.hasClaimed,
+          rank: game.rank,
+          isWinner: game.isWinner,
+          timestamp: Date.now() - (game.gameId * 86400000),
+        }));
+        setGameRewards(gameRewardsData);
+        setIsLoading(false);
+      } else {
+        // 如果没有缓存数据，立即刷新
+        console.log('🔍 RewardsModal: No cached data, refreshing playerData');
+        playerData.refreshPlayerData();
+      }
+    } else {
+      // 如果没有连接钱包，设置为非加载状态
       setIsLoading(false);
     }
-  };
+  }, [address, isConnected]); // 依赖address和isConnected，确保钱包状态变化时重新执行
+
+  // 简化的数据获取逻辑 - 当playerData更新时同步到组件状态
+  useEffect(() => {
+    if (!playerData.isLoading && 
+        playerData.playerProfile?.gameHistory && 
+        playerData.playerProfile.gameHistory.length > 0) {
+      
+      console.log('🔍 RewardsModal: PlayerData updated, syncing to component state');
+      const gameRewardsData: GameReward[] = playerData.playerProfile.gameHistory.map(game => ({
+        gameId: game.gameId,
+        score: game.score,
+        reward: game.reward,
+        hasClaimed: game.hasClaimed,
+        rank: game.rank,
+        isWinner: game.isWinner,
+        timestamp: Date.now() - (game.gameId * 86400000),
+      }));
+      
+      console.log('🔍 RewardsModal: Setting gameRewards with', gameRewardsData.length, 'items');
+      setGameRewards(gameRewardsData);
+      setIsLoading(false);
+    }
+  }, [playerData.isLoading, playerData.playerProfile]);
+
+  // 手动重试时重新获取数据
+  useEffect(() => {
+    if (retryTrigger > 0 && address && isConnected) {
+      console.log('🔍 RewardsModal: Manual retry triggered');
+      setIsLoading(true);
+      setFetchError(null);
+      playerData.refreshPlayerData();
+    }
+  }, [retryTrigger]);
 
   /**
    * 领取奖励
@@ -136,13 +159,6 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
     }
   }, [blockchain.isConfirmed, claimingGameId]);
 
-  // 组件加载时获取数据
-  useEffect(() => {
-    if (isConnected) {
-      fetchRewardsHistory();
-    }
-  }, [isConnected]);
-
   // 计算统计数据
   const totalRewards = gameRewards.reduce((sum, reward) => sum + reward.reward, BigInt(0));
   const unclaimedRewards = gameRewards
@@ -151,6 +167,16 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
   const totalGames = gameRewards.length;
   const winCount = gameRewards.filter(reward => reward.isWinner).length;
   const winRate = totalGames > 0 ? (winCount / totalGames * 100).toFixed(1) : '0';
+
+  // 根据过滤条件过滤对局
+  const filteredRewards = showFilter === 'claimable' 
+    ? gameRewards.filter(reward => reward.reward > BigInt(0) && !reward.hasClaimed)
+    : gameRewards;
+
+  const claimableCount = gameRewards.filter(reward => reward.reward > BigInt(0) && !reward.hasClaimed).length;
+
+  // 检查是否正在获取数据
+  const isDataLoading = isLoading || playerData.isLoading;
 
   const modalContent = (
     <div className="rewards-modal">
@@ -166,6 +192,18 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
       {!isConnected ? (
         <div className="not-connected">
           <p>Please connect your wallet to view rewards</p>
+        </div>
+      ) : isDataLoading ? (
+        // 完整的加载状态UI - 避免显示空的统计信息
+        <div className="rewards-loading">
+          <div className="loading-content">
+            <div className="loading-spinner">🔄</div>
+            <h3>Loading Your Rewards...</h3>
+            <p>Fetching your game history and rewards from the blockchain</p>
+            <div style={{ fontSize: '12px', color: '#888', marginTop: '16px' }}>
+              💡 First-time loading may take a few seconds...
+            </div>
+          </div>
         </div>
       ) : (
         <>
@@ -191,18 +229,64 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
 
           {/* 奖励历史 */}
           <div className="rewards-history">
-            <h3>Reward History</h3>
+            <div className="history-header">
+              <h3>Reward History</h3>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {/* 过滤选项 */}
+                <div className="filter-options">
+                  <button 
+                    className={`filter-btn ${showFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setShowFilter('all')}
+                  >
+                    All Games ({totalGames})
+                  </button>
+                  <button 
+                    className={`filter-btn ${showFilter === 'claimable' ? 'active' : ''}`}
+                    onClick={() => setShowFilter('claimable')}
+                  >
+                    Claimable ({claimableCount})
+                  </button>
+                </div>
+                
+                {/* 刷新按钮 */}
+                <button 
+                  onClick={handleRetry}
+                  className="filter-btn"
+                  style={{ fontSize: '12px', padding: '4px 8px' }}
+                >
+                  🔄 Refresh
+                </button>
+              </div>
+            </div>
             
-            {isLoading ? (
-              <div className="loading">Loading rewards...</div>
-            ) : gameRewards.length === 0 ? (
+            {fetchError ? (
+              <div className="error-state">
+                <p>❌ {fetchError}</p>
+                <button 
+                  className="retry-btn"
+                  onClick={handleRetry}
+                >
+                  🔄 Retry
+                </button>
+              </div>
+            ) : filteredRewards.length === 0 ? (
               <div className="no-rewards">
-                <p>No game rewards found</p>
-                <p>Play some race games to earn rewards!</p>
+                {showFilter === 'claimable' ? (
+                  <>
+                    <p>No claimable rewards found</p>
+                    <p>All your rewards have been claimed!</p>
+                  </>
+                ) : (
+                  <>
+                    <p>No game rewards found</p>
+                    <p>Play some race games to earn rewards!</p>
+                  </>
+                )}
               </div>
             ) : (
               <div className="rewards-list">
-                {gameRewards.map((reward) => (
+                {filteredRewards.map((reward) => (
                   <div 
                     key={reward.gameId} 
                     className={`reward-item ${reward.isWinner ? 'winner' : 'loser'}`}

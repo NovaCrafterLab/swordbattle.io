@@ -82,7 +82,7 @@ export const usePlayerData = () => {
   }, [address, blockchain]);
 
   /**
-   * 获取玩家历史游戏数据
+   * 获取玩家游戏历史数据
    */
   const getPlayerHistory = useCallback(async (gameIds: number[]): Promise<PlayerGameData[]> => {
     if (!address || gameIds.length === 0) return [];
@@ -97,6 +97,46 @@ export const usePlayerData = () => {
       return [];
     }
   }, [address, getPlayerGameData]);
+
+  /**
+   * 从API服务器获取玩家游戏历史
+   */
+  const fetchPlayerGameHistory = useCallback(async (): Promise<PlayerGameData[]> => {
+    if (!address) return [];
+
+    try {
+      console.log('🎯 Fetching player game history from API for:', address);
+      
+      const response = await fetch(`${process.env.REACT_APP_API_URL || process.env.REACT_APP_API || 'http://localhost:8080'}/blockchain/players/${address}/history?limit=50`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log('📊 API game history response:', result);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch game history');
+      }
+      
+      // 转换API数据为组件需要的格式
+      const gameHistory: PlayerGameData[] = result.data.games.map((game: any) => ({
+        gameId: game.gameId,
+        score: game.score,
+        reward: BigInt(Math.floor(parseFloat(game.reward) * 1e18)), // 转换为wei
+        hasClaimed: game.hasClaimed,
+        rank: game.rank || 0,
+        isWinner: game.isWinner,
+      }));
+      
+      console.log('🏆 Processed game history:', gameHistory);
+      return gameHistory;
+    } catch (err) {
+      console.error('❌ Failed to fetch player game history:', err);
+      return [];
+    }
+  }, [address]);
 
   /**
    * 刷新玩家数据
@@ -118,9 +158,8 @@ export const usePlayerData = () => {
         refetchNonce(),
       ]);
 
-      // TODO: 获取玩家游戏历史
-      // 这里需要从合约事件或后端API获取玩家参与过的游戏列表
-      const gameHistory: PlayerGameData[] = [];
+      // 从API获取玩家游戏历史
+      const gameHistory = await fetchPlayerGameHistory();
 
       // 计算统计数据
       const totalRewards = gameHistory.reduce((sum, game) => sum + game.reward, BigInt(0));
@@ -154,23 +193,27 @@ export const usePlayerData = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [address, refetchBalance, refetchAllowance, refetchNonce]);
+  }, [address, refetchBalance, refetchAllowance, refetchNonce, fetchPlayerGameHistory]);
 
   /**
    * 检查是否需要授权USD1代币
    */
   const needsApproval = useCallback((amount: bigint): boolean => {
-    if (!playerProfile) return true;
-    return playerProfile.allowance < amount;
-  }, [playerProfile]);
+    const currentAllowance = (typeof allowance === 'bigint' ? allowance : null) || 
+                            playerProfile?.allowance || 
+                            BigInt(0);
+    return currentAllowance < amount;
+  }, [allowance, playerProfile]);
 
   /**
    * 检查是否有足够的USD1余额
    */
   const hasSufficientBalance = useCallback((amount: bigint): boolean => {
-    if (!playerProfile) return false;
-    return playerProfile.usd1Balance >= amount;
-  }, [playerProfile]);
+    const currentBalance = (typeof usd1Balance === 'bigint' ? usd1Balance : null) || 
+                          playerProfile?.usd1Balance || 
+                          BigInt(0);
+    return currentBalance >= amount;
+  }, [usd1Balance, playerProfile]);
 
   /**
    * 格式化USD1金额
@@ -208,8 +251,14 @@ export const usePlayerData = () => {
 
   // 当地址变化时刷新数据
   useEffect(() => {
-    refreshPlayerData();
-  }, [refreshPlayerData]);
+    if (address) {
+      console.log('🔄 usePlayerData: Address changed, refreshing data for:', address);
+      refreshPlayerData();
+    } else {
+      console.log('🔄 usePlayerData: No address, clearing profile');
+      setPlayerProfile(null);
+    }
+  }, [address]); // 只依赖address，避免无限循环
 
   return {
     playerProfile,
@@ -218,17 +267,28 @@ export const usePlayerData = () => {
     refreshPlayerData,
     getPlayerGameData,
     getPlayerHistory,
+    fetchPlayerGameHistory,
     needsApproval,
     hasSufficientBalance,
     formatUSD1Amount,
     getPlayerLevel,
     getPlayerTitle,
     
-    // 便捷访问
+    // 便捷访问 - 改进逻辑，优先使用实时数据
     address,
-    usd1Balance: playerProfile?.usd1Balance || BigInt(0),
-    allowance: playerProfile?.allowance || BigInt(0),
-    nonce: playerProfile?.nonce || 0,
+    usd1Balance: (typeof usd1Balance === 'bigint' ? usd1Balance : null) || 
+                 playerProfile?.usd1Balance || 
+                 BigInt(0),
+    allowance: (typeof allowance === 'bigint' ? allowance : null) || 
+               playerProfile?.allowance || 
+               BigInt(0),
+    nonce: (typeof playerNonce === 'number' ? playerNonce : null) || 
+           playerProfile?.nonce || 
+           0,
     isConnected: !!address,
+    
+    // 添加数据获取状态
+    isBalanceLoading: !usd1Balance && !!address,
+    isAllowanceLoading: !allowance && !!address,
   };
 }; 

@@ -23,6 +23,9 @@ const dotenvFiles = [
   NODE_ENV !== 'test' && `${paths.dotenv}.local`,
   `${paths.dotenv}.${NODE_ENV}`,
   paths.dotenv,
+  // 添加对项目根目录统一环境配置文件的支持
+  path.resolve(paths.appPath, '..', 'env', `client.env.${NODE_ENV}`),
+  path.resolve(paths.appPath, '..', 'env', 'client.env'),
 ].filter(Boolean);
 
 // Load environment variables from .env* files. Suppress warnings using silent
@@ -69,7 +72,7 @@ function getClientEnvironment(publicUrl) {
         return env;
       },
       {
-        // Useful for determining whether we’re running in production mode.
+        // Useful for determining whether we're running in production mode.
         // Most importantly, it switches React into the correct mode.
         NODE_ENV: process.env.NODE_ENV || 'development',
         // Useful for resolving the correct path to static assets in `public`.
