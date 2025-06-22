@@ -28,6 +28,11 @@ export interface ServerInfo {
   environment: any;
   blockchainEnabled: boolean;
   blockchainStatus: any;
+  blockchainConfig?: {
+    gameLevel: number;
+    environment: string;
+    chainId: number;
+  };
   gameStatus: any;
   timestamp: number;
 }
@@ -56,7 +61,7 @@ export const useGameState = (serverUrl?: string) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 获取当前游戏ID
+  // 获取当前游戏ID - 优先使用服务器返回的gameId
   const { data: gameCounter } = blockchain.useGameCounter();
   
   // 添加gameCounter调试信息
@@ -68,13 +73,20 @@ export const useGameState = (serverUrl?: string) => {
     isBigInt: typeof gameCounter === 'bigint',
     isGreaterEqualZero: (typeof gameCounter === 'number' && gameCounter >= 0) || (typeof gameCounter === 'bigint' && gameCounter >= 0n),
     condition: (gameCounter !== null && gameCounter !== undefined),
+    serverGameId: serverInfo?.gameStatus?.gameId,
   });
   
   // 获取入场费
   const { data: entryFee } = blockchain.useEntryFee();
 
-  // 获取游戏信息
+  // 获取游戏信息 - 优先使用服务器的gameId，否则使用区块链的gameCounter
   const currentGameId = (() => {
+    // 优先使用服务器返回的gameId（这是当前活跃游戏的ID）
+    if (serverInfo?.gameStatus?.gameId !== null && serverInfo?.gameStatus?.gameId !== undefined) {
+      return serverInfo.gameStatus.gameId;
+    }
+    
+    // 如果服务器没有返回gameId，使用区块链的gameCounter
     if (gameCounter === null || gameCounter === undefined) return null;
     if (typeof gameCounter === 'number') return gameCounter;
     if (typeof gameCounter === 'bigint') return Number(gameCounter);
@@ -83,8 +95,10 @@ export const useGameState = (serverUrl?: string) => {
   
   console.log('🎮 CurrentGameId calculation:', {
     gameCounter,
+    serverGameId: serverInfo?.gameStatus?.gameId,
     currentGameId,
     gameCounterType: typeof gameCounter,
+    source: serverInfo?.gameStatus?.gameId !== null && serverInfo?.gameStatus?.gameId !== undefined ? 'server' : 'blockchain',
   });
   
   const { data: gameInfo, refetch: refetchGameInfo } = blockchain.useGameInfo(currentGameId || 0);

@@ -24,9 +24,37 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
   const [isApproving, setIsApproving] = useState(false);
   const [txStep, setTxStep] = useState<'idle' | 'approving' | 'joining' | 'waiting'>('idle');
 
-  // 获取入场费
-  const { data: entryFee } = blockchain.useEntryFee();
-  const entryFeeAmount = typeof entryFee === 'bigint' ? entryFee : parseEther('10'); // 默认10 USD1
+  // 从服务器获取游戏级别，如果没有则默认为LOW(0)
+  const gameLevel = gameState.serverInfo?.blockchainConfig?.gameLevel ?? 0; // 0=LOW, 1=MEDIUM, 2=HIGH
+  
+  // 获取级别配置
+  const { data: levelConfig } = blockchain.useLevelConfig(gameLevel);
+  
+  // 获取入场费（优先使用级别配置，否则使用默认值）
+  const { data: defaultEntryFee } = blockchain.useEntryFee();
+  const entryFeeAmount = (levelConfig?.entryFee && typeof levelConfig.entryFee === 'bigint') 
+    ? levelConfig.entryFee 
+    : (typeof defaultEntryFee === 'bigint' ? defaultEntryFee : parseEther('10')); // 默认10 USD1
+
+  // 获取级别显示名称
+  const getLevelDisplayName = (level: number) => {
+    switch (level) {
+      case 0: return 'LOW';
+      case 1: return 'MEDIUM';
+      case 2: return 'HIGH';
+      default: return 'UNKNOWN';
+    }
+  };
+
+  // 获取级别显示颜色
+  const getLevelDisplayColor = (level: number) => {
+    switch (level) {
+      case 0: return '#10b981'; // 绿色
+      case 1: return '#f59e0b'; // 橙色
+      case 2: return '#ef4444'; // 红色
+      default: return '#6b7280'; // 灰色
+    }
+  };
 
   // 检查是否需要授权
   const needsApproval = playerData.needsApproval(entryFeeAmount);
@@ -214,6 +242,21 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
         <div className="race-server-info">
           <span className="server-url">{new URL(serverUrl).hostname}</span>
           {gameState.isRaceServer && <span className="race-badge">RACE</span>}
+          {gameState.isRaceServer && gameState.serverInfo?.blockchainConfig && (
+            <span 
+              className="level-badge"
+              style={{ 
+                backgroundColor: getLevelDisplayColor(gameLevel),
+                color: 'white',
+                padding: '3px 8px',
+                borderRadius: '4px',
+                fontSize: '0.7em',
+                fontWeight: 'bold'
+              }}
+            >
+              {getLevelDisplayName(gameLevel)}
+            </span>
+          )}
         </div>
       </div>
 
@@ -254,6 +297,12 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
         {gameState.isRaceServer && (
           <div className="game-info">
             <div className="info-grid">
+              <div className="info-item">
+                <label>Game Level</label>
+                <span style={{ color: getLevelDisplayColor(gameLevel) }}>
+                  {getLevelDisplayName(gameLevel)}
+                </span>
+              </div>
               <div className="info-item">
                 <label>Entry Fee</label>
                 <span>{formatEther(entryFeeAmount)} USD1</span>

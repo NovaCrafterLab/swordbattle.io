@@ -122,8 +122,18 @@ async function start() {
         isRaceServer: config.isRaceServer,
         blockchainEnabled: config.blockchain.enabled,
         
+        // 区块链配置信息
+        blockchainConfig: config.blockchain.enabled ? {
+          gameLevel: config.blockchain.gameLevel || 0, // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH
+          environment: config.blockchain.environment.networkName,
+          chainId: config.blockchain.environment.chainId,
+        } : null,
+        
         // 区块链游戏状态（仅在比赛服务器模式下）
         gameStatus,
+        
+        // 添加时间戳用于调试
+        timestamp: Date.now(),
       }),
     );
   });

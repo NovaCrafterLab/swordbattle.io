@@ -12,6 +12,7 @@ export interface PlayerGameData {
   hasClaimed: boolean;
   rank: number;
   isWinner: boolean;
+  level?: number; // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH
 }
 
 export interface PlayerProfile {
@@ -72,6 +73,7 @@ export const usePlayerData = () => {
       const score = Number(playerInfo.score || 0);
       const reward = BigInt(Math.floor(parseFloat(playerInfo.reward) * 1e18)); // 转换为wei
       const hasClaimed = Boolean(playerInfo.claimed);
+      const level = typeof playerInfo.level === 'number' ? playerInfo.level : undefined; // 游戏级别
 
       // 如果没有奖励，跳过这个游戏
       if (reward === BigInt(0)) {
@@ -97,6 +99,7 @@ export const usePlayerData = () => {
         hasClaimed,
         rank,
         isWinner: reward > BigInt(0),
+        level, // 添加游戏级别信息
       };
     } catch (err) {
       console.error(`Failed to get blockchain data for game ${gameId}:`, err);
@@ -275,8 +278,8 @@ export const usePlayerData = () => {
       const databaseGames: PlayerGameData[] = result.data.games.map((game: any) => ({
         gameId: game.gameId,
         score: game.score,
-        reward: BigInt(0), // 数据库中的奖励数据可能不准确，将从区块链获取
-        hasClaimed: false, // 数据库中的claim状态可能不准确，将从区块链获取
+        reward: BigInt(Math.floor(parseFloat(game.reward || '0') * 1e18)), // 使用数据库中的奖励数据，转换为wei
+        hasClaimed: game.hasClaimed || false, // 使用数据库中的claim状态
         rank: game.rank || 0,
         isWinner: game.isWinner,
       }));
@@ -315,26 +318,37 @@ export const usePlayerData = () => {
       // 步骤3：合并数据
       const mergedGames: PlayerGameData[] = databaseGames.map((game, index) => {
         const rewardInfo = rewardResults[index];
+        
+        // 如果区块链查询失败或返回0奖励，尝试使用数据库中的奖励数据
+        let finalReward = rewardInfo.reward;
+        let finalHasClaimed = rewardInfo.hasClaimed;
+        
+        // 如果区块链返回0奖励，但数据库中有奖励数据，使用数据库数据
+        if (rewardInfo.reward === BigInt(0) && game.reward > BigInt(0)) {
+          finalReward = game.reward;
+          finalHasClaimed = game.hasClaimed;
+        }
+        
         return {
           ...game,
-          reward: rewardInfo.reward,
-          hasClaimed: rewardInfo.hasClaimed,
-          isWinner: rewardInfo.reward > BigInt(0), // 根据实际奖励更新获胜状态
+          reward: finalReward,
+          hasClaimed: finalHasClaimed,
+          isWinner: finalReward > BigInt(0) || game.isWinner, // 根据实际奖励或数据库状态更新获胜状态
         };
       });
       
-      // 过滤掉没有奖励的游戏
-      const gamesWithRewards = mergedGames.filter(game => game.reward > BigInt(0));
+      // 不过滤游戏，显示所有游戏历史（包括没有奖励的）
+      // const gamesWithRewards = mergedGames.filter(game => game.reward > BigInt(0));
       
       // 步骤4：异步同步区块链奖励数据到数据库（不阻塞UI）
-      if (gamesWithRewards.length > 0) {
+      if (mergedGames.length > 0) {
         syncRewardsToDatabase().catch(error => {
           console.error('Failed to sync rewards to database:', error);
           // 不影响用户体验，静默处理错误
         });
       }
       
-      return gamesWithRewards.sort((a, b) => b.gameId - a.gameId);
+      return mergedGames.sort((a, b) => b.gameId - a.gameId);
       
     } catch (err) {
       console.error('Mixed query failed:', err);
@@ -371,10 +385,8 @@ export const usePlayerData = () => {
    */
   const fetchPlayerGameHistory = useCallback(async (useBlockchain: boolean = false): Promise<PlayerGameData[]> => {
     if (useBlockchain) {
-      console.log('🔗 使用纯区块链查询');
       return await fetchPlayerGameHistoryFromBlockchain();
     } else {
-      console.log('🔀 使用混合查询（数据库 + 区块链）');
       return await fetchPlayerGameHistoryMixed();
     }
   }, [fetchPlayerGameHistoryFromBlockchain, fetchPlayerGameHistoryMixed]);

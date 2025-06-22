@@ -114,14 +114,15 @@ export class BlockchainService implements OnModuleInit {
 
       return {
         gameId: Number(result[0]),
-        playerCount: Number(result[1]),
-        totalPool: formatEther(result[2]),
-        ended: result[3],
-        createdAt: Number(result[4]),
-        endedAt: Number(result[5]),
-        cleaned: result[6],
-        gameDuration: Number(result[7]),
-        isExpired: result[8],
+        level: Number(result[1]), // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH
+        playerCount: Number(result[2]),
+        totalPool: formatEther(result[3]),
+        ended: result[4],
+        createdAt: Number(result[5]),
+        endedAt: Number(result[6]),
+        cleaned: result[7],
+        gameDuration: Number(result[8]),
+        isExpired: result[9],
       };
     } catch (error) {
       this.logger.error(`Failed to get game info for game ${gameId}:`, error);
@@ -214,10 +215,14 @@ export class BlockchainService implements OnModuleInit {
 
       return {
         playerAddr: result[0] as string,
-        score: Number(result[1]),
-        submitted: result[2] as boolean,
-        claimed: result[3] as boolean,
-        reward: formatEther(result[4]),
+        kills: Number(result[1]),
+        score: Number(result[2]),
+        submitted: result[3] as boolean,
+        claimed: result[4] as boolean,
+        killReward: formatEther(result[5]),
+        survivalReward: formatEther(result[6]),
+        // 计算总奖励
+        reward: formatEther(BigInt(result[5]) + BigInt(result[6])),
       };
     } catch (error) {
       this.logger.error(`Failed to get player info for ${playerAddress} in game ${gameId}:`, error);
@@ -338,6 +343,7 @@ export class BlockchainService implements OnModuleInit {
               hasClaimed: playerInfo.claimed,
               rank,
               isWinner,
+              level: gameInfo.level,
               timestamp: gameInfo.endedAt > 0 ? gameInfo.endedAt * 1000 : gameInfo.createdAt * 1000,
               gameEnded: gameInfo.ended,
             });
@@ -360,7 +366,7 @@ export class BlockchainService implements OnModuleInit {
   }
 
   // EIP-712签名分数提交
-  async signScoreSubmission(gameId: number, playerAddress: string, score: number, nonce: number): Promise<string> {
+  async signScoreSubmission(gameId: number, playerAddress: string, kills: number, score: number, nonce: number): Promise<string> {
     if (!this.isAvailable() || !this.walletClient) {
       throw new Error('Blockchain service or wallet not available');
     }
@@ -379,6 +385,7 @@ export class BlockchainService implements OnModuleInit {
         ScoreSubmission: [
           { name: 'gameId', type: 'uint256' },
           { name: 'player', type: 'address' },
+          { name: 'kills', type: 'uint256' },
           { name: 'score', type: 'uint256' },
           { name: 'nonce', type: 'uint256' },
         ],
@@ -388,6 +395,7 @@ export class BlockchainService implements OnModuleInit {
       const message = {
         gameId: BigInt(gameId),
         player: getAddress(playerAddress as `0x${string}`),
+        kills: BigInt(kills),
         score: BigInt(score),
         nonce: BigInt(nonce),
       };
@@ -400,7 +408,7 @@ export class BlockchainService implements OnModuleInit {
         message,
       });
 
-      this.logger.log(`Signed score submission for player ${playerAddress}, game ${gameId}, score ${score}`);
+      this.logger.log(`Signed score submission for player ${playerAddress}, game ${gameId}, kills ${kills}, score ${score}`);
       return signature;
     } catch (error) {
       this.logger.error(`Failed to sign score submission:`, error);

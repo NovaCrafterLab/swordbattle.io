@@ -82,6 +82,7 @@ module.exports = {
       usd1Token: process.env.USD1_TOKEN_CONTRACT,
     },
     trustedSigner: process.env.TRUSTED_SIGNER_PRIVATE_KEY,
+    gameLevel: parseInt(process.env.GAME_LEVEL || '0'), // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH
     environment: {
       isDev,
       isRelease,

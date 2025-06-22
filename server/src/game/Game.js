@@ -586,16 +586,18 @@ class Game {
       this.isGameCreationInProgress = true;
       this.gamePhase = 'initializing';
       
-      console.log(`🚀 Creating blockchain game... (Attempt ${currentAttempt}/${maxRetries})`);
+      // 从配置中获取游戏级别
+      const gameLevel = config.blockchain.gameLevel || 0;
+      console.log(`🚀 Creating blockchain game... (Attempt ${currentAttempt}/${maxRetries}, Level: ${gameLevel})`);
       
       // 在创建游戏前记录初始计数器
       const initialCounter = await this.blockchainService.getGameCounter();
       console.log(`📊 Current game counter before creation: ${initialCounter}`);
       
-      // 调用合约创建游戏
-      const createResult = await this.blockchainService.createGame();
+      // 调用合约创建游戏，传入级别参数
+      const createResult = await this.blockchainService.createGame(gameLevel);
       console.log(`✅ Game creation transaction sent: ${createResult.txHash}`);
-      console.log(`📊 Transaction details: Initial counter = ${createResult.initialCounter}, Timestamp = ${new Date(createResult.timestamp).toISOString()}`);
+      console.log(`📊 Transaction details: Initial counter = ${createResult.initialCounter}, Level = ${createResult.level}, Timestamp = ${new Date(createResult.timestamp).toISOString()}`);
       
       // 监听GameCreated事件获取gameId，传递初始计数器
       await this.waitForGameCreated(initialCounter);
@@ -835,6 +837,7 @@ class Game {
         const signature = await this.getScoreSignature(
           this.blockchainGameId,
           scoreData.walletAddress,
+          scoreData.kills,
           scoreData.finalScore,
           nonce
         );
@@ -844,12 +847,13 @@ class Game {
         console.log(`📊 Submitting score to blockchain...`);
         const txHash = await this.blockchainService.submitScore(
           this.blockchainGameId,
+          scoreData.kills,
           scoreData.finalScore,
           nonce,
           signature
         );
 
-        console.log(`✅ Score submitted for ${scoreData.playerName}: ${scoreData.finalScore} (tx: ${txHash})`);
+        console.log(`✅ Score submitted for ${scoreData.playerName}: ${scoreData.finalScore} kills: ${scoreData.kills} (tx: ${txHash})`);
         this.playerScoreSubmitted.add(playerId);
         successfulSubmissions++;
         
@@ -858,6 +862,7 @@ class Game {
           gameId: Number(this.blockchainGameId),
           playerAddress: scoreData.walletAddress,
           score: scoreData.finalScore,
+          kills: scoreData.kills, // 添加击杀数据
           rewardAmount: '0', // 临时值，后续可以从区块链查询实际奖励
           hasClaimed: false,
           rank: 0, // 临时值，后续可以计算实际排名
@@ -1051,12 +1056,13 @@ class Game {
   /**
    * 通过API服务器获取分数签名
    */
-  async getScoreSignature(gameId, playerAddress, score, nonce) {
+  async getScoreSignature(gameId, playerAddress, kills, score, nonce) {
     try {
       // 验证参数
       console.log(`🔍 Signature request parameters:`);
       console.log(`   gameId: ${gameId} (type: ${typeof gameId})`);
       console.log(`   playerAddress: ${playerAddress} (type: ${typeof playerAddress})`);
+      console.log(`   kills: ${kills} (type: ${typeof kills})`);
       console.log(`   score: ${score} (type: ${typeof score})`);
       console.log(`   nonce: ${nonce} (type: ${typeof nonce})`);
       
@@ -1065,6 +1071,9 @@ class Game {
       }
       if (playerAddress === undefined || playerAddress === null || playerAddress === '') {
         throw new Error('playerAddress is undefined, null or empty');
+      }
+      if (kills === undefined || kills === null) {
+        throw new Error('kills is undefined or null');
       }
       if (score === undefined || score === null) {
         throw new Error('score is undefined or null');
@@ -1077,6 +1086,7 @@ class Game {
       const requestBody = {
         gameId: typeof gameId === 'bigint' ? gameId.toString() : String(gameId),
         playerAddress: String(playerAddress),
+        kills: typeof kills === 'bigint' ? kills.toString() : String(kills),
         score: typeof score === 'bigint' ? score.toString() : String(score),
         nonce: typeof nonce === 'bigint' ? nonce.toString() : String(nonce),
       };

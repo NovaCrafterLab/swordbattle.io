@@ -18,6 +18,7 @@ interface GameReward {
   rank: number;
   isWinner: boolean;
   timestamp?: number;
+  level?: number; // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH
 }
 
 const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
@@ -50,6 +51,7 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
           rank: game.rank,
           isWinner: game.isWinner,
           timestamp: Date.now() - (game.gameId * 86400000),
+          level: game.level,
         }));
         setGameRewards(gameRewardsData);
         setIsLoading(false);
@@ -75,6 +77,7 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
         rank: game.rank,
         isWinner: game.isWinner,
         timestamp: Date.now() - (game.gameId * 86400000),
+        level: game.level,
       }));
       
       setGameRewards(gameRewardsData);
@@ -103,6 +106,18 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
     } catch (error) {
       console.error('Failed to claim reward:', error);
       setClaimingGameId(null);
+    }
+  };
+
+  /**
+   * 获取游戏级别显示
+   */
+  const getLevelDisplay = (level?: number) => {
+    switch (level) {
+      case 0: return { text: 'LOW', color: '#10b981' };
+      case 1: return { text: 'MEDIUM', color: '#f59e0b' };
+      case 2: return { text: 'HIGH', color: '#ef4444' };
+      default: return { text: 'UNKNOWN', color: '#6b7280' };
     }
   };
 
@@ -288,6 +303,21 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
                     <div className="reward-info">
                       <div className="game-info">
                         <span className="game-id">Game #{reward.gameId}</span>
+                        {reward.level !== undefined && (
+                          <span 
+                            className="level-badge"
+                            style={{ 
+                              backgroundColor: getLevelDisplay(reward.level).color,
+                              color: 'white',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '0.7em',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            {getLevelDisplay(reward.level).text}
+                          </span>
+                        )}
                         <span className="rank">{getRankDisplay(reward.rank)}</span>
                         {reward.timestamp && (
                           <span className="time">{formatTime(reward.timestamp)}</span>

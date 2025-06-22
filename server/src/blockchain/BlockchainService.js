@@ -209,7 +209,7 @@ class BlockchainService {
   }
 
   // EIP-712签名相关方法
-  async signScoreSubmission(gameId, playerAddress, score, nonce) {
+  async signScoreSubmission(gameId, playerAddress, kills, score, nonce) {
     if (!this.walletClient || !this.account) {
       throw new Error('No wallet available for signing');
     }
@@ -227,6 +227,7 @@ class BlockchainService {
       ScoreSubmission: [
         { name: 'gameId', type: 'uint256' },
         { name: 'player', type: 'address' },
+        { name: 'kills', type: 'uint256' },
         { name: 'score', type: 'uint256' },
         { name: 'nonce', type: 'uint256' },
       ],
@@ -236,6 +237,7 @@ class BlockchainService {
     const message = {
       gameId: BigInt(gameId),
       player: playerAddress,
+      kills: BigInt(kills),
       score: BigInt(score),
       nonce: BigInt(nonce),
     };
@@ -361,13 +363,13 @@ class BlockchainService {
   /**
    * 创建新游戏
    */
-  async createGame() {
+  async createGame(level = 0) {
     if (!this.isInitialized || !this.walletClient) {
       throw new Error('Blockchain service not initialized or no wallet available');
     }
 
     try {
-      console.log('📝 Creating new game on blockchain...');
+      console.log(`📝 Creating new game on blockchain with level ${level}...`);
       console.log('🔍 Checking current game counter before creation...');
       
       // 记录创建前的游戏计数器
@@ -375,15 +377,16 @@ class BlockchainService {
       console.log(`📊 Current game counter before creation: ${initialCounter}`);
       
       const contract = this.getSwordBattleContract();
-      const txHash = await this.writeContract(contract, 'createGame', []);
+      const txHash = await this.writeContract(contract, 'createGame', [level]);
       
-      console.log(`✅ Game creation transaction sent: ${txHash}`);
+      console.log(`✅ Game creation transaction sent: ${txHash} (Level: ${level})`);
       console.log('⏳ Transaction submitted to blockchain, waiting for confirmation...');
       
       return {
         txHash,
         initialCounter,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        level
       };
     } catch (error) {
       console.error('❌ Failed to create game:', error);
@@ -426,17 +429,18 @@ class BlockchainService {
   /**
    * 提交分数
    */
-  async submitScore(gameId, score, nonce, signature) {
+  async submitScore(gameId, kills, score, nonce, signature) {
     if (!this.isInitialized || !this.walletClient) {
       throw new Error('Blockchain service not initialized or no wallet available');
     }
 
     try {
-      console.log(`📊 Submitting score ${score} for game ${gameId}...`);
+      console.log(`📊 Submitting score ${score} with ${kills} kills for game ${gameId}...`);
       
       const contract = this.getSwordBattleContract();
       const txHash = await this.writeContract(contract, 'submitScore', [
         BigInt(gameId),
+        BigInt(kills),
         BigInt(score),
         BigInt(nonce),
         signature

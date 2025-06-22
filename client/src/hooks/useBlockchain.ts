@@ -54,14 +54,46 @@ export const useBlockchain = () => {
   };
 
   /**
-   * 获取入场费
+   * 获取入场费（支持级别参数）
    */
-  const useEntryFee = () => {
+  const useEntryFee = (level?: number) => {
     return useReadContract({
       ...swordBattleContract,
-      functionName: 'entryFee',
+      functionName: level !== undefined ? 'levelConfigs' : 'entryFee',
+      args: level !== undefined ? [level] : [],
       query: {
         enabled: true,
+        select: (data: any) => {
+          // 如果是levelConfigs调用，返回entryFee字段
+          if (level !== undefined && Array.isArray(data)) {
+            return data[0]; // entryFee是第一个字段
+          }
+          return data;
+        },
+      },
+    });
+  };
+
+  /**
+   * 获取级别配置
+   */
+  const useLevelConfig = (level: number) => {
+    return useReadContract({
+      ...swordBattleContract,
+      functionName: 'levelConfigs',
+      args: [level],
+      query: {
+        enabled: level >= 0 && level <= 2, // 只支持 0=LOW, 1=MEDIUM, 2=HIGH
+        select: (data: any) => {
+          if (Array.isArray(data)) {
+            return {
+              entryFee: data[0],
+              killReward: data[1], 
+              active: data[2],
+            };
+          }
+          return data;
+        },
       },
     });
   };
@@ -219,6 +251,7 @@ export const useBlockchain = () => {
     // 读取hooks
     useGameCounter,
     useEntryFee,
+    useLevelConfig,
     useGameInfo,
     useGamePlayers,
     usePlayerNonce,

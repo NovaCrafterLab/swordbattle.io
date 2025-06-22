@@ -14,6 +14,9 @@ export class SignScoreDto {
   playerAddress: string;
 
   @IsNumberString()
+  kills: string;
+
+  @IsNumberString()
   score: string;
 
   @IsNumberString()
@@ -157,30 +160,32 @@ export class BlockchainController {
     try {
       console.log('Received sign-score request:', signScoreDto);
       
-      const { gameId, playerAddress, score, nonce } = signScoreDto;
+      const { gameId, playerAddress, kills, score, nonce } = signScoreDto;
       
       // 直接转换字符串为整数
       const gameIdNum = parseInt(gameId);
+      const killsNum = parseInt(kills);
       const scoreNum = parseInt(score);
       const nonceNum = parseInt(nonce);
       
-      console.log('Parsed parameters:', { gameIdNum, scoreNum, nonceNum, playerAddress });
+      console.log('Parsed parameters:', { gameIdNum, killsNum, scoreNum, nonceNum, playerAddress });
       
       // 验证转换结果
-      if (isNaN(gameIdNum) || isNaN(scoreNum) || isNaN(nonceNum)) {
-        console.error('Invalid numeric parameters:', { gameIdNum, scoreNum, nonceNum });
-        throw new Error(`Invalid numeric parameters: gameId=${gameIdNum}, score=${scoreNum}, nonce=${nonceNum}`);
+      if (isNaN(gameIdNum) || isNaN(killsNum) || isNaN(scoreNum) || isNaN(nonceNum)) {
+        console.error('Invalid numeric parameters:', { gameIdNum, killsNum, scoreNum, nonceNum });
+        throw new Error(`Invalid numeric parameters: gameId=${gameIdNum}, kills=${killsNum}, score=${scoreNum}, nonce=${nonceNum}`);
       }
       
       if (!playerAddress) {
         throw new Error('Invalid player address');
       }
       
-      console.log('Calling blockchain service with:', { gameIdNum, playerAddress, scoreNum, nonceNum });
+      console.log('Calling blockchain service with:', { gameIdNum, playerAddress, killsNum, scoreNum, nonceNum });
       
       const signature = await this.blockchainService.signScoreSubmission(
         gameIdNum,
         playerAddress,
+        killsNum,
         scoreNum,
         nonceNum,
       );
