@@ -258,15 +258,6 @@ function App() {
               playerName = `Player_${Math.random().toString(36).substring(2, 8)}`;
             }
             
-            console.log('🎮 App.tsx onJoinGame called with:', {
-              walletAddress,
-              walletAddressExists: !!walletAddress,
-              name,
-              accountUsername: account.username,
-              isLoggedIn: account.isLoggedIn,
-              finalPlayerName: playerName,
-              playerNameExists: !!playerName,
-            });
             setGameStarted(true);
             // 比赛模式下传递钱包地址
             window.phaser_game?.events.emit('startGame', playerName, walletAddress);
@@ -283,14 +274,6 @@ function App() {
         if (!playerName) {
           playerName = `Player_${Math.random().toString(36).substring(2, 8)}`;
         }
-        
-        console.log('🎮 Normal game mode starting with:', {
-          name,
-          accountUsername: account.username,
-          isLoggedIn: account.isLoggedIn,
-          finalPlayerName: playerName,
-          playerNameExists: !!playerName,
-        });
         
         setGameStarted(true);
         window.phaser_game?.events.emit('startGame', playerName);

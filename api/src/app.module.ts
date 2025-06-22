@@ -7,6 +7,7 @@ import { GamesModule } from './games/games.module';
 import { StatsModule } from './stats/stats.module';
 import { AuthService } from './auth/auth.service';
 import { BlockchainModule } from './blockchain/blockchain.module';
+import { RaceGamesModule } from './race-games/race-games.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { BlockchainModule } from './blockchain/blockchain.module';
     GamesModule,
     StatsModule,
     BlockchainModule,
+    RaceGamesModule,
   ],
   providers: [AuthService],
 })

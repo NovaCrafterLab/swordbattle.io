@@ -34,17 +34,14 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
 
   // 重试函数
   const handleRetry = () => {
-    console.log('🔄 Retry triggered...');
     setRetryTrigger(prev => prev + 1);
   };
 
   // 组件挂载时立即刷新playerData
   useEffect(() => {
-    console.log('🔍 RewardsModal: Component mounted, triggering immediate refresh');
     if (address && isConnected) {
       // 立即检查是否已有缓存的数据
       if (playerData.playerProfile?.gameHistory && playerData.playerProfile.gameHistory.length > 0) {
-        console.log('🔍 RewardsModal: Found existing data on mount, using immediately');
         const gameRewardsData: GameReward[] = playerData.playerProfile.gameHistory.map(game => ({
           gameId: game.gameId,
           score: game.score,
@@ -58,7 +55,6 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
         setIsLoading(false);
       } else {
         // 如果没有缓存数据，立即刷新
-        console.log('🔍 RewardsModal: No cached data, refreshing playerData');
         playerData.refreshPlayerData();
       }
     } else {
@@ -69,11 +65,8 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
 
   // 简化的数据获取逻辑 - 当playerData更新时同步到组件状态
   useEffect(() => {
-    if (!playerData.isLoading && 
-        playerData.playerProfile?.gameHistory && 
-        playerData.playerProfile.gameHistory.length > 0) {
-      
-      console.log('🔍 RewardsModal: PlayerData updated, syncing to component state');
+    // 修改条件：只要playerData加载完成且有playerProfile就同步数据（包括空数据）
+    if (!playerData.isLoading && playerData.playerProfile?.gameHistory !== undefined) {
       const gameRewardsData: GameReward[] = playerData.playerProfile.gameHistory.map(game => ({
         gameId: game.gameId,
         score: game.score,
@@ -84,7 +77,6 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
         timestamp: Date.now() - (game.gameId * 86400000),
       }));
       
-      console.log('🔍 RewardsModal: Setting gameRewards with', gameRewardsData.length, 'items');
       setGameRewards(gameRewardsData);
       setIsLoading(false);
     }
@@ -93,7 +85,6 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
   // 手动重试时重新获取数据
   useEffect(() => {
     if (retryTrigger > 0 && address && isConnected) {
-      console.log('🔍 RewardsModal: Manual retry triggered');
       setIsLoading(true);
       setFetchError(null);
       playerData.refreshPlayerData();
@@ -168,12 +159,14 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
   const winCount = gameRewards.filter(reward => reward.isWinner).length;
   const winRate = totalGames > 0 ? (winCount / totalGames * 100).toFixed(1) : '0';
 
+  // 可claim的奖励数量
+  const claimableCount = gameRewards.filter(reward => reward.reward > BigInt(0) && !reward.hasClaimed).length;
+  const claimableAmount = unclaimedRewards;
+
   // 根据过滤条件过滤对局
   const filteredRewards = showFilter === 'claimable' 
     ? gameRewards.filter(reward => reward.reward > BigInt(0) && !reward.hasClaimed)
     : gameRewards;
-
-  const claimableCount = gameRewards.filter(reward => reward.reward > BigInt(0) && !reward.hasClaimed).length;
 
   // 检查是否正在获取数据
   const isDataLoading = isLoading || playerData.isLoading;
@@ -199,9 +192,10 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
           <div className="loading-content">
             <div className="loading-spinner">🔄</div>
             <h3>Loading Your Rewards...</h3>
-            <p>Fetching your game history and rewards from the blockchain</p>
+            <p>Fetching game history from database and reward info from blockchain</p>
             <div style={{ fontSize: '12px', color: '#888', marginTop: '16px' }}>
-              💡 First-time loading may take a few seconds...
+              💾 Database → Game history, scores, rankings<br/>
+              🔗 Blockchain → Real-time reward amounts, claim status
             </div>
           </div>
         </div>
@@ -214,8 +208,8 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
               <span className="stat-value">{formatEther(totalRewards)} USD1</span>
             </div>
             <div className="stat-item">
-              <label>Unclaimed</label>
-              <span className="stat-value unclaimed">{formatEther(unclaimedRewards)} USD1</span>
+              <label>Available to Claim</label>
+              <span className="stat-value claimable">{formatEther(claimableAmount)} USD1</span>
             </div>
             <div className="stat-item">
               <label>Games Played</label>

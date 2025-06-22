@@ -810,6 +810,9 @@ class Game {
     let successfulSubmissions = 0;
     let failedSubmissions = 0;
     
+    // 收集成功的分数数据用于批量保存到数据库
+    const gameDataForDatabase = [];
+    
     for (const [playerId, scoreData] of scores) {
       totalPlayers++;
       
@@ -850,6 +853,19 @@ class Game {
         this.playerScoreSubmitted.add(playerId);
         successfulSubmissions++;
         
+        // 准备数据库保存数据（暂时假设奖励为0，排名为0，后续可以改进）
+        gameDataForDatabase.push({
+          gameId: Number(this.blockchainGameId),
+          playerAddress: scoreData.walletAddress,
+          score: scoreData.finalScore,
+          rewardAmount: '0', // 临时值，后续可以从区块链查询实际奖励
+          hasClaimed: false,
+          rank: 0, // 临时值，后续可以计算实际排名
+          isWinner: false, // 临时值，后续可以根据排名确定
+          gameEnded: true,
+          gameEndedAt: new Date(),
+        });
+        
       } catch (error) {
         console.error(`❌ Failed to submit score for ${scoreData.playerName}:`, error);
         console.error(`❌ Error details: ${error.message}`);
@@ -862,6 +878,174 @@ class Game {
     console.log(`   Players with wallet: ${playersWithWallet}`);
     console.log(`   Successful submissions: ${successfulSubmissions}`);
     console.log(`   Failed submissions: ${failedSubmissions}`);
+    
+    // 保存成功的游戏数据到数据库
+    if (gameDataForDatabase.length > 0) {
+      try {
+        console.log(`💾 Saving ${gameDataForDatabase.length} game records to database...`);
+        await this.saveGameDataToDatabase(gameDataForDatabase);
+        console.log(`✅ Game data saved to database successfully`);
+        
+        // 🎯 新增：启动异步延迟更新任务
+        this.scheduleBlockchainRewardUpdate(gameDataForDatabase);
+        
+      } catch (dbError) {
+        console.error(`❌ Failed to save game data to database:`, dbError);
+        // 不抛出错误，让游戏继续结束
+      }
+    }
+  }
+
+  /**
+   * 保存游戏数据到数据库
+   */
+  async saveGameDataToDatabase(gameDataArray) {
+    try {
+      const response = await fetch(`${config.apiEndpoint}/race-games/save-batch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.serverSecret}`, // 服务器认证
+        },
+        body: JSON.stringify({
+          games: gameDataArray
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to save game data');
+      }
+
+      console.log(`💾 Database save response:`, result);
+      return result.data;
+    } catch (error) {
+      console.error('❌ Error saving game data to database:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 安排区块链奖励数据的异步更新任务
+   * 游戏结束30秒后查询区块链真实奖励并更新数据库
+   */
+  scheduleBlockchainRewardUpdate(gameDataArray) {
+    console.log(`⏰ 安排30秒后的区块链奖励更新任务...`);
+    
+    // 30秒后执行异步更新
+    setTimeout(async () => {
+      try {
+        console.log(`🔄 开始执行区块链奖励更新任务 (游戏ID: ${this.blockchainGameId})`);
+        await this.updateBlockchainRewards(gameDataArray);
+        console.log(`✅ 区块链奖励更新任务完成`);
+      } catch (error) {
+        console.error(`❌ 区块链奖励更新任务失败:`, error);
+        // 可以考虑重试机制或者记录到错误日志中
+      }
+    }, 30000); // 30秒延迟
+  }
+
+  /**
+   * 从区块链查询真实奖励数据并更新数据库
+   */
+  async updateBlockchainRewards(gameDataArray) {
+    if (!gameDataArray || gameDataArray.length === 0) {
+      console.log('⚠️ 没有游戏数据需要更新奖励');
+      return;
+    }
+
+    console.log(`🔗 开始查询游戏 ${this.blockchainGameId} 的区块链奖励数据...`);
+    
+    const updatedGameData = [];
+    
+    for (const gameData of gameDataArray) {
+      try {
+        console.log(`🔍 查询玩家 ${gameData.playerAddress} 的奖励...`);
+        
+        // 从区块链查询真实奖励数据
+        const playerReward = await this.blockchainService.readContract(
+          this.blockchainService.getSwordBattleContract(),
+          'playerRewards', 
+          [BigInt(this.blockchainGameId), gameData.playerAddress]
+        );
+        
+        const hasClaimed = await this.blockchainService.readContract(
+          this.blockchainService.getSwordBattleContract(),
+          'hasClaimed', 
+          [BigInt(this.blockchainGameId), gameData.playerAddress]
+        );
+        
+        const rewardEth = Number(playerReward) / 1e18; // 转换为以太币单位
+        const isWinner = playerReward > BigInt(0);
+        
+        console.log(`💰 玩家 ${gameData.playerAddress} 区块链奖励: ${rewardEth} USD1 (已领取: ${hasClaimed})`);
+        
+        // 更新奖励数据
+        const updatedData = {
+          ...gameData,
+          rewardAmount: rewardEth.toString(),
+          hasClaimed: Boolean(hasClaimed),
+          isWinner: isWinner,
+        };
+        
+        updatedGameData.push(updatedData);
+        
+      } catch (error) {
+        console.error(`❌ 查询玩家 ${gameData.playerAddress} 奖励失败:`, error);
+        // 如果查询失败，保留原始数据
+        updatedGameData.push(gameData);
+      }
+    }
+    
+    // 批量更新数据库中的奖励信息
+    if (updatedGameData.length > 0) {
+      try {
+        console.log(`💾 更新数据库中的奖励信息...`);
+        await this.updateRewardsInDatabase(updatedGameData);
+        console.log(`✅ 数据库奖励信息更新完成`);
+      } catch (dbError) {
+        console.error(`❌ 更新数据库奖励信息失败:`, dbError);
+      }
+    }
+  }
+
+  /**
+   * 更新数据库中的奖励信息
+   */
+  async updateRewardsInDatabase(gameDataArray) {
+    try {
+      const response = await fetch(`${config.apiEndpoint}/race-games/update-rewards`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.serverSecret}`,
+        },
+        body: JSON.stringify({
+          games: gameDataArray
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update reward data');
+      }
+
+      console.log(`💾 数据库奖励更新响应:`, result);
+      return result.data;
+    } catch (error) {
+      console.error('❌ 更新数据库奖励信息时出错:', error);
+      throw error;
+    }
   }
 
   /**

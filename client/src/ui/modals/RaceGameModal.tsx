@@ -34,22 +34,15 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
 
   // 组件挂载时立即刷新数据
   useEffect(() => {
-    console.log('🎯 RaceGameModal mounted, refreshing data...');
     gameState.refreshGameData();
   }, []);
 
   // 监听钱包连接状态，主动刷新玩家数据
   useEffect(() => {
     if (isConnected && address) {
-      console.log('💰 Wallet connected, refreshing player data...', address);
       playerData.refreshPlayerData();
     }
   }, [isConnected, address]);
-
-  // 监听 gameId 变化
-  useEffect(() => {
-    console.log('🎮 GameId changed:', gameState.gameId);
-  }, [gameState.gameId]);
 
   /**
    * 连接钱包
@@ -92,12 +85,12 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
    */
   const handleJoinGame = async () => {
     if (!address) {
-      console.error('❌ No wallet address available');
+      console.error('No wallet address available');
       return;
     }
     
     if (gameState.gameId === null || gameState.gameId === undefined) {
-      console.error('❌ No game ID available');
+      console.error('No game ID available');
       return;
     }
 
@@ -105,16 +98,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
       setIsJoining(true);
       setTxStep('joining');
       
-      console.log(`🎮 Joining game ${gameState.gameId} with address ${address}`);
-      console.log(`📊 Current server game info:`, {
-        gameId: gameState.gameId,
-        registeredCount: gameState.gameState.registeredCount,
-        totalPrize: gameState.gameState.totalPrize,
-        serverUrl: serverUrl
-      });
-      
       const txResult = await blockchain.joinGame(gameState.gameId);
-      console.log(`✅ Join game transaction sent:`, txResult);
       
     } catch (error) {
       console.error('Failed to join game:', error);
@@ -129,12 +113,10 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
     if (blockchain.isConfirmed && txStep !== 'idle') {
       if (txStep === 'approving') {
         // 授权完成，刷新数据
-        console.log('🔄 Approval confirmed, refreshing player data...');
         playerData.refreshPlayerData().then(() => {
-          console.log('✅ Player data refreshed after approval');
           setTxStep('idle');
         }).catch((error) => {
-          console.error('❌ Error refreshing player data:', error);
+          console.error('Error refreshing player data:', error);
           setTxStep('idle');
         });
       } else if (txStep === 'joining') {
@@ -144,12 +126,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
         
         // 进入游戏
         setTimeout(() => {
-          console.log('🚀 Entering game after transaction confirmation...', {
-            address,
-            isConnected,
-            addressExists: !!address,
-            txStep,
-          });
           onJoinGame(address);
           onClose();
         }, 1000);
@@ -183,11 +159,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
     if (gameState.isPlayerJoined) {
       return (
         <button className="race-btn race-btn-success" onClick={() => { 
-          console.log('🚀 Player already joined, entering game...', {
-            address,
-            isConnected,
-            addressExists: !!address,
-          });
           onJoinGame(address); 
           onClose(); 
         }}>
@@ -266,7 +237,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
             )}
             <button 
               onClick={() => {
-                console.log('🔄 Manual refresh triggered');
                 gameState.refreshGameData();
                 if (isConnected && address) {
                   playerData.refreshPlayerData();

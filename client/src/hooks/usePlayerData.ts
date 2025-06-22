@@ -49,6 +49,62 @@ export const usePlayerData = () => {
   const { data: playerNonce, refetch: refetchNonce } = blockchain.usePlayerNonce(address || '');
 
   /**
+   * 从区块链获取特定游戏的玩家数据（通过API而不是直接调用hooks）
+   */
+  const getPlayerGameDataFromBlockchain = useCallback(async (gameId: number): Promise<PlayerGameData | null> => {
+    if (!address) return null;
+
+    try {
+      // 通过API端点获取区块链数据
+      const apiUrl = `${process.env.REACT_APP_API_URL || process.env.REACT_APP_API || 'http://localhost:8080'}/blockchain/games/${gameId}/players/${address}`;
+      
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch blockchain data');
+      }
+      
+      const playerInfo = result.data;
+      const score = Number(playerInfo.score || 0);
+      const reward = BigInt(Math.floor(parseFloat(playerInfo.reward) * 1e18)); // 转换为wei
+      const hasClaimed = Boolean(playerInfo.claimed);
+
+      // 如果没有奖励，跳过这个游戏
+      if (reward === BigInt(0)) {
+        return null;
+      }
+
+      // 简单的排名计算（基于奖励金额，实际排名可能需要更复杂的逻辑）
+      let rank = 1;
+      if (reward >= BigInt('10000000000000000000')) { // 10 USD1
+        rank = 1;
+      } else if (reward >= BigInt('5000000000000000000')) { // 5 USD1
+        rank = 2;
+      } else if (reward >= BigInt('1000000000000000000')) { // 1 USD1
+        rank = 3;
+      } else {
+        rank = 4;
+      }
+
+      return {
+        gameId,
+        score,
+        reward,
+        hasClaimed,
+        rank,
+        isWinner: reward > BigInt(0),
+      };
+    } catch (err) {
+      console.error(`Failed to get blockchain data for game ${gameId}:`, err);
+      return null;
+    }
+  }, [address]);
+
+  /**
    * 获取玩家特定游戏的数据
    */
   const getPlayerGameData = useCallback(async (gameId: number): Promise<PlayerGameData | null> => {
@@ -99,44 +155,229 @@ export const usePlayerData = () => {
   }, [address, getPlayerGameData]);
 
   /**
-   * 从API服务器获取玩家游戏历史
+   * 从区块链获取玩家游戏历史（使用真实的链上数据）
    */
-  const fetchPlayerGameHistory = useCallback(async (): Promise<PlayerGameData[]> => {
-    if (!address) return [];
+  const fetchPlayerGameHistoryFromBlockchain = useCallback(async (): Promise<PlayerGameData[]> => {
+    if (!address) {
+      return [];
+    }
 
     try {
-      console.log('🎯 Fetching player game history from API for:', address);
+      // 首先获取当前游戏计数器，确定需要查询的游戏范围
+      const gameCounterUrl = `${process.env.REACT_APP_API_URL || process.env.REACT_APP_API || 'http://localhost:8080'}/blockchain/game-counter`;
+      const gameCounterResponse = await fetch(gameCounterUrl);
       
-      const response = await fetch(`${process.env.REACT_APP_API_URL || process.env.REACT_APP_API || 'http://localhost:8080'}/blockchain/players/${address}/history?limit=50`);
+      if (!gameCounterResponse.ok) {
+        throw new Error(`Failed to get game counter: ${gameCounterResponse.status}`);
+      }
+      
+      const gameCounterResult = await gameCounterResponse.json();
+      if (!gameCounterResult.success) {
+        throw new Error('Failed to get game counter');
+      }
+      
+      const currentGameId = Number(gameCounterResult.data.counter || 0);
+      
+      if (currentGameId === 0) {
+        return [];
+      }
+      
+      // 查询最近50个游戏的数据（可以根据需要调整）
+      const gameHistoryPromises: Promise<PlayerGameData | null>[] = [];
+      const startGameId = Math.max(1, currentGameId - 49); // 查询最近50个游戏
+      
+      for (let gameId = startGameId; gameId <= currentGameId; gameId++) {
+        gameHistoryPromises.push(getPlayerGameDataFromBlockchain(gameId));
+      }
+      
+      // 并行查询所有游戏数据
+      const gameHistoryResults = await Promise.all(gameHistoryPromises);
+      
+      // 过滤掉空数据（玩家没有参与的游戏）
+      const validGameHistory = gameHistoryResults.filter((data): data is PlayerGameData => 
+        data !== null && data.reward > BigInt(0) // 只显示有奖励的游戏
+      );
+      
+      return validGameHistory.sort((a, b) => b.gameId - a.gameId); // 按游戏ID降序排列
+      
+    } catch (err) {
+      console.error('Failed to fetch blockchain game history:', err);
+      return [];
+    }
+  }, [address, getPlayerGameDataFromBlockchain]);
+
+  /**
+   * 从区块链获取特定游戏的奖励信息（通过API而不是直接调用hooks）
+   */
+  const getGameRewardFromBlockchain = useCallback(async (gameId: number): Promise<{reward: bigint, hasClaimed: boolean}> => {
+    if (!address) return { reward: BigInt(0), hasClaimed: false };
+
+    try {
+      // 通过API端点获取区块链数据，而不是直接调用hooks
+      const apiUrl = `${process.env.REACT_APP_API_URL || process.env.REACT_APP_API || 'http://localhost:8080'}/blockchain/games/${gameId}/players/${address}`;
+      
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch blockchain data');
+      }
+      
+      // 解析API返回的数据
+      const playerInfo = result.data;
+      const reward = BigInt(Math.floor(parseFloat(playerInfo.reward) * 1e18)); // 转换为wei
+      const hasClaimed = Boolean(playerInfo.claimed);
+
+      return { reward, hasClaimed };
+    } catch (err) {
+      console.error(`Failed to get reward info for game ${gameId}:`, err);
+      return { reward: BigInt(0), hasClaimed: false };
+    }
+  }, [address]);
+
+  /**
+   * 从数据库API获取玩家游戏历史（仅基础数据，不包含准确的奖励信息）
+   */
+  const fetchPlayerGameHistoryFromDatabase = useCallback(async (): Promise<PlayerGameData[]> => {
+    if (!address) {
+      return [];
+    }
+
+    try {
+      // 构建API URL
+      const apiUrl = `${process.env.REACT_APP_API_URL || process.env.REACT_APP_API || 'http://localhost:8080'}/race-games/players/${address}/games`;
+      
+      // 添加超时控制
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+      
+      // 调用数据库API
+      const response = await fetch(apiUrl, {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
       const result = await response.json();
-      console.log('📊 API game history response:', result);
       
       if (!result.success) {
         throw new Error(result.error || 'Failed to fetch game history');
       }
       
-      // 转换API数据为组件需要的格式
-      const gameHistory: PlayerGameData[] = result.data.games.map((game: any) => ({
+      // 转换API数据为组件需要的格式（注意：这里的reward可能不准确）
+      const databaseGames: PlayerGameData[] = result.data.games.map((game: any) => ({
         gameId: game.gameId,
         score: game.score,
-        reward: BigInt(Math.floor(parseFloat(game.reward) * 1e18)), // 转换为wei
-        hasClaimed: game.hasClaimed,
+        reward: BigInt(0), // 数据库中的奖励数据可能不准确，将从区块链获取
+        hasClaimed: false, // 数据库中的claim状态可能不准确，将从区块链获取
         rank: game.rank || 0,
         isWinner: game.isWinner,
       }));
       
-      console.log('🏆 Processed game history:', gameHistory);
-      return gameHistory;
+      return databaseGames.sort((a, b) => b.gameId - a.gameId); // 按游戏ID降序排列
+      
     } catch (err) {
-      console.error('❌ Failed to fetch player game history:', err);
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.error('Database API request timeout');
+      } else {
+        console.error('Failed to fetch game history from database:', err);
+      }
       return [];
     }
   }, [address]);
+
+  /**
+   * 混合查询：从数据库获取游戏列表，从区块链获取奖励信息
+   */
+  const fetchPlayerGameHistoryMixed = useCallback(async (): Promise<PlayerGameData[]> => {
+    try {
+      // 步骤1：从数据库获取游戏基础数据
+      const databaseGames = await fetchPlayerGameHistoryFromDatabase();
+      
+      if (databaseGames.length === 0) {
+        return [];
+      }
+      
+      // 步骤2：从区块链获取奖励信息
+      const rewardPromises = databaseGames.map(game => 
+        getGameRewardFromBlockchain(game.gameId)
+      );
+      
+      const rewardResults = await Promise.all(rewardPromises);
+      
+      // 步骤3：合并数据
+      const mergedGames: PlayerGameData[] = databaseGames.map((game, index) => {
+        const rewardInfo = rewardResults[index];
+        return {
+          ...game,
+          reward: rewardInfo.reward,
+          hasClaimed: rewardInfo.hasClaimed,
+          isWinner: rewardInfo.reward > BigInt(0), // 根据实际奖励更新获胜状态
+        };
+      });
+      
+      // 过滤掉没有奖励的游戏
+      const gamesWithRewards = mergedGames.filter(game => game.reward > BigInt(0));
+      
+      // 步骤4：异步同步区块链奖励数据到数据库（不阻塞UI）
+      if (gamesWithRewards.length > 0) {
+        syncRewardsToDatabase().catch(error => {
+          console.error('Failed to sync rewards to database:', error);
+          // 不影响用户体验，静默处理错误
+        });
+      }
+      
+      return gamesWithRewards.sort((a, b) => b.gameId - a.gameId);
+      
+    } catch (err) {
+      console.error('Mixed query failed:', err);
+      return [];
+    }
+  }, [fetchPlayerGameHistoryFromDatabase, getGameRewardFromBlockchain]);
+
+  /**
+   * 同步区块链奖励数据到数据库
+   */
+  const syncRewardsToDatabase = useCallback(async (): Promise<void> => {
+    if (!address) return;
+
+    try {
+      const apiUrl = `${process.env.REACT_APP_API_URL || process.env.REACT_APP_API || 'http://localhost:8080'}/race-games/players/${address}/sync-rewards`;
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        console.warn('Sync API call failed:', response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error('Failed to sync blockchain rewards:', error);
+    }
+  }, [address]);
+
+  /**
+   * 主要的数据获取方法 - 默认使用混合查询
+   */
+  const fetchPlayerGameHistory = useCallback(async (useBlockchain: boolean = false): Promise<PlayerGameData[]> => {
+    if (useBlockchain) {
+      console.log('🔗 使用纯区块链查询');
+      return await fetchPlayerGameHistoryFromBlockchain();
+    } else {
+      console.log('🔀 使用混合查询（数据库 + 区块链）');
+      return await fetchPlayerGameHistoryMixed();
+    }
+  }, [fetchPlayerGameHistoryFromBlockchain, fetchPlayerGameHistoryMixed]);
 
   /**
    * 刷新玩家数据
@@ -158,8 +399,8 @@ export const usePlayerData = () => {
         refetchNonce(),
       ]);
 
-      // 从API获取玩家游戏历史
-      const gameHistory = await fetchPlayerGameHistory();
+      // 使用混合查询获取玩家游戏历史（数据库 + 区块链）
+      const gameHistory = await fetchPlayerGameHistory(false); // false = 使用混合查询
 
       // 计算统计数据
       const totalRewards = gameHistory.reduce((sum, game) => sum + game.reward, BigInt(0));
@@ -187,6 +428,7 @@ export const usePlayerData = () => {
       };
 
       setPlayerProfile(profile);
+      
     } catch (err) {
       console.error('Failed to refresh player data:', err);
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -194,6 +436,30 @@ export const usePlayerData = () => {
       setIsLoading(false);
     }
   }, [address, refetchBalance, refetchAllowance, refetchNonce, fetchPlayerGameHistory]);
+
+  // 定期同步机制
+  useEffect(() => {
+    if (!address) return;
+
+    // 设置定期刷新间隔（每30秒）
+    const syncInterval = setInterval(() => {
+      refreshPlayerData();
+    }, 30000); // 30秒
+
+    // 组件卸载时清除定时器
+    return () => {
+      clearInterval(syncInterval);
+    };
+  }, [address, refreshPlayerData]);
+
+  // 当地址变化时刷新数据
+  useEffect(() => {
+    if (address) {
+      refreshPlayerData();
+    } else {
+      setPlayerProfile(null);
+    }
+  }, [address]); // 只依赖address，避免无限循环
 
   /**
    * 检查是否需要授权USD1代币
@@ -248,17 +514,6 @@ export const usePlayerData = () => {
     if (level >= 2) return 'Novice Fighter';
     return 'Newcomer';
   }, [getPlayerLevel, playerProfile]);
-
-  // 当地址变化时刷新数据
-  useEffect(() => {
-    if (address) {
-      console.log('🔄 usePlayerData: Address changed, refreshing data for:', address);
-      refreshPlayerData();
-    } else {
-      console.log('🔄 usePlayerData: No address, clearing profile');
-      setPlayerProfile(null);
-    }
-  }, [address]); // 只依赖address，避免无限循环
 
   return {
     playerProfile,
