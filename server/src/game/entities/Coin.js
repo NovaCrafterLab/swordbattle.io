@@ -26,7 +26,7 @@ class Coin extends Entity {
     this.droppedBy = objectData.droppedBy;
 
     // Despawn coin after 2 minutes
-    this.despawnTime = Date.now() + 1000 * 60 * 2;
+    this.despawnTime = this.game.logicalTime + 1000 * 90;
 
     this.spawn();
   }
@@ -36,7 +36,7 @@ class Coin extends Entity {
     this.shape.y += this.velocity.y;
     this.velocity.scale(0.5);
 
-    if (Date.now() > this.despawnTime) {
+    if (this.game.logicalTime > this.despawnTime) {
       if (this.respawnable) this.createInstance();
       this.remove();
     }

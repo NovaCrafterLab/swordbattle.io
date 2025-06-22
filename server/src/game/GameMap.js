@@ -147,25 +147,21 @@ class GameMap {
   }
 
   spawnCoinsInShape(shape, totalCoinValue, droppedBy) {
-    const maxCoinsCount = 200;
-    let remainingCoinValue = totalCoinValue;
-    const coins = Math.min(Math.round(totalCoinValue / 5), maxCoinsCount);
+    const maxCoinsCount = 60;
+    const coins = Math.min(
+      Math.max(1, Math.round(Math.log2(totalCoinValue + 1) * 2)),
+      maxCoinsCount
+    );
     const coinValue = totalCoinValue / coins;
 
     for (let i = 0; i < coins; i++) {
-      // Get a random point within the shape for the coin's position
       const randomPoint = shape.getRandomPoint();
-      const coin = this.game.map.addEntity({
+      this.game.map.addEntity({
         type: Types.Entity.Coin,
-        position: [randomPoint.x, randomPoint.y], // Spawn directly at the random point
+        position: [randomPoint.x, randomPoint.y],
         value: coinValue,
         droppedBy,
       });
-      //Remove the velocity application.
-      //coin.velocity.add(new SAT.Vector(
-      //  randomPoint.x - center.x,
-      //  randomPoint.y - center.y,
-      //).scale(0.5));
     }
   }
 

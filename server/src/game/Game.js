@@ -27,6 +27,8 @@ class Game {
     this.map = new GameMap(this);
     this.globalEntities = new GlobalEntities(this);
 
+    this.logicalTime = 0
+
     this.entitiesQuadtree = null;
     this.tps = 0;
 

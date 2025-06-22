@@ -40,13 +40,13 @@ class Chest extends Entity {
     this.targets.push(Types.Entity.Sword);
 
     // Despawn coin after 20 minutes
-    this.despawnTime = Date.now() + 1000 * 60 * 20;
+    this.despawnTime = this.game.logicalTime + 1000 * 60 * 20;
 
     this.spawn();
   }
 
   update() {
-    if (Date.now() > this.despawnTime) {
+    if (this.game.logicalTime > this.despawnTime) {
       if (this.respawnable) this.createInstance();
       this.remove();
     }

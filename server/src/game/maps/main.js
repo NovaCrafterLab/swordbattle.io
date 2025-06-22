@@ -2,7 +2,7 @@ const Types = require('../Types');
 
 module.exports = {
   coinsCount: 0,
-  aiPlayersCount: 20,
+  aiPlayersCount: 100,
   biomes: [
     {
       type: Types.Biome.Safezone,
@@ -191,7 +191,7 @@ module.exports = {
         },
         {
           type: Types.Entity.Coin,
-          amount: 500,
+          amount: 300,
           position: 'random',
           respawnable: true,
         },
@@ -249,7 +249,7 @@ module.exports = {
         },
         {
           type: Types.Entity.Coin,
-          amount: 500,
+          amount: 300,
           position: 'random',
           respawnable: true,
         },
@@ -367,7 +367,7 @@ module.exports = {
         },
         {
           type: Types.Entity.Coin,
-          amount: 500,
+          amount: 300,
           position: 'random',
           respawnable: true,
         },

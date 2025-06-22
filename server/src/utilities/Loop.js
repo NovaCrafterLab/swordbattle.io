@@ -7,19 +7,18 @@ const NS_PER_SEC = 1_000_000_000n;
 
 /* throttle severe-lag logs to once every 3 min */
 const logSevereLag = (() => {
-  let last = 0; // ms timestamp
-  const PERIOD = 180_000; // 3 min
+  const PERIOD_TICKS = 1800;
+  let lastTick = 0;
 
   return (ctx) => {
-    const now = Date.now();
-    if (now - last < PERIOD) return;
-    last = now;
+    if (ctx.totalTicks - lastTick < PERIOD_TICKS) return;
+    lastTick = ctx.totalTicks;
 
     const realPlayersCnt = ctx.game.realPlayersCnt ??
       [...ctx.game.players.values()].filter((p) => !p.isBot).length;
 
     console.warn(
-      `Server lagging... tick ${ctx.tickTimeElapsed} ms (> ${ctx.interval} ms)\n` +
+      `Tick: ${ctx.tickTimeElapsed} ms (> ${ctx.interval} ms), ` +
       `Players: ${realPlayersCnt}, Entities: ${ctx.entityCnt}, ` +
       `Heap: ${Math.round(process.memoryUsage().heapUsed / 1048576)} MB`,
     );
@@ -37,6 +36,8 @@ class Loop {
     this.ticksThisSecond = 0;
     this.lastSecond = Number(process.hrtime.bigint() / NS_PER_SEC);
     this.tickTimeElapsed = 0;
+
+    this.totalTicks = 0;
 
     this.eventHandler = () => {};
     this.onTpsUpdate = () => {};
@@ -66,6 +67,7 @@ class Loop {
   runLoop() {
     if (!this.isRunning) return;
     prof('wholeTick', () => {
+      this.game.logicalTime += this.interval;
       const start = process.hrtime.bigint();
 
       this.updateTPS(start);
@@ -76,6 +78,7 @@ class Loop {
 
       if (this.tickTimeElapsed > this.interval * 2) logSevereLag(this);
       this.ticksThisSecond++;
+      this.totalTicks++;
 
       const delay = Math.max(0, this.interval - this.tickTimeElapsed);
       setTimeout(this._runLoop, delay);
