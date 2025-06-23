@@ -3,11 +3,16 @@ const Timer = require('../components/Timer');
 const Types = require('../Types');
 const helpers = require('../../helpers');
 
+function squaredDistance(x1, y1, x2, y2) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  return dx * dx + dy * dy;
+}
+
 const BehaviourStages = {
   Idle: 0,
   RandomMovement: 1,
   TargetPlayer: 2,
-  // TargetLeader: 3,
   TargetCoins: 4,
   TargetChests: 5,
   RunAway: 6,
@@ -29,11 +34,6 @@ const BehaviourConfig = {
     actions: ['target', 'attack'],
     targets: [Types.Entity.Player],
   },
-  // [BehaviourStages.TargetLeader]: {
-  //   duration: [25, 35],
-  //   actions: ['target', 'attack'],
-  //   targets: [],
-  // },
   [BehaviourStages.TargetCoins]: {
     duration: [20, 25],
     actions: ['target'],
@@ -47,7 +47,7 @@ const BehaviourConfig = {
   },
   [BehaviourStages.RunAway]: {
     duration: [1, 5],
-    actions: ['runAway', 'attack'],
+    actions: ['runAway'],
     targets: [],
   },
 };
@@ -60,10 +60,14 @@ class PlayerAI extends Player {
     this.target = null;
     this.attackCooldown = 0;
     this.smartness = Math.random();
+
     this.stageTimer = new Timer(0, 0, 0);
     this.changeDirectionTimer = new Timer(0, 3, 5);
-    // give up on a target after 5-7 seconds
     this.targetTimer = new Timer(0, 5, 7);
+    this.entityScanTimer = new Timer(0, 0.2, 0.4);
+
+    this.cachedTargets = [];
+    this.lavaPositions = [];
 
     this.game.map.shape.randomSpawnInside(this.shape);
     this.changeStage();
@@ -71,40 +75,42 @@ class PlayerAI extends Player {
 
   resetTargetTimer() {
     this.targetTimer.renew();
-    this.targetTimer.active = false; // Initially set to inactive until a target is acquired
+    this.targetTimer.active = false;
   }
 
   changeStage(stage) {
-    if (stage === undefined) {
-      stage = helpers.randomChoice(
-        Object.values(BehaviourStages).filter(
-          (type) => type !== BehaviourStages.RunAway,
-        ),
-      );
-    }
+    stage ??= helpers.randomChoice(
+      Object.values(BehaviourStages).filter(type => type !== BehaviourStages.RunAway)
+    );
     this.stage = stage;
     this.stageConfig = BehaviourConfig[this.stage];
+
     this.stageTimer.minTime = this.stageConfig.duration[0];
     this.stageTimer.maxTime = this.stageConfig.duration[1];
     this.stageTimer.renew();
+
     this.resetTargetTimer();
     this.target = null;
   }
 
   applyInputs(dt) {
     this.stageTimer.update(dt);
-    if (this.stageTimer.finished) {
-      this.changeStage();
-    }
-    this.attackCooldown -= dt;
-    if (this.attackCooldown < 0) {
-      this.attackCooldown = 0;
-    }
-    if (this.target && this.target.removed) {
-      this.target = null;
+    if (this.stageTimer.finished) this.changeStage();
+
+    this.attackCooldown = Math.max(0, this.attackCooldown - dt);
+
+    if (this.target?.removed) this.target = null;
+
+    // Entity scan
+    this.entityScanTimer.update(dt);
+    if (this.entityScanTimer.finished) {
+      this.entityScanTimer.renew();
+      this.cachedTargets = this.getEntitiesInViewport()
+        .map(id => this.game.entities.get(id))
+        .filter(e => e && e !== this && !e.removed);
     }
 
-    // Update and check the target timer
+    // Target timeout
     if (this.target) {
       if (!this.targetTimer.active) {
         this.targetTimer.active = true;
@@ -112,78 +118,43 @@ class PlayerAI extends Player {
       }
       this.targetTimer.update(dt);
       if (this.targetTimer.finished) {
-        this.target = null; // Give up on the target
-        // random movement after giving up on the target
+        this.target = null;
         this.changeStage(BehaviourStages.RandomMovement);
         this.changeDirectionTimer.finished = true;
-
         this.resetTargetTimer();
       }
     }
 
-    if (!this.target) {
-      if (this.stage === BehaviourStages.TargetLeader) {
-        // this.target = this.game.leaderPlayer;
-        console.log('Targeting leader is not implemented yet');
-      } else {
-        const targets = this.getEntitiesInViewport()
-          .map((id) => this.game.entities.get(id))
-          .filter((e) => e);
-        let minDistance = Infinity;
-        for (const target of targets) {
-          if (target === this) continue;
-          if (!this.stageConfig.targets.includes(target.type)) continue;
-
-          const distance = helpers.distance(
-            this.shape.x,
-            this.shape.y,
-            target.shape.x,
-            target.shape.y,
-          );
-          if (distance < minDistance) {
-            this.target = target;
-            minDistance = distance;
-          }
+    // Acquire new target if none
+    if (!this.target && this.stageConfig.targets.length > 0) {
+      let minDistSq = Infinity;
+      for (const e of this.cachedTargets) {
+        if (!this.stageConfig.targets.includes(e.type)) continue;
+        const distSq = squaredDistance(this.shape.x, this.shape.y, e.shape.x, e.shape.y);
+        if (distSq < minDistSq) {
+          this.target = e;
+          minDistSq = distSq;
         }
       }
     }
 
+    // Execute stage actions
     for (const action of this.stageConfig.actions) {
       switch (action) {
         case 'randomMovement':
-          this.randomMovement();
+          this.randomMovement(dt);
           break;
         case 'target':
-          this.targetEntity(
-            dt,
-            this.stageConfig.actions.includes('attack'),
-            this.stageConfig.force,
-          );
+          this.targetEntity(dt, this.stageConfig.actions.includes('attack'), this.stageConfig.force);
           break;
         case 'runAway':
-          this.runAway(dt, this.stageConfig.actions.includes('attack'));
+          this.runAway(dt);
           break;
       }
     }
 
     this.checkUpgrades();
-
     super.applyInputs(dt);
-  }
-
-  checkUpgrades() {
-    if (this.levels.upgradePoints > 0) {
-      const buff = helpers.randomChoice(Object.values(Types.Buff));
-      this.levels.addBuff(buff);
-    }
-    if (this.smartness > 0.6) {
-      if (this.evolutions.possibleEvols.size > 0) {
-        const evol = helpers.randomChoice(
-          Array.from(this.evolutions.possibleEvols),
-        );
-        this.evolutions.upgrade(evol);
-      }
-    }
   }
 
   randomMovement(dt) {
@@ -192,7 +163,6 @@ class PlayerAI extends Player {
       this.changeDirectionTimer.renew();
       this.movementDirection += helpers.random(-Math.PI, Math.PI) / 2;
     }
-
     this.mouse = {
       angle: this.movementDirection,
       force: helpers.random(100, 150),
@@ -200,70 +170,34 @@ class PlayerAI extends Player {
   }
 
   targetEntity(dt, attack = false, force = [100, 150]) {
-    if (!this.target) {
-      return this.randomMovement();
-    }
+    if (!this.target) return this.randomMovement(dt);
 
-    const targetPos = this.target.shape.center;
-    const angle = helpers.angle(
-      this.shape.x,
-      this.shape.y,
-      targetPos.x,
-      targetPos.y,
-    );
-    const distance = helpers.distance(
-      this.shape.x,
-      this.shape.y,
-      targetPos.x,
-      targetPos.y,
-    );
+    const { x, y } = this.target.shape.center;
+    const angle = helpers.angle(this.shape.x, this.shape.y, x, y);
+    const dist = helpers.distance(this.shape.x, this.shape.y, x, y);
 
-    if (attack) this.attack(distance);
+    if (attack) this.attack(dist);
 
     this.angle = helpers.angleLerp(this.angle, angle, dt / 0.2);
-    this.movementDirection = helpers.angleLerp(
-      this.movementDirection,
-      angle,
-      dt / 0.2,
-    );
+    this.movementDirection = helpers.angleLerp(this.movementDirection, angle, dt / 0.2);
     this.mouse = {
       angle: this.movementDirection,
       force: helpers.random(force[0], force[1]),
     };
   }
 
-  runAway(dt, attack = false) {
-    if (!this.target || this.health.percent > 0.5) {
+  runAway(dt) {
+    const now = Date.now();
+    this.lavaPositions = this.lavaPositions.filter(p => now - p.time < 10000);
+    const avoid = this.lavaPositions[0] ?? this.target?.shape;
+
+    if (!avoid || this.health.percent > 0.5) {
       return this.changeStage();
     }
 
-    const angle = helpers.angle(
-      this.shape.x,
-      this.shape.y,
-      this.target.shape.x,
-      this.target.shape.y,
-    );
-    const movementAngle = helpers.angle(
-      this.target.shape.x,
-      this.target.shape.y,
-      this.shape.x,
-      this.shape.y,
-    );
-    const distance = helpers.distance(
-      this.shape.x,
-      this.shape.y,
-      this.target.shape.x,
-      this.target.shape.y,
-    );
+    const angleAway = helpers.angle(avoid.x, avoid.y, this.shape.x, this.shape.y);
 
-    if (attack) this.attack(distance);
-
-    this.angle = helpers.angleLerp(this.angle, angle, dt / 0.2);
-    this.movementDirection = helpers.angleLerp(
-      this.movementDirection,
-      movementAngle,
-      dt / 0.2,
-    );
+    this.angle = this.movementDirection = helpers.angleLerp(this.movementDirection, angleAway, dt / 0.2);
     this.mouse = {
       angle: this.movementDirection,
       force: helpers.random(130, 150),
@@ -271,12 +205,10 @@ class PlayerAI extends Player {
   }
 
   attack(distance) {
-    if (!this.sword.isAnimationFinished || this.sword.isFlying) {
+    if (!this.sword.isAnimationFinished || this.sword.isFlying || this.attackCooldown > 0) {
       this.inputs.clear();
       return;
     }
-    if (this.attackCooldown > 0) return;
-
     if (distance < 300) {
       this.inputs.inputDown(Types.Input.SwordSwing);
     } else if (distance < 1300) {
@@ -285,21 +217,24 @@ class PlayerAI extends Player {
     this.attackCooldown = helpers.random(0.5, 1.3);
   }
 
-  damaged(damage, entity) {
-    if (entity) {
-      // 20% chance of angry and fight back
-      if (Math.random() > 0.8) {
-        // if health is less than 0.2, then run away
-        // if (this.health.percent < 0.2) {
-        //   this.changeStage(BehaviourStages.RunAway);
-        //   this.target = entity;
-        // } else
+  checkUpgrades() {
+    if (this.levels.upgradePoints > 0) {
+      this.levels.addBuff(helpers.randomChoice(Object.values(Types.Buff)));
+    }
+    if (this.smartness > 0.6 && this.evolutions.possibleEvols.size > 0) {
+      const evo = helpers.randomChoice(Array.from(this.evolutions.possibleEvols));
+      this.evolutions.upgrade(evo);
+    }
+  }
 
-        if (this.stage !== BehaviourStages.RunAway) {
-          this.changeStage(BehaviourStages.TargetPlayer);
-          this.target = entity;
-        }
-      }
+  damaged(damage, entity) {
+    if (entity?.type === Types.Entity.LavaPool || this.effects.has(Types.Effect.Burning)) {
+      this.lavaPositions.push({ x: this.shape.x, y: this.shape.y, time: Date.now() });
+      this.changeStage(BehaviourStages.RunAway);
+      this.target = null;
+    } else if (entity && Math.random() > 0.8) {
+      this.changeStage(BehaviourStages.TargetPlayer);
+      this.target = entity;
     }
 
     super.damaged(damage, entity);
@@ -307,12 +242,7 @@ class PlayerAI extends Player {
 
   remove(reason) {
     super.remove(reason);
-
-    // only spawn if total player count is less than game.aiPlayerCount
-    // if(this.game.players.size < this.game.aiPlayerCount) {
-    //   console.log('respawning AI bot');
-    //   this.game.map.spawnPlayerBot();
-    // }
+    // 自动重生可选逻辑
   }
 }
 

@@ -16,6 +16,7 @@ class Entity {
 
     this.id = null;
     this.shape = null;
+    this.prevRect = null;
     this.removed = false;
     this.isStatic = false;
     this.isGlobal = false;
@@ -35,6 +36,14 @@ class Entity {
 
   get weight() {
     return this.shape.area * this.density;
+  }
+
+  get _targetsSet() {
+    if (!this.__targetsSet || this.__targetsVersion !== this.targets) {
+      this.__targetsSet = new Set(Array.isArray(this.targets) ? this.targets : []);
+      this.__targetsVersion = this.targets;
+    }
+    return this.__targetsSet;
   }
 
   processDefinition() {
