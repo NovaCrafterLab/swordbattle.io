@@ -1,5 +1,11 @@
+// 获取环境变量，优先使用系统/命令行设置，否则默认为development
+const ENV = process.env.NODE_ENV || 'development';
+const isDev = ENV === 'development';
+const isProduction = ENV === 'production';
+
+// 根据环境变量加载对应的配置文件
 require('dotenv').config({
-  path: process.env.NODE_ENV === 'production' 
+  path: isProduction 
     ? '../env/api.env.production'
     : '../env/api.env.development'
 });
@@ -21,6 +27,12 @@ interface ConfigProps {
 
 // 调试信息：显示环境变量状态
 console.log('=== API Configuration Debug ===');
+console.log('环境变量来源分析:');
+console.log('  ENV (resolved):', ENV);
+console.log('  ENV来源:', process.env.NODE_ENV ? '系统/命令行' : '默认值');
+console.log('  isDev:', isDev);
+console.log('  isProduction:', isProduction);
+console.log('  加载的配置文件:', isProduction ? 'api.env.production' : 'api.env.development');
 console.log('Environment Variables:');
 console.log('  NODE_ENV:', process.env.NODE_ENV);
 console.log('  API_PORT:', process.env.API_PORT);
@@ -35,7 +47,7 @@ console.log('  APP_SECRET:', process.env.APP_SECRET ? '***' : 'undefined');
 console.log('  SERVER_SECRET:', process.env.SERVER_SECRET ? '***' : 'undefined');
 
 export const config: ConfigProps = {
-  isProduction: process.env.NODE_ENV === 'production',
+  isProduction: isProduction,
   port:
     parseInt(process.env.API_PORT, 10) ||
     parseInt(process.env.PORT, 10) ||
