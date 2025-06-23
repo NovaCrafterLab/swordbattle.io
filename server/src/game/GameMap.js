@@ -149,7 +149,7 @@ class GameMap {
   spawnCoinsInShape(shape, totalCoinValue, droppedBy) {
     const maxCoinsCount = 60;
     const coins = Math.min(
-      Math.max(1, Math.round(Math.log2(totalCoinValue + 1) * 2)),
+      Math.max(1, Math.round(Math.log2(totalCoinValue + 1) * 2) - 7),
       maxCoinsCount
     );
     const coinValue = totalCoinValue / coins;

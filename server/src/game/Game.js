@@ -1,7 +1,7 @@
 // server/src/game/Game.js
 const SAT = require('sat');
 const IdPool = require('./components/IdPool');
-const QuadTree = require('./components/Quadtree');
+const SpatialHash = require('./components/SpatialHash');
 const GameMap = require('./GameMap');
 const GlobalEntities = require('./GlobalEntities');
 const Player = require('./entities/Player');
@@ -33,7 +33,7 @@ class Game {
     this.tps = 0;
 
     this._qtTick = 0;
-    
+
     // 区块链游戏相关属性初始化
     this.blockchainGameId = null;
     this.gamePhase = 'initializing';
@@ -44,16 +44,16 @@ class Game {
     this.playerScoreSubmitted = new Set();
     this.isGameCreationInProgress = false;
     this.gameTimeout = null;
-    
+
     // 游戏最大持续时间 (30分钟)
-    this.maxGameDuration = 30 * 60 * 1000; // 30分钟 = 1800000毫秒
+    this.maxGameDuration = 30 * 60 * 1000;
   }
 
   initialize() {
     this.map.initialize();
 
     const mapBoundary = this.map;
-    this.entitiesQuadtree = new QuadTree(mapBoundary, 10, 5);
+    this.entitiesQuadtree = new SpatialHash(mapBoundary);
   }
 
   tick(dt) {
@@ -64,14 +64,17 @@ class Game {
       }
     });
 
-    const needRebuild = ++this._qtTick === 4 || this.newEntities.size > 0;
-    if (needRebuild) {
-      this._qtTick = 0;
-      prof('quadtree.rebuild', () => {
-        this.updateQuadtree(this.entitiesQuadtree, this.entities);
-      });
-      this.newEntities.clear();
-    }
+    // const needRebuild = ++this._qtTick === 4 || this.newEntities.size > 0;
+    // if (needRebuild) {
+    //   this._qtTick = 0;
+
+    // }
+
+    this._qtTick += 1;
+    prof('quadtree.rebuild', () => {
+      this.updateQuadtree();
+    });
+    this.newEntities.clear();
 
     prof('collisions', () => {
       for (const entity of this.entities.values()) {
@@ -87,10 +90,7 @@ class Game {
   processCollisions(entity, dt) {
     const candidates = this.entitiesQuadtree.get(entity.shape.boundary);
 
-    const targetsSet = entity._targetsSet ??
-      (entity._targetsSet = (Array.isArray(entity.targets)
-        ? new Set(entity.targets)
-        : entity.targets));
+    const targetsSet = entity._targetsSet;
 
     const entityBoundary = entity.shape.boundary;
     const entityCenter = entity.shape.center;
@@ -233,12 +233,78 @@ class Game {
     return data;
   }
 
-  updateQuadtree(quadtree, entities) {
-    quadtree.clear();
-    for (const [id, entity] of entities) {
-      const collisionRect = entity.shape.boundary;
-      collisionRect.entity = entity;
-      quadtree.insert(collisionRect);
+  // Player-count-based movement threshold
+  get movementTolerance() {
+    if (this.players.size > 700) return 32;
+    if (this.players.size > 400) return 64;
+    return 128;
+  }
+
+  // Player-count-based quadtree rebuild interval (ticks)
+  get quadtreeTickInterval() {
+    if (this.players.size > 1200) return 30;
+    if (this.players.size > 800) return 60;
+    if (this.players.size > 600) return 90;
+    return 120;
+  }
+
+  changeRatio() {
+    let moved = 0;
+
+    // Early return when entity count is small
+    if (this.entities.size < 2000)
+      return this.newEntities.size + this.removedEntities.size;
+
+    // Check each dynamic entity for large movement
+    const tolerance = this.movementTolerance;
+    for (const entity of this.entities.values()) {
+      if (entity.isStatic || !entity.shape?.boundary) continue;
+
+      const rect = entity.shape.boundary;
+      const prev = entity.prevRect;
+      if (!prev) continue;
+
+      const dx = Math.abs(prev.x - rect.x);
+      const dy = Math.abs(prev.y - rect.y);
+      if (dx > tolerance || dy > tolerance) moved++;
+    }
+
+    return moved + this.newEntities.size + this.removedEntities.size;
+  }
+
+  updateQuadtree() {
+    const stable = this.entities.size - this.changeRatio();
+    const needFullRebuild =
+      stable < 0 || stable * stable < this.entities.size;
+
+    const interval = this.quadtreeTickInterval;
+
+    if (needFullRebuild || this._qtTick < 60 || this._qtTick % interval === 0) {
+      this.entitiesQuadtree.clear();
+      for (const entity of this.entities.values()) {
+        const rect = entity.shape.boundary;
+        rect.entity = entity;
+        this.entitiesQuadtree.insert(rect);
+      }
+      return;
+    }
+
+    // Incremental updates
+    for (const entity of this.removedEntities) {
+      const rect = entity.shape.boundary;
+      rect.entity = entity;
+      this.entitiesQuadtree.remove(rect);
+    }
+
+    for (const entity of this.entities.values()) {
+      const rect = entity.shape.boundary;
+      rect.entity = entity;
+      if (entity.removed || this.removedEntities.has(entity)) {
+        this.entitiesQuadtree.remove(rect);
+        if (this._qtTick % 2 === 0) console.log(true);
+        continue;
+      }
+      this.entitiesQuadtree.update(rect);
     }
   }
 
@@ -359,7 +425,7 @@ class Game {
 
       // 验证玩家是否已在链上注册
       const isRegistered = await this.verifyPlayerRegistration(walletAddress);
-      
+
       if (!isRegistered) {
         console.log(`❌ Player ${name} rejected: Not registered for current game`);
         // 发送错误消息给客户端
@@ -383,10 +449,10 @@ class Game {
       // 验证通过，创建玩家
       console.log(`✅ Player ${name} verified and joining game`);
       const player = this.createAndAddPlayer(client, data, name);
-      
+
       // 保存钱包地址到客户端
       client.walletAddress = walletAddress;
-      
+
       return player;
     } catch (error) {
       console.error(`❌ Error verifying player ${name}:`, error);
@@ -407,7 +473,7 @@ class Game {
     client.fullSync = true;
     client.player = player;
     player.client = client;
-    
+
     if (client.account) {
       const account = client.account;
       if (account.skins && account.skins.equipped) {
@@ -415,16 +481,16 @@ class Game {
         player.sword.skin = player.skin;
       }
     }
-    
+
     this.players.add(player);
     this.map.spawnPlayer(player);
     this.addEntity(player);
-    
+
     // 在比赛模式下，检查是否可以开始游戏
     if (config.isRaceServer && config.blockchain.enabled && this.gamePhase === 'waiting') {
       this.checkGameStart();
     }
-    
+
     return player;
   }
 
@@ -434,18 +500,18 @@ class Game {
   checkGameStart() {
     const registeredCount = this.registeredPlayers.size;
     const activeCount = this.players.size;
-    
+
     console.log(`🎮 Game status: ${activeCount}/${registeredCount} players joined`);
-    
+
     // 可以添加更多开始游戏的条件，比如最小玩家数、时间限制等
     if (activeCount >= Math.min(2, registeredCount)) { // 至少2个玩家或所有注册玩家都加入
       if (this.gamePhase === 'waiting') {
         this.gamePhase = 'active';
         console.log('🚀 Game started! All players are ready.');
-        
+
         // 设置游戏超时定时器
         this.startGameTimeout();
-        
+
         // 可以在这里添加游戏开始的特殊逻辑
         this.broadcastGameStart();
       }
@@ -601,14 +667,14 @@ class Game {
       
       // 监听GameCreated事件获取gameId，传递初始计数器
       await this.waitForGameCreated(initialCounter);
-      
+
       console.log(`✅ Blockchain game initialization completed successfully on attempt ${currentAttempt}`);
-      
+
     } catch (error) {
       console.error(`❌ Failed to create blockchain game (attempt ${currentAttempt}/${maxRetries}):`, error);
       this.gamePhase = 'error';
       this.isGameCreationInProgress = false;
-      
+
       // 如果还有重试次数，等待5秒后重试
       if (retryCount < maxRetries - 1) {
         console.log(`🔄 Retrying game creation in 5 seconds... (${maxRetries - currentAttempt} attempts remaining)`);
@@ -634,16 +700,16 @@ class Game {
         try {
           const currentCounter = await this.blockchainService.getGameCounter();
           console.log(`📊 Checking game counter: ${currentCounter} (initial: ${initialCounter})`);
-          
+
           // 检查计数器是否增加了（表示新游戏创建成功）
           if (currentCounter > initialCounter) {
             this.blockchainGameId = currentCounter;
             this.gamePhase = 'waiting';
             this.gameStartTime = Date.now();
-            
+
             console.log(`🎮 NEW blockchain game created with ID: ${this.blockchainGameId} (previous: ${initialCounter})`);
             console.log('⏳ Waiting for players to join...');
-            
+
             clearTimeout(timeout);
             this.isGameCreationInProgress = false;
             resolve();
@@ -675,15 +741,15 @@ class Game {
 
     try {
       console.log(`🔍 Verifying player ${playerAddress} for game ${this.blockchainGameId}:`);
-      
+
       // 检查玩家是否在链上游戏中
       const players = await this.blockchainService.getGamePlayers(this.blockchainGameId);
       console.log(`📋 Found ${players.length} players in game ${this.blockchainGameId}:`);
       console.log(`   Players: ${players.map(p => p.toLowerCase()).join(', ')}`);
       console.log(`   Looking for: ${playerAddress.toLowerCase()}`);
-      
+
       const isRegistered = players.map(p => p.toLowerCase()).includes(playerAddress.toLowerCase());
-      
+
       if (isRegistered) {
         this.registeredPlayers.add(playerAddress.toLowerCase());
         console.log(`✅ Player ${playerAddress} verified as registered`);
@@ -705,10 +771,10 @@ class Game {
    */
   collectPlayerScores() {
     this.finalScores.clear();
-    
+
     for (const player of this.players) {
       if (player.removed) continue;
-      
+
       // 收集玩家分数数据
       const score = {
         playerId: player.id,
@@ -720,10 +786,10 @@ class Game {
         finalScore: this.calculatePlayerScore(player),
         walletAddress: player.client?.walletAddress || null
       };
-      
+
       this.finalScores.set(player.id, score);
     }
-    
+
     console.log(`📊 Collected scores for ${this.finalScores.size} players`);
     return this.finalScores;
   }
@@ -736,7 +802,7 @@ class Game {
     const kills = player.kills || 0;
     const coins = player.levels?.coins || 0;
     const playtime = player.playtime || 0;
-    
+
     // 分数 = 击杀数 * 100 + 金币数 * 10 + 游戏时间（秒）
     return kills * 100 + coins * 10 + Math.floor(playtime / 1000);
   }
@@ -757,15 +823,15 @@ class Game {
     try {
       // 清除游戏超时定时器
       this.clearGameTimeout();
-      
+
       this.gamePhase = 'ending';
       this.gameEndTime = Date.now();
-      
+
       console.log(`🏁 Ending blockchain game (reason: ${reason})`);
-      
+
       // 收集所有玩家分数
       const scores = this.collectPlayerScores();
-      
+
       // 尝试为每个玩家的分数进行签名（通过API服务器）
       // 但不要让分数提交失败阻止游戏结束
       try {
@@ -774,21 +840,21 @@ class Game {
         console.error('❌ Failed to submit player scores, but continuing with game end:', scoreError);
         // 继续执行游戏结束流程，不让分数提交失败阻止游戏结束
       }
-      
+
       // 调用合约结束游戏
       const txHash = await this.blockchainService.endGame(this.blockchainGameId);
       console.log(`✅ Game end transaction sent: ${txHash}`);
-      
+
       this.gamePhase = 'ended';
-      
+
       // 清理当前游戏状态
       this.cleanupCurrentGame();
-      
+
       // 可选：重新开始新游戏
       setTimeout(() => {
         this.initializeBlockchainGame();
       }, 10000); // 10秒后创建新游戏
-      
+
     } catch (error) {
       console.error('❌ Failed to end blockchain game:', error);
       // 即使出错也要尝试设置状态，避免游戏卡在ending状态
@@ -806,7 +872,7 @@ class Game {
     }
 
     console.log('📤 Submitting player scores to contract...');
-    
+
     let totalPlayers = 0;
     let playersWithWallet = 0;
     let successfulSubmissions = 0;
@@ -817,7 +883,7 @@ class Game {
     
     for (const [playerId, scoreData] of scores) {
       totalPlayers++;
-      
+
       if (!scoreData.walletAddress) {
         console.log(`⚠️ Skipping player ${scoreData.playerName} - no wallet address`);
         continue;
@@ -831,7 +897,7 @@ class Game {
         console.log(`📋 Getting nonce for player ${scoreData.walletAddress}...`);
         const nonce = await this.blockchainService.getPlayerNonce(scoreData.walletAddress);
         console.log(`📋 Player nonce: ${nonce}`);
-        
+
         // 通过API服务器获取签名
         console.log(`✍️ Getting signature from API server...`);
         const signature = await this.getScoreSignature(
@@ -877,7 +943,7 @@ class Game {
         failedSubmissions++;
       }
     }
-    
+
     console.log(`📊 Score submission summary:`);
     console.log(`   Total players: ${totalPlayers}`);
     console.log(`   Players with wallet: ${playersWithWallet}`);
@@ -1065,7 +1131,7 @@ class Game {
       console.log(`   kills: ${kills} (type: ${typeof kills})`);
       console.log(`   score: ${score} (type: ${typeof score})`);
       console.log(`   nonce: ${nonce} (type: ${typeof nonce})`);
-      
+
       if (gameId === undefined || gameId === null) {
         throw new Error('gameId is undefined or null');
       }
@@ -1090,7 +1156,7 @@ class Game {
         score: typeof score === 'bigint' ? score.toString() : String(score),
         nonce: typeof nonce === 'bigint' ? nonce.toString() : String(nonce),
       };
-      
+
       console.log(`📤 Sending request to ${config.apiEndpoint}/blockchain/sign-score`);
       console.log(`📤 Request body: ${JSON.stringify(requestBody)}`);
 
@@ -1103,10 +1169,10 @@ class Game {
       });
 
       console.log(`📨 Response status: ${response.status}`);
-      
+
       const data = await response.json();
       console.log(`📨 Response data: ${JSON.stringify(data)}`);
-      
+
       if (data.success) {
         return data.data.signature;
       } else {
@@ -1143,29 +1209,29 @@ class Game {
    */
   cleanupCurrentGame() {
     console.log('🧹 Cleaning up current game...');
-    
+
     // 清理区块链相关状态
     this.blockchainGameId = null;
     this.registeredPlayers.clear();
     this.finalScores.clear();
     this.playerScoreSubmitted.clear();
-    
+
     // 重置游戏时间
     this.gameStartTime = null;
     this.gameEndTime = null;
-    
+
     // 移除所有玩家（让他们重新连接到新游戏）
     const playersToRemove = [...this.players];
     for (const player of playersToRemove) {
       if (player.client) {
-        player.client.disconnectReason = { 
-          message: 'Game ended', 
-          type: 'GameEnd' 
+        player.client.disconnectReason = {
+          message: 'Game ended',
+          type: 'GameEnd'
         };
       }
       this.removeEntity(player);
     }
-    
+
     console.log(`🧹 Game cleanup completed. Removed ${playersToRemove.length} players.`);
   }
 }

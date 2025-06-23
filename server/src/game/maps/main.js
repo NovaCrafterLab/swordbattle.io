@@ -2,7 +2,7 @@ const Types = require('../Types');
 
 module.exports = {
   coinsCount: 0,
-  aiPlayersCount: 100,
+  aiPlayersCount: 30,
   biomes: [
     {
       type: Types.Biome.Safezone,
@@ -185,7 +185,8 @@ module.exports = {
         },
         {
           type: Types.Entity.Chest,
-          amount: 20,
+          amount: 16,
+          respawnTime: [10, 15],
           position: 'random',
           respawnable: true,
         },
@@ -289,7 +290,8 @@ module.exports = {
         },
         {
           type: Types.Entity.Chest,
-          amount: 18,
+          amount: 12,
+          respawnTime: [10, 15],
           position: 'random',
           respawnable: true,
         },
@@ -361,7 +363,8 @@ module.exports = {
         },
         {
           type: Types.Entity.Chest,
-          amount: 20,
+          amount: 16,
+          respawnTime: [10, 15],
           position: 'random',
           respawnable: true,
         },

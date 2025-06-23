@@ -19,7 +19,7 @@ class Coin extends Entity {
       objectData.value[0],
       objectData.value[1],
     );
-    const radius = Math.min(200, 70 + this.value * 7);
+    const radius = Math.min(200, 70 + Math.log2(this.value + 1) * 5);
 
     this.shape = Circle.create(0, 0, radius);
     this.targets.push(Types.Entity.Player);
