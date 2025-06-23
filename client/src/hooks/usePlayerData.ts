@@ -13,6 +13,7 @@ export interface PlayerGameData {
   rank: number
   isWinner: boolean
   level?: number // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH
+  timestamp?: number // 添加时间戳字段
 }
 
 export interface PlayerProfile {
@@ -105,6 +106,7 @@ export const usePlayerData = () => {
           rank,
           isWinner: reward > BigInt(0),
           level,
+          timestamp: playerInfo.timestamp,
         }
       } catch (err) {
         console.error(`Failed to get blockchain data for game ${gameId}:`, err)
@@ -146,6 +148,7 @@ export const usePlayerData = () => {
           hasClaimed: hasClaimedBool,
           rank: 0, // TODO: 计算排名
           isWinner: rewardBigInt > BigInt(0),
+          timestamp: 0, // TODO: 获取真实时间戳
         }
       } catch (err) {
         console.error(`Failed to get player data for game ${gameId}:`, err)
@@ -318,6 +321,7 @@ export const usePlayerData = () => {
           hasClaimed: game.hasClaimed || false,
           rank: game.rank || 0,
           isWinner: game.isWinner,
+          timestamp: game.timestamp, // 使用API返回的真实时间戳
         })
       )
 

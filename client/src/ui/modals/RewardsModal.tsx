@@ -50,7 +50,7 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
           hasClaimed: game.hasClaimed,
           rank: game.rank,
           isWinner: game.isWinner,
-          timestamp: Date.now() - (game.gameId * 86400000),
+          timestamp: game.timestamp,
           level: game.level,
         }));
         setGameRewards(gameRewardsData);
@@ -76,7 +76,7 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
         hasClaimed: game.hasClaimed,
         rank: game.rank,
         isWinner: game.isWinner,
-        timestamp: Date.now() - (game.gameId * 86400000),
+        timestamp: game.timestamp,
         level: game.level,
       }));
       
