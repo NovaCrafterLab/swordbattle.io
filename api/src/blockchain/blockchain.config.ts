@@ -27,8 +27,12 @@ export const defaultBlockchainConfig: BlockchainConfig = {
   enabled: process.env.BLOCKCHAIN_ENABLED === 'true',
   rpcUrl: process.env.BLOCKCHAIN_RPC_URL,
   contracts: {
-    swordBattle: process.env.SWORD_BATTLE_CONTRACT || '',
-    usd1Token: process.env.USD1_TOKEN_CONTRACT || '',
+    swordBattle: isDev 
+      ? (process.env.SWORD_BATTLE_CONTRACT_TESTNET || process.env.SWORD_BATTLE_CONTRACT || '')
+      : (process.env.SWORD_BATTLE_CONTRACT_MAINNET || process.env.SWORD_BATTLE_CONTRACT || ''),
+    usd1Token: isDev 
+      ? (process.env.USD1_TOKEN_CONTRACT_TESTNET || process.env.USD1_TOKEN_CONTRACT || '')
+      : (process.env.USD1_TOKEN_CONTRACT_MAINNET || process.env.USD1_TOKEN_CONTRACT || ''),
   },
   trustedSigner: process.env.TRUSTED_SIGNER_PRIVATE_KEY,
   environment: {
@@ -48,11 +52,17 @@ export function validateBlockchainConfig(config: BlockchainConfig): boolean {
   const missingFields: string[] = [];
   
   if (!config.contracts.swordBattle) {
-    missingFields.push('SWORD_BATTLE_CONTRACT');
+    const expectedVar = isDev 
+      ? 'SWORD_BATTLE_CONTRACT_TESTNET (或 SWORD_BATTLE_CONTRACT)' 
+      : 'SWORD_BATTLE_CONTRACT_MAINNET (或 SWORD_BATTLE_CONTRACT)';
+    missingFields.push(expectedVar);
   }
   
   if (!config.contracts.usd1Token) {
-    missingFields.push('USD1_TOKEN_CONTRACT');
+    const expectedVar = isDev 
+      ? 'USD1_TOKEN_CONTRACT_TESTNET (或 USD1_TOKEN_CONTRACT)' 
+      : 'USD1_TOKEN_CONTRACT_MAINNET (或 USD1_TOKEN_CONTRACT)';
+    missingFields.push(expectedVar);
   }
   
   if (!config.trustedSigner) {
@@ -61,8 +71,15 @@ export function validateBlockchainConfig(config: BlockchainConfig): boolean {
 
   if (missingFields.length > 0) {
     console.error('Missing required blockchain configuration:', missingFields);
+    console.error(`当前环境: ${isDev ? '开发环境 (测试网)' : '生产环境 (主网)'}`);
     return false;
   }
+
+  // 输出当前使用的合约地址配置
+  console.log('✅ Blockchain configuration validated');
+  console.log(`   环境: ${config.environment.networkName}`);
+  console.log(`   SWORD_BATTLE合约: ${config.contracts.swordBattle}`);
+  console.log(`   USD1_TOKEN合约: ${config.contracts.usd1Token}`);
 
   return true;
 } 
