@@ -13,6 +13,7 @@ interface Config {
 
   // add server
   serverTest: string;
+  serverRace: string;
 }
 
 export const config: Config = {
@@ -30,6 +31,7 @@ export const config: Config = {
 
   // add server
   serverTest: process.env.REACT_APP_ENDPOINT_TEST || '',
+  serverRace: process.env.REACT_APP_ENDPOINT_RACE || '',
 
   apiEndpoint: process.env.REACT_APP_API || '',
   apiEndpointBackup: process.env.REACT_APP_API_BACKUP,

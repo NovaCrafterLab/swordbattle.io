@@ -17,6 +17,12 @@ services:
     environment:
       DEBUG: 'true'
 
+  server-race:
+    env_file:
+      - ./env/development.server.race.env
+    environment:
+      DEBUG: 'true'
+
   client:
     env_file:
       - ./env/client.env.development

@@ -21,6 +21,11 @@ services:
       - ./env/server.env.production
     restart: always
 
+  server-race:
+    env_file:
+      - ./env/production.server.race.env
+    restart: always
+
   client:
     env_file:
       - ./env/client.env.production
