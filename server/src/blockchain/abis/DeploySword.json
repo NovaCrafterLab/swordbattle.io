@@ -315,6 +315,11 @@
         "type": "uint256"
       },
       {
+        "internalType": "address",
+        "name": "player",
+        "type": "address"
+      },
+      {
         "internalType": "uint256",
         "name": "kills",
         "type": "uint256"

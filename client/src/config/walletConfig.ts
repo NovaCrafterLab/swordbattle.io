@@ -15,7 +15,11 @@ console.log('Environment:', ENV);
 export const CONTRACTS = isDev
   ? {
       // BSC测试网合约地址
+<<<<<<< Updated upstream
       SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_TESTNET || '0xB5c8754A8683b6a39ea00d86F4885d35010FC12c',
+=======
+      SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_TESTNET || '0x835ad66aE6d6fA8D66fC3fd9Dd58B9871b4FA671',
+>>>>>>> Stashed changes
       USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_TESTNET || '0x73b8C8c5c81F257832e86A7329123035477C12fA',
     }
   : {
