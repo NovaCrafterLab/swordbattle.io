@@ -1,5 +1,5 @@
-import Coin from './game/entities/Coin';
-import Player from './game/entities/Player';
+import Coin from '@/game/entities/Coin';
+import Player from '@/game/entities/Player';
 
 export function random(min: number, max: number) {
   return min + Math.random() * (max - min);

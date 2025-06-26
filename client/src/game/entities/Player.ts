@@ -3,7 +3,7 @@ import { Shape } from '../physics/Shape';
 import { Evolutions } from '../Evolutions';
 import { Health } from '../components/Health';
 import { BiomeTypes, EntityTypes, FlagTypes, InputTypes } from '../Types';
-import { random } from '../../helpers';
+import { random } from '@/utils/helpers';
 import { Settings } from '../Settings';
 import * as cosmetics from '../cosmetics.json';
 const { skins } = cosmetics;

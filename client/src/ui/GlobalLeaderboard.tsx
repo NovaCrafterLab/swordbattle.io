@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom'; // add useNavigate
 import clsx from 'clsx';
-import { numberWithCommas, secondsToTime } from '../helpers';
+import { numberWithCommas, secondsToTime } from '@/utils/helpers';
 import api from '../api';
 
 import 'bootstrap/dist/js/bootstrap.bundle.min';

@@ -7,7 +7,7 @@ import {
   numberWithCommas,
   lastSeen,
   fixDate,
-} from '../helpers';
+} from '@/utils/helpers';
 import api from '../api';
 import { Line } from 'react-chartjs-2';
 import {

@@ -8,7 +8,7 @@ import { DisconnectTypes } from '../../game/Types';
 import {
   calculateGemsXP,
   // playVideoAd
-} from '../../helpers';
+} from '@/utils/helpers';
 
 function GameResults({ onHome, results, game, isLoggedIn, adElement }: any) {
   const onHomeClick = () => {

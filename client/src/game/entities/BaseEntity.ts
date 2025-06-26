@@ -1,5 +1,5 @@
 import { EntityDepth } from '.';
-import { isObject, mergeDeep } from '../../helpers';
+import { isObject, mergeDeep } from '@/utils/helpers';
 import { ShapeTypes } from '../Types';
 import { Shape, ShapeType } from '../physics/Shape';
 import { Health } from '../components/Health';

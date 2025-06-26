@@ -48,7 +48,7 @@ import MigrationModal from './modals/MigrationModal';
 import {
   getCookies,
   // playVideoAd
-} from '../helpers';
+} from '@/utils/helpers';
 
 // import Ad from './Ad';
 

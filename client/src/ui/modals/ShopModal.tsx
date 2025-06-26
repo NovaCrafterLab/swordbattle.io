@@ -10,7 +10,7 @@ import api from '../../api';
 import * as cosmetics from '../../game/cosmetics.json';
 
 import './ShopModal.scss';
-import { buyFormats, numberWithCommas } from '../../helpers';
+import { buyFormats, numberWithCommas } from '@/utils/helpers';
 import { Id } from '@reduxjs/toolkit/dist/tsHelpers';
 let { skins } = cosmetics;
 

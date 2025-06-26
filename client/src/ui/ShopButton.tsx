@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ShopImg from '../assets/img/shop.png';
 import { AccountState } from '../redux/account/slice';
-import { addCommas } from '../helpers';
+import { addCommas } from '@/utils/helpers';
 
 export default function ShopButton({
   account,
