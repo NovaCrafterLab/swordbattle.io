@@ -147,7 +147,7 @@ footer {
       color: #fff;
       -webkit-text-stroke: 1px rgba(0, 0, 0, 0.4);
       text-shadow:
-          /* 四个方向的黑色“轮廓” */
+          /* 四个方向的黑色"轮廓" */
         -1px -1px 0 #000,
         1px -1px 0 #000,
         -1px 1px 0 #000,
@@ -582,5 +582,89 @@ span {
   }
   #linksContainer {
     display: none;
+  }
+}
+
+.wallet-required-modal {
+  text-align: center;
+  padding: 2rem;
+  background: var(--panel-bg);
+  border-radius: 8px;
+  border: 2px solid var(--panel-border);
+  max-width: 400px;
+  margin: 0 auto;
+
+  h2 {
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+  }
+
+  p {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    line-height: 1.5;
+
+    strong {
+      color: var(--text-primary);
+      font-weight: bold;
+    }
+  }
+
+  .modal-buttons {
+    margin-top: 1.5rem;
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &.btn-primary {
+        background: var(--primary-color, #007bff);
+        color: white;
+
+        &:hover {
+          background: var(--primary-hover, #0056b3);
+          transform: translateY(-1px);
+        }
+      }
+    }
+  }
+}
+
+.wallet-status {
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  text-align: center;
+  transition: all 0.3s ease;
+
+  &.connected {
+    background: rgba(40, 167, 69, 0.1);
+    border: 1px solid rgba(40, 167, 69, 0.3);
+    
+    .status-text {
+      color: #28a745;
+    }
+  }
+
+  &.disconnected {
+    background: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.3);
+    
+    .status-text {
+      color: #dc3545;
+    }
+  }
+
+  .status-text {
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
   }
 }

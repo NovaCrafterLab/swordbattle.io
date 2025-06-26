@@ -9,6 +9,7 @@ import {
   faGear,
   faX,
 } from '@fortawesome/free-solid-svg-icons';
+import { useAccount } from 'wagmi';
 
 import clsx from 'clsx';
 import { useScale } from './Scale';
@@ -69,6 +70,7 @@ try {
 function App() {
   const dispatch = useDispatch();
   const account = useSelector(selectAccount);
+  const { address: walletAddress, isConnected: walletConnected } = useAccount();
 
   const scale = useScale(false);
   const [name, setName] = useState('');
@@ -88,6 +90,11 @@ function App() {
   });
 
   const navigate = useNavigate();
+
+  // 检测是否为race服务器的帮助函数
+  const isRaceServer = (serverValue: string) => {
+    return serverValue === 'race' || serverValue === 'rac(test)' || serverValue.includes('race');
+  };
 
   useEffect(() => {
     // debounce resize
@@ -238,9 +245,46 @@ function App() {
 
     // 检查是否为比赛服务器
     const selectedServer = servers.find(s => s.value === server);
-    const isRaceServer = selectedServer?.value === 'race';
+    const isCurrentRaceServer = selectedServer && isRaceServer(selectedServer.value);
     
-    if (isRaceServer) {
+    // 添加调试信息
+    console.log('🔍 Debug Info:');
+    console.log('  Selected server:', selectedServer);
+    console.log('  Is race server:', isCurrentRaceServer);
+    console.log('  Wallet connected:', walletConnected);
+    console.log('  Wallet address:', walletAddress);
+    
+    if (isCurrentRaceServer) {
+      // 检查钱包连接状态
+      if (!walletConnected) {
+        console.log('❌ Wallet not connected, showing modal');
+        
+        // 显示钱包连接提示模态框
+        const WalletRequiredModal = () => (
+          <div className="wallet-required-modal">
+            <h2>需要连接钱包</h2>
+            <p>比赛服务器需要您连接Web3钱包才能参与游戏。</p>
+            <p>请点击右上角的 <strong>"Connect Wallet"</strong> 按钮连接您的钱包后再试。</p>
+            <div className="modal-buttons">
+              <button 
+                className="btn btn-primary" 
+                onClick={() => {
+                  closeModal();
+                  // 可以在这里触发连接钱包的操作
+                }}
+              >
+                我知道了
+              </button>
+            </div>
+          </div>
+        );
+        
+        setModal(<WalletRequiredModal />);
+        return;
+      }
+      
+      console.log('✅ Wallet connected, proceeding to race game');
+      
       // 显示比赛游戏模态框
       const serverUrl = `${window.location.protocol}//${selectedServer.address}`;
       setModal(
@@ -455,20 +499,46 @@ function App() {
                               Loading...
                             </option>
                           )}
-                          {servers.map((server) => (
-                            <option
-                              key={server.value}
-                              value={server.value}
-                              disabled={server.offline}
-                            >
-                              {server.name} (
-                              {server.offline
-                                ? 'OFFLINE'
-                                : `${server.playerCnt} players - ${server.ping}ms`}
-                              )
-                            </option>
-                          ))}
+                          {servers.map((serverItem) => {
+                            const isCurrentRaceServer = isRaceServer(serverItem.value);
+                            return (
+                              <option
+                                key={serverItem.value}
+                                value={serverItem.value}
+                                disabled={serverItem.offline}
+                              >
+                                {isCurrentRaceServer ? '🏆 ' : ''}{serverItem.name}{isCurrentRaceServer ? ' (Race)' : ''} (
+                                {serverItem.offline
+                                  ? 'OFFLINE'
+                                  : `${serverItem.playerCnt} players - ${serverItem.ping}ms`}
+                                )
+                              </option>
+                            );
+                          })}
                         </select>
+
+                        {/* 钱包连接状态提示 */}
+                        {(() => {
+                          const selectedServer = servers.find(s => s.value === server);
+                          const isCurrentRaceServer = selectedServer && isRaceServer(selectedServer.value);
+                          
+                          if (isCurrentRaceServer) {
+                            return (
+                              <div className={`wallet-status ${walletConnected ? 'connected' : 'disconnected'}`}>
+                                {walletConnected ? (
+                                  <span className="status-text">
+                                    ✅ 钱包已连接 ({walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)})
+                                  </span>
+                                ) : (
+                                  <span className="status-text">
+                                    ⚠️ 比赛服务器需要连接钱包
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
 
                         <div
                           id="enterGame"
