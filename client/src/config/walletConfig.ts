@@ -4,25 +4,26 @@
 // ABI导入
 import DeploySwordABI from './DeploySword.json';
 import ERC20ABI from './ERC20.json';
+import { config } from '../config';
 
 // 环境变量检查
-const ENV = process.env.REACT_APP_NODE_ENV || 'development'; // 默认为开发环境
-export const isDev = ENV === 'development';
+const ENV = process.env.REACT_APP_NODE_ENV ?? process.env.NODE_ENV ?? 'development';
+export const isDev = config.isDev;
 export const isRelease = ENV === 'release';
 console.log('Environment:', ENV);
 
 // 合约地址配置 - 根据环境选择
 export const CONTRACTS = isDev
   ? {
-      // BSC测试网合约地址
-      SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_TESTNET || '0x835ad66aE6d6fA8D66fC3fd9Dd58B9871b4FA671',
-      USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_TESTNET || '0x73b8C8c5c81F257832e86A7329123035477C12fA',
-    }
+    // BSC测试网合约地址
+    SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_TESTNET || '0x835ad66aE6d6fA8D66fC3fd9Dd58B9871b4FA671',
+    USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_TESTNET || '0x73b8C8c5c81F257832e86A7329123035477C12fA',
+  }
   : {
-      // BSC主网合约地址
-      SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_MAINNET || '0x0000000000000000000000000000000000000000',
-      USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_MAINNET || '0x0000000000000000000000000000000000000000',
-    } as const;
+    // BSC主网合约地址
+    SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_MAINNET || '0x0000000000000000000000000000000000000000',
+    USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_MAINNET || '0x0000000000000000000000000000000000000000',
+  } as const;
 
 // ABI导入
 export const ABIS = {
@@ -75,29 +76,29 @@ export const CURRENT_RPC_POOL = isDev ? BSC_TESTNET_RPC_POOL : BSC_MAINNET_RPC_P
 // 网络配置 - 根据环境选择
 export const NETWORK_CONFIG = isDev
   ? {
-      chainId: 97,
-      name: 'BSC Testnet',
-      rpcUrls: BSC_TESTNET_RPC_POOL,
-      primaryRpcUrl: BSC_TESTNET_RPC_POOL[0],
-      explorerUrl: 'https://testnet.bscscan.com/',
-      nativeCurrency: {
-        name: 'tBNB',
-        symbol: 'tBNB',
-        decimals: 18,
-      },
-    }
+    chainId: 97,
+    name: 'BSC Testnet',
+    rpcUrls: BSC_TESTNET_RPC_POOL,
+    primaryRpcUrl: BSC_TESTNET_RPC_POOL[0],
+    explorerUrl: 'https://testnet.bscscan.com/',
+    nativeCurrency: {
+      name: 'tBNB',
+      symbol: 'tBNB',
+      decimals: 18,
+    },
+  }
   : {
-      chainId: 56,
-      name: 'BSC Mainnet',
-      rpcUrls: BSC_MAINNET_RPC_POOL,
-      primaryRpcUrl: BSC_MAINNET_RPC_POOL[0],
-      explorerUrl: 'https://bscscan.com/',
-      nativeCurrency: {
-        name: 'BNB',
-        symbol: 'BNB',
-        decimals: 18,
-      },
-    } as const;
+    chainId: 56,
+    name: 'BSC Mainnet',
+    rpcUrls: BSC_MAINNET_RPC_POOL,
+    primaryRpcUrl: BSC_MAINNET_RPC_POOL[0],
+    explorerUrl: 'https://bscscan.com/',
+    nativeCurrency: {
+      name: 'BNB',
+      symbol: 'BNB',
+      decimals: 18,
+    },
+  } as const;
 
 // 导出环境信息
 export const ENVIRONMENT = {

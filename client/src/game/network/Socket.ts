@@ -80,4 +80,5 @@ class Socket {
   }
 }
 
-export default new Socket();
+const socketInstance = new Socket();
+export default socketInstance;

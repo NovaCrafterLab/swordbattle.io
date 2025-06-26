@@ -1,20 +1,30 @@
+// client/src/game/components/captchaEncoder.ts
+// Compact captcha exporter with minimal logging
+
+import logger from '@/utils/logger';
+
 export default function exportCaptcha(captcha: string) {
-  const parts = 6;
-  const maxLenPerPart = 200;
-  if (captcha.length > parts * maxLenPerPart) {
-    alert(
-      'Captcha too long, length: ' +
-        captcha.length +
-        ', max length: ' +
-        parts * maxLenPerPart,
+  const PARTS = 6;           // number of chunks
+  const MAX_LEN = 200;       // max chars per chunk
+
+  // length guard
+  if (captcha.length > PARTS * MAX_LEN) {
+    logger.error(
+      `Captcha too long. length: ${captcha.length}, max: ${PARTS * MAX_LEN}`,
     );
     return;
   }
+
   const prefix = 'captchaP';
-  let output = {} as any;
-  for (let i = 0; i < parts; i++) {
-    const part = captcha.slice(i * maxLenPerPart, (i + 1) * maxLenPerPart);
-    output[prefix + i] = part;
+  const output: Record<string, string> = {};
+
+  for (let i = 0; i < PARTS; i++) {
+    const part = captcha.slice(i * MAX_LEN, (i + 1) * MAX_LEN);
+    output[`${prefix}${i}`] = part;
   }
+
+  // debug only—won’t show in production
+  logger.debug('Captcha exported', output);
+
   return output;
 }

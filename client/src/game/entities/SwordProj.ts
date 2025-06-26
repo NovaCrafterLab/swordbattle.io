@@ -1,5 +1,5 @@
 import { BaseEntity } from './BaseEntity';
-import Sword from './Sword';
+// import Sword from './Sword';
 
 class SwordProj extends BaseEntity {
   static stateFields = [...BaseEntity.stateFields, 'angle'];

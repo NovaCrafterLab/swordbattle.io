@@ -1,6 +1,8 @@
+// client/src/game/hud/EvolutionSelect.ts
 import HudComponent from './HudComponent';
-import { Evolutions } from '../Evolutions';
-import { config } from '../../config';
+import { Evolutions } from '@/game/Evolutions';
+// import { config } from '@/config';
+import logger from '@/utils/logger';
 
 class EvolutionSelect extends HudComponent {
   spritesContainer: Phaser.GameObjects.Container | null = null;
@@ -17,14 +19,12 @@ class EvolutionSelect extends HudComponent {
       .text(0, -170, 'Evolutions', {
         fontSize: 22,
         fontStyle: 'bold',
-        stroke: '#000000',
+        stroke: '#000',
         strokeThickness: 5,
       })
       .setOrigin(0.5)
       .setVisible(false)
       .setInteractive()
-      // .on('pointerover', () => this.game.input.setDefaultCursor('pointer'))
-      // .on('pointerout', () => this.game.input.setDefaultCursor(config.cursorUrl || 'default'))
       .on('pointerdown', () => this.toggleMinimize());
 
     this.spritesContainer = this.hud.scene.add.container(0, -70);
@@ -56,7 +56,6 @@ class EvolutionSelect extends HudComponent {
     this.game.gameState.selectedEvolution = type;
     this.game.gameState.self.entity!.possibleEvolutions = {};
     this.updateList = true;
-    // this.game.input.setDefaultCursor(config.cursorUrl || 'default');
   }
 
   update() {
@@ -64,16 +63,22 @@ class EvolutionSelect extends HudComponent {
     if (!this.container || !this.spritesContainer || !player) return;
 
     if (this.updateList) {
-      this.spritesContainer?.removeAll(true);
+      this.spritesContainer.removeAll(true);
+
+      // guard: ensure evolutions data exist
+      if (!player.possibleEvolutions) return;
+
+      const count = Object.keys(player.possibleEvolutions).length;
+
+      // abnormal state—log and exit
+      if (!this.container || !this.hideButton) {
+        logger.error('EvolutionSelect: container or hideButton is null');
+        return;
+      }
 
       const alpha = 0.8;
-      if (!player.possibleEvolutions) return;
-      const count = Object.keys(player.possibleEvolutions).length;
-      // this.container.setVisible(count !== 0);
-      // this.hideButton?.setVisible(count !== 0);
-      // Smooth visibility
-      if (!this.container || !this.hideButton)
-        alert('container or hideButton is null');
+
+      /* ----- container visibility ----- */
       if (count === 0 && this.container.visible) {
         this.hud.scene!.tweens.add({
           targets: this.container,
@@ -83,11 +88,9 @@ class EvolutionSelect extends HudComponent {
         });
       } else if (
         count !== 0 &&
-        this.container &&
         (!this.container.visible || this.container.alpha < 1)
       ) {
-        this.container?.setVisible(true);
-        this.container?.setAlpha(0);
+        this.container.setVisible(true).setAlpha(0);
         this.hud.scene!.tweens.add({
           targets: this.container,
           alpha: 1,
@@ -99,7 +102,8 @@ class EvolutionSelect extends HudComponent {
         });
       }
 
-      if (count === 0 && this.hideButton?.visible) {
+      /* ----- hideButton visibility ----- */
+      if (count === 0 && this.hideButton.visible) {
         this.hud.scene!.tweens.add({
           targets: this.hideButton,
           alpha: 0,
@@ -108,11 +112,9 @@ class EvolutionSelect extends HudComponent {
         });
       } else if (
         count !== 0 &&
-        this.hideButton &&
         (!this.hideButton.visible || this.hideButton.alpha < 1)
       ) {
-        this.hideButton?.setVisible(true);
-        this.hideButton?.setAlpha(0);
+        this.hideButton.setVisible(true).setAlpha(0);
         this.hud.scene!.tweens.add({
           targets: this.hideButton,
           alpha: 1,
@@ -124,30 +126,35 @@ class EvolutionSelect extends HudComponent {
         });
       }
 
+      /* ----- build evolution choices ----- */
       let i = 0;
       for (const evol in player.possibleEvolutions) {
         i += 1;
         const evolution = Evolutions[evol];
+
         const body = this.hud.scene.add
           .sprite(0, 0, this.game.gameState.self.entity!.skinName + 'Body')
-          .setOrigin(0.5, 0.5);
+          .setOrigin(0.5);
+
         const overlay = this.hud.scene.add
           .sprite(0, 0, evolution[1])
           .setOrigin(evolution[3][0], evolution[3][1]);
         overlay.setScale((body.width / overlay.width) * evolution[2]);
 
-        const container = this.hud.scene.add.container(
-          (this.spriteSize + 50) * (i - (count + 1) / 2),
-          0,
-          [body, overlay],
-        );
-        container.setScale(this.spriteSize / body.height).setAlpha(alpha);
+        const container = this.hud.scene.add
+          .container(
+            (this.spriteSize + 50) * (i - (count + 1) / 2),
+            0,
+            [body, overlay],
+          )
+          .setScale(this.spriteSize / body.height)
+          .setAlpha(alpha);
 
-        const text = this.hud
-          .scene!.add.text(0, 0, evolution[0], {
+        const text = this.hud.scene.add
+          .text(0, 0, evolution[0], {
             fontSize: 40,
             fontStyle: 'bold',
-            stroke: '#000000',
+            stroke: '#000',
             strokeThickness: 6,
           })
           .setAlpha(alpha);
@@ -155,12 +162,10 @@ class EvolutionSelect extends HudComponent {
         body
           .setInteractive()
           .on('pointerover', () => {
-            // this.game.input.setDefaultCursor('pointer');
             container.setAlpha(1);
             text.setAlpha(1);
           })
           .on('pointerout', () => {
-            // this.game.input.setDefaultCursor(config.cursorUrl || 'default');
             container.setAlpha(alpha);
             text.setAlpha(alpha);
           })
@@ -170,7 +175,9 @@ class EvolutionSelect extends HudComponent {
         Phaser.Display.Align.In.BottomCenter(text, body, 0, 40);
         this.spritesContainer.add(container);
       }
+
       this.updateList = false;
+      logger.debug('EvolutionSelect list updated, count:', count);
     }
   }
 }
