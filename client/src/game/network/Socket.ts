@@ -1,4 +1,5 @@
 import * as Protocol from './Protocol';
+import logger from '@/utils/logger';
 
 const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
 window.socket = null;
@@ -6,15 +7,10 @@ window.socket = null;
 class Socket {
   private socket: null | WebSocket;
   private queue: any[];
-  private debugMode: boolean;
 
   constructor() {
     this.socket = null;
     this.queue = [];
-
-    try {
-      this.debugMode = window.location.search.includes('debugAlertMode');
-    } catch (e) {}
   }
 
   connect(address: string, onOpen: any, onMessage: any, onClose: any) {
@@ -29,13 +25,12 @@ class Socket {
     window.socket = this.socket;
 
     this.socket.addEventListener('open', () => {
+      logger.info('WebSocket open:', endpoint);
       this.onOpen();
       onOpen();
     });
     this.socket.addEventListener('close', (event: CloseEvent) => {
-      if (this.debugMode) {
-        alert('Connection closed: ' + event.code + ' ' + event.reason);
-      }
+      logger.warn('WebSocket closed:', event.code, event.reason, endpoint);
       onClose(event, endpoint);
       this.close();
     });
@@ -48,8 +43,7 @@ class Socket {
         );
         onMessage(payload);
       } catch (err) {
-        console.error('Decoding message error: ', err);
-        // alert("Your game has crashed. Please refresh the page. If this issue persists, please contact support. Error: " + err)
+        logger.error('Decoding message error:', err);
       }
     });
 
@@ -64,15 +58,18 @@ class Socket {
 
   emit(data: any) {
     if (this.socket?.readyState !== 1) {
+      logger.debug('WebSocket not ready, queueing message:', data);
       return this.queue.push(data);
     }
 
     const payload = Protocol.encodeClientMessage(data);
+    logger.debug('WebSocket send:', data);
     this.socket?.send(payload);
   }
 
   close() {
     if (this.socket) {
+      logger.info('WebSocket closing');
       this.socket.close(1000);
       this.socket = null;
       window.socket = null;
