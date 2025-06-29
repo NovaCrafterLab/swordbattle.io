@@ -146,10 +146,15 @@ export const useBlockchain = () => {
   const usePlayerScore = (gameId: number, playerAddress: string) => {
     return useReadContract({
       ...swordBattleContract,
-      functionName: 'playerScores',
+      functionName: 'getPlayerInfo',
       args: [BigInt(gameId), playerAddress as `0x${string}`],
       query: {
         enabled: gameId >= 0 && !!playerAddress,
+        select: (data: any) => {
+          // getPlayerInfo返回: [playerAddr, kills, score, submitted, claimed, killReward, survivalReward]
+          // score在索引2位置
+          return Array.isArray(data) ? data[2] : 0;
+        },
       },
     });
   };
@@ -160,7 +165,7 @@ export const useBlockchain = () => {
   const usePlayerReward = (gameId: number, playerAddress: string) => {
     return useReadContract({
       ...swordBattleContract,
-      functionName: 'playerRewards',
+      functionName: 'getReward',
       args: [BigInt(gameId), playerAddress as `0x${string}`],
       query: {
         enabled: gameId >= 0 && !!playerAddress,
@@ -174,10 +179,15 @@ export const useBlockchain = () => {
   const useHasClaimedReward = (gameId: number, playerAddress: string) => {
     return useReadContract({
       ...swordBattleContract,
-      functionName: 'hasClaimed',
+      functionName: 'getPlayerInfo',
       args: [BigInt(gameId), playerAddress as `0x${string}`],
       query: {
         enabled: gameId >= 0 && !!playerAddress,
+        select: (data: any) => {
+          // getPlayerInfo返回: [playerAddr, kills, score, submitted, claimed, killReward, survivalReward]
+          // claimed在索引4位置
+          return Array.isArray(data) ? data[4] : false;
+        },
       },
     });
   };
