@@ -1,7 +1,13 @@
+// client/src/ServerList.ts
+
 import { Settings } from './game/Settings';
 import { config } from './config';
+import logger from '@/utils/logger';
 
-interface Server {
+/* ──────────────────────────────────────────────────────────── *
+ * types & constants                                            *
+ * ──────────────────────────────────────────────────────────── */
+export interface Server {
   value: string;
   name: string;
   address: string;
@@ -11,11 +17,6 @@ interface Server {
   realPlayersCnt?: number;
 }
 
-let debugMode = false;
-try {
-  debugMode = window.location.search.includes('debugAlertMode');
-} catch (e) {}
-
 const servers: Server[] = [
   { value: 'test', name: 'TEST', address: config.serverTest, ping: 0 },
   { value: 'race', name: 'Race', address: config.serverRace, ping: 0 },
@@ -24,6 +25,7 @@ const servers: Server[] = [
   // { value: 'us', name: 'USA', address: config.serverUS, ping: 0 },
   // { value: 'usbackup', name: 'USA Unblocked', address: config.serverUSBackup, ping: 0 },
 ];
+
 if (config.isDev) {
   servers.unshift({
     value: 'dev',
@@ -33,140 +35,107 @@ if (config.isDev) {
   });
 }
 
+/* cache controls */
 let lastPingUpdate = 0;
 let isUpdating = false;
 
-export async function updatePing() {
+/* ──────────────────────────────────────────────────────────── *
+ * ping helpers                                                *
+ * ──────────────────────────────────────────────────────────── */
+export async function updatePing(): Promise<Server[]> {
   const cache: Record<string, Server> = {};
-  // Wait if update is already in progress
-  while (isUpdating) {
-    await new Promise((resolve) => setTimeout(resolve, 10)); // Wait for 10ms before checking again
-  }
 
-  if (Date.now() - lastPingUpdate < 60000) {
-    return servers;
-  }
+  /* avoid parallel execution */
+  while (isUpdating) await new Promise(r => setTimeout(r, 10));
 
-  isUpdating = true; // Set flag to indicate update is in progress
+  /* fresh enough */
+  if (Date.now() - lastPingUpdate < 60_000) return servers;
+
+  isUpdating = true;
   lastPingUpdate = Date.now();
 
   try {
-    for (const server of servers) {
-      // instead lets do it at the same time
-      // const promises = servers.map((server2) => {
-      const start = Date.now();
-      if (
-        !server.address ||
-        (!config.isDev && server.address.includes('localhost'))
-      ) {
-        server.offline = true;
-        server.ping = Infinity;
-      } else {
-        if (cache[server.address]) {
-          server.offline = cache[server.address].offline;
-          server.ping = cache[server.address].ping;
-          server.playerCnt = cache[server.address].realPlayersCnt;
-        } else {
-          try {
-            const data = await fetch(
-              `${window.location.protocol}//${server.address}/serverinfo?${Date.now()}`,
-              {
-                method: 'GET',
-                headers: {
-                  'Content-Type': 'text/plain',
-                },
-              },
-            );
-            try {
-              const json = await data.json();
-              server.offline = false;
-              server.ping = Date.now() - start;
-              server.playerCnt = json.realPlayersCnt;
-              cache[server.address] = server;
-            } catch (e) {
-              server.offline = true;
-              server.ping = Infinity;
-              cache[server.address] = server;
-            }
-          } catch (e) {
-            server.offline = true;
-            server.ping = Infinity;
-            cache[server.address] = server;
-          }
+    await Promise.all(
+      servers.map(async s => {
+        const start = Date.now();
+
+        if (!s.address || (!config.isDev && s.address.includes('localhost'))) {
+          Object.assign(s, { offline: true, ping: Infinity });
+          return;
         }
-      }
-    }
+
+        if (cache[s.address]) {
+          Object.assign(s, cache[s.address]);
+          return;
+        }
+
+        try {
+          const resp = await fetch(
+            `${window.location.protocol}//${s.address}/serverinfo?${Date.now()}`,
+            { headers: { 'Content-Type': 'text/plain' } },
+          );
+          const json = await resp.json();
+          Object.assign(s, {
+            offline: false,
+            ping: Date.now() - start,
+            playerCnt: json.realPlayersCnt,
+          });
+        } catch {
+          Object.assign(s, { offline: true, ping: Infinity });
+        }
+
+        cache[s.address] = { ...s };
+      }),
+    );
   } finally {
-    isUpdating = false; // Reset flag whether update is successful or not
+    isUpdating = false;
   }
 
   return servers;
 }
 
-export async function getServerList() {
-  console.time('updatePingServerList');
+/* ──────────────────────────────────────────────────────────── *
+ * public API                                                  *
+ * ──────────────────────────────────────────────────────────── */
+export async function getServerList(): Promise<Server[]> {
+  const t0 = performance.now();
   await updatePing();
-  console.timeEnd('updatePingServerList');
-  const autoServer = getAutoServer();
-  const list = [
-    {
-      ...autoServer,
-      value: 'auto',
-      name: `AUTO (${autoServer.name})`,
-    },
-    ...servers,
-  ];
+  logger.info(`updatePingServerList took ${Math.round(performance.now() - t0)} ms`);
 
-  return list;
-}
-
-function getAutoServer(): Server {
-  let server: Server = servers[0];
-
-  // pick server with lowest ping
-  for (let i = 0; i < servers.length; i++) {
-    if (servers[i].ping < server.ping) {
-      server = servers[i];
-    }
-  }
-
-  if (server.offline) {
-    alert(
-      'All servers are offline or blocked. Please try again in 5-10 mins. If not fixed, please report to support@swordbattle.io',
-    );
-  }
-
-  return server;
+  const auto = pickLowestPing();
+  return [{ ...auto, value: 'auto', name: `AUTO (${auto.name})` }, ...servers];
 }
 
 export async function getServer(): Promise<Server> {
-  console.time('updatePingServer');
+  const t0 = performance.now();
   await updatePing();
-  console.timeEnd('updatePingServer');
-  let server: Server = getAutoServer();
+  logger.info(`updatePingServer took ${Math.round(performance.now() - t0)} ms`);
 
-  if (Settings.server === 'auto') {
-    return server;
+  let chosen = pickLowestPing();
+
+  if (Settings.server !== 'auto') {
+    const manual = servers.find(s => s.value === Settings.server && !s.offline);
+    if (manual) chosen = manual;
   }
 
-  for (let i = 0; i < servers.length; i++) {
-    if (Settings.server === servers[i].value && !servers[i].offline) {
-      server = servers[i];
-      console.log('Selected server:', server);
-      break;
-    }
-  }
-  if (Settings.server !== server.value) {
-    if (debugMode) {
-      alert(
-        'changed server to ' +
-          server.value +
-          ' because the previous one was offline, previous server: ' +
-          Settings.server,
-      );
-    }
-    Settings.server = server.value;
+  /* auto-switch when selected server is offline */
+  if (Settings.server !== chosen.value) {
+    logger.warn(`Switched server to ${chosen.value} because ${Settings.server} is offline`);
+    alert(`Switched server to ${chosen.value} because ${Settings.server} is offline`);
+    Settings.server = chosen.value;
     window.location.reload();
   }
-  return server;
+
+  return chosen;
+}
+
+/* ──────────────────────────────────────────────────────────── *
+ * helpers                                                     *
+ * ──────────────────────────────────────────────────────────── */
+function pickLowestPing(): Server {
+  const best = servers.reduce((min, cur) => (cur.ping < min.ping ? cur : min));
+  if (best.offline) {
+    logger.error('All servers are offline or blocked. Please try again later.');
+  }
+  return best;
 }

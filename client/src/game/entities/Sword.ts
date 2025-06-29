@@ -1,4 +1,4 @@
-import { random } from '../../helpers';
+import { random } from '@/utils/helpers';
 import { BaseEntity } from './BaseEntity';
 import * as cosmetics from '../cosmetics.json';
 import { Settings } from '../Settings';

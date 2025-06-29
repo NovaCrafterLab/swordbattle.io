@@ -1,3 +1,4 @@
+// client/src/game/GameState.ts
 import Game from './scenes/Game';
 import Socket from './network/Socket';
 import { EntityTypes } from './Types';
@@ -9,8 +10,9 @@ import { GetEntityClass } from './entities';
 import { Spectator } from './Spectator';
 import { getServer } from '../ServerList';
 import { config } from '../config';
-import exportCaptcha from './components/captchaEncoder';
-import { findCoinCollector } from '../helpers';
+// import exportCaptcha from './components/captchaEncoder';
+import { findCoinCollector } from '../utils/helpers';
+import logger from '@/utils/logger';
 
 class GameState {
   game: Game;
@@ -46,6 +48,7 @@ class GameState {
   recentDeadPlayers: Record<number, { name: string; time: number }> = {};
 
   constructor(game: Game) {
+    
     this.game = game;
     this.gameMap = new GameMap(this.game);
     this.spectator = new Spectator(this.game);
@@ -56,21 +59,23 @@ class GameState {
     try {
       this.debugMode = window.location.search.includes('debugAlertMode');
       if (this.debugMode) {
-        alert('Debug alert mode activated');
+        logger.info('Debug alert mode activated');
       }
-    } catch (e) {}
+    } catch (e) {
+      logger.warn('Error checking debug mode', e);
+    }
   }
 
   refreshSocket(unbind = false) {
     // unbind
     if (unbind) {
-      this.socket.removeEventListener('open', this.onServerOpen.bind(this));
-      this.socket.removeEventListener(
-        'message',
-        this.onServerMessage.bind(this),
-      );
-      this.socket.removeEventListener('close', this.onServerClose.bind(this));
-
+      try {
+        this.socket.removeEventListener('open', this.onServerOpen.bind(this));
+        this.socket.removeEventListener('message', this.onServerMessage.bind(this));
+        this.socket.removeEventListener('close', this.onServerClose.bind(this));
+      } catch (e) {
+        logger.warn('Error unbinding socket events', e);
+      }
       this.gameMap = new GameMap(this.game);
       this.spectator = new Spectator(this.game);
     }
@@ -79,17 +84,17 @@ class GameState {
     getServer().then((server) => {
       console.timeEnd('getServer');
       if (this.debugMode) {
-        alert(
-          'Sending ws connection to ' + server.address + ' name ' + server.name,
-        );
+        logger.info('Sending ws connection to', server.address, 'name', server.name);
       }
-      console.log('connecting to', server.address, Date.now());
+      logger.info('connecting to', server.address, Date.now());
       this.socket = Socket.connect(
         server.address,
         this.onServerOpen.bind(this),
         this.onServerMessage.bind(this),
         this.onServerClose.bind(this),
       );
+    }).catch((e) => {
+      logger.error('getServer failed', e);
     });
   }
 
@@ -102,7 +107,7 @@ class GameState {
   }
 
   start(name: string, walletAddress?: string) {
-    console.log('🎯 GameState.start called with:', {
+    logger.info('🎯 GameState.start called with:', {
       name,
       nameExists: !!name,
       walletAddress,
@@ -120,9 +125,9 @@ class GameState {
     // 如果提供了钱包地址，包含在请求中（用于区块链比赛服务器）
     if (walletAddress) {
       gameData.walletAddress = walletAddress;
-      console.log('✅ Adding walletAddress to gameData:', gameData);
+      logger.info('✅ Adding walletAddress to gameData:', gameData);
     } else {
-      console.log('⚠️ No walletAddress provided, sending without it:', gameData);
+      logger.warn('⚠️ No walletAddress provided, sending without it:', gameData);
     }
     
     Socket.emit(gameData);
@@ -170,19 +175,18 @@ class GameState {
 
   onServerOpen() {
     this.spectate();
-    console.log('server connected', Date.now());
+    logger.info('server connected', Date.now());
   }
 
   onServerClose(event: CloseEvent, endpoint?: string) {
     Socket.close();
     clearInterval(this.interval);
-
     let reason = event.reason || 'Connection failed';
     if (endpoint) {
       reason += ` (${endpoint})`;
     }
     this.game.game.events.emit('connectionClosed', reason);
-    console.log('connection closed');
+    logger.warn('connection closed:', reason);
   }
 
   onServerMessage(data: any) {
@@ -204,80 +208,75 @@ class GameState {
   }
 
   processServerMessage(data: any) {
-    if (data.isPong) {
-      this.ping = Date.now() - this.pingStart;
-    }
-    if (data.tps) {
-      this.tps = data.tps;
-    }
-
-    if (data.fullSync) {
-      Object.values(this.entities).forEach((entity) => entity.remove());
-      this.entities = {};
-      this.self.id = data.selfId;
-    }
-
-    for (let stringId in data.entities) {
-      const id = Number(stringId);
-
-      const entityData = data.entities[id];
-      if (!this.entities[id] && !entityData.removed) {
-        this.addEntity(id, entityData);
+    try {
+      if (data.isPong) {
+        this.ping = Date.now() - this.pingStart;
       }
-
-      if (entityData.removed) {
-        if (id === this.self.id) {
-          if (typeof entityData.disconnectReasonType !== 'undefined') {
-            this.disconnectReason = {
-              reason: entityData.disconnectReasonMessage,
-              code: entityData.disconnectReasonType,
-            };
-          }
-          this.showGameResults();
+      if (data.tps) {
+        this.tps = data.tps;
+      }
+      if (data.fullSync) {
+        Object.values(this.entities).forEach((entity) => entity.remove());
+        this.entities = {};
+        this.self.id = data.selfId;
+      }
+      for (let stringId in data.entities) {
+        const id = Number(stringId);
+        const entityData = data.entities[id];
+        if (!this.entities[id] && !entityData.removed) {
+          this.addEntity(id, entityData);
         }
-        this.removeEntity(id, entityData);
-      } else {
-        this.entities[id].updateState(entityData);
+        if (entityData.removed) {
+          if (id === this.self.id) {
+            if (typeof entityData.disconnectReasonType !== 'undefined') {
+              this.disconnectReason = {
+                reason: entityData.disconnectReasonMessage,
+                code: entityData.disconnectReasonType,
+              };
+            }
+            this.showGameResults();
+          }
+          this.removeEntity(id, entityData);
+        } else {
+          this.entities[id].updateState(entityData);
+        }
       }
-    }
-    for (let stringId in data.globalEntities) {
-      const id = Number(stringId);
-
-      const entityData = data.globalEntities[id];
-      if (!this.globalEntities[id]) {
-        this.addGlobalEntity(id, entityData);
+      for (let stringId in data.globalEntities) {
+        const id = Number(stringId);
+        const entityData = data.globalEntities[id];
+        if (!this.globalEntities[id]) {
+          this.addGlobalEntity(id, entityData);
+        }
+        if (entityData.removed) {
+          this.removeGlobalEntity(id);
+        } else {
+          this.globalEntities[id].updateState(entityData);
+        }
       }
-      if (entityData.removed) {
-        this.removeGlobalEntity(id);
-      } else {
-        this.globalEntities[id].updateState(entityData);
+      if (data.spectator) {
+        if (!this.spectator.active) {
+          this.spectator.enable();
+        }
+        this.spectator.follow(data.spectator);
       }
-    }
-
-    if (data.spectator) {
-      if (!this.spectator.active) {
-        this.spectator.enable();
+      if (data.mapData) {
+        this.gameMap.updateMapData(data.mapData);
       }
-      this.spectator.follow(data.spectator);
-    }
-    if (data.mapData) {
-      this.gameMap.updateMapData(data.mapData);
-    }
-
-    if (data.fullSync) {
-      const selfEntity = this.entities[this.self.id];
-      this.self.entity = selfEntity;
-      if (selfEntity) {
-        this.game.follow(selfEntity);
+      if (data.fullSync) {
+        const selfEntity = this.entities[this.self.id];
+        this.self.entity = selfEntity;
+        if (selfEntity) {
+          this.game.follow(selfEntity);
+        }
+        if (!this.isReady) {
+          logger.info('game ready', Date.now());
+          if (this.debugMode) logger.info('Game ready-- fullsync');
+          this.isReady = true;
+          this.game.game.events.emit('gameReady');
+        }
       }
-
-      if (!this.isReady) {
-        console.log('game ready', Date.now());
-        if (this.debugMode) alert('Game ready-- fullsync');
-
-        this.isReady = true;
-        this.game.game.events.emit('gameReady');
-      }
+    } catch (e) {
+      logger.error('processServerMessage error', e);
     }
   }
 

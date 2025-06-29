@@ -1,4 +1,7 @@
-const isDev = process.env.NODE_ENV === 'development';
+// client/src/game/Settings.ts
+// import { config } from '@/config';
+// config.isDev
+// const isDev = process.env.NODE_ENV === 'development';
 
 interface SettingType {
   name: string;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { addCommas } from '../helpers';
+import { addCommas } from '@/utils/helpers';
 
 export default function ValueCnt({
   scale,

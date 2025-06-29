@@ -323,6 +323,7 @@ module.exports = function (webpackEnv) {
           'react-dom$': 'react-dom/profiling',
           'scheduler/tracing': 'scheduler/tracing-profiling',
         }),
+        '@': paths.appSrc,
         ...(modules.webpackAliases || {}),
       },
       plugins: [
@@ -350,6 +351,7 @@ module.exports = function (webpackEnv) {
           exclude: /@babel(?:\/|\\{1,2})runtime/,
           test: /\.(js|mjs|jsx|ts|tsx|css)$/,
           loader: require.resolve('source-map-loader'),
+          exclude: /node_modules/,
         },
         {
           // "oneOf" will traverse all following loaders until one will

@@ -59,7 +59,7 @@ export const usePlayerData = () => {
 
       try {
         // 通过API端点获取区块链数据
-        const apiUrl = `${process.env.REACT_APP_API_URL || process.env.REACT_APP_API || 'http://localhost:8080'}/blockchain/games/${gameId}/players/${address}`
+        const apiUrl = `${process.env.REACT_APP_API_URL ?? process.env.REACT_APP_API ?? 'http://localhost:8080'}/blockchain/games/${gameId}/players/${address}`
 
         const response = await fetch(apiUrl)
         if (!response.ok) {

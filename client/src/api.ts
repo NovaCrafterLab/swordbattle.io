@@ -144,4 +144,8 @@ function method(url: string, options: {}, callback = (data: any) => {}): any {
     .catch(() => callback({ message: unavialableMessage }));
 }
 
-export default { endpoint, get, post, method, postAsync };
+
+export { endpoint, get, post, method, postAsync };
+
+const api = { endpoint, get, post, method, postAsync };
+export default api;

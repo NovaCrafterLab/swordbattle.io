@@ -1,7 +1,7 @@
 import HudComponent from './HudComponent';
 import GlobalEntity from '../entities/GlobalEntity';
 import { BiomeTypes, EntityTypes } from '../Types';
-import { config } from '../../config';
+// import { config } from '../../config';
 
 class Minimap extends HudComponent {
   graphics: Phaser.GameObjects.Graphics | null = null;

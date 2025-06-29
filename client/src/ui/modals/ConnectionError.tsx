@@ -9,7 +9,7 @@ export default function ConnectionError({ reason = 'Connection failed' }: any) {
       <p className="notification">
         If help is needed restoring progress, save an image of this full page
         and email to{' '}
-        <span style={{ color: 'yellow' }}>support@swordbattle.io</span>
+        {/* <span style={{ color: 'yellow' }}>support@swordbattle.io</span> */}
       </p>
       <p>If not, please try reconnecting.</p>
       <br />
