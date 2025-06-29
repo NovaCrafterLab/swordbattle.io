@@ -20,7 +20,6 @@ export interface Server {
 const servers: Server[] = [
   { value: 'test', name: 'TEST', address: config.serverTest, ping: 0 },
   { value: 'race', name: 'Race', address: config.serverRace, ping: 0 },
-  { value: 'rac(test)', name: 'Race(test)', address: "localhost:8000", ping: 0 },
   // { value: 'eu', name: 'Europe', address: config.serverEU, ping: 0 },
   // { value: 'us', name: 'USA', address: config.serverUS, ping: 0 },
   // { value: 'usbackup', name: 'USA Unblocked', address: config.serverUSBackup, ping: 0 },
@@ -30,6 +29,15 @@ if (config.isDev) {
   servers.unshift({
     value: 'dev',
     name: 'Development',
+    address: config.serverDev,
+    ping: 0,
+  });
+}
+
+if (config.isDev) {
+  servers.unshift({
+    value: 'rac(test)',
+    name: 'Race(test)',
     address: config.serverDev,
     ping: 0,
   });
