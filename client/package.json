@@ -7,7 +7,7 @@
     "start": "node scripts/start.js",
     "dev": "node scripts/start.js",
     "analyze:map": "source-map-explorer 'build/static/js/*.js'",
-    "build": "cross-env GENERATE_SOURCEMAP=false node scripts/build.js",
+    "build": "node scripts/build.js",
     "build:map": "cross-env GENERATE_SOURCEMAP=ture node scripts/build.js",
     "build-protocol": "npx pbjs --ts ./src/game/network/Protocol.ts ./src/game/network/schema.proto",
     "clean": "rimraf build",
