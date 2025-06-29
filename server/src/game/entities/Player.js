@@ -20,6 +20,7 @@ const Types = require('../Types');
 const config = require('../../config');
 const { clamp, calculateGemsXP } = require('../../helpers');
 const { skins } = require('../../cosmetics.json');
+const Logger = require('../../utils/Logger');
 
 const { prof } = require('../../prof');
 
@@ -365,6 +366,17 @@ class Player extends Entity {
   remove(message = 'Server', type = Types.DisconnectReason.Server) {
     if (this.removed) return;
 
+    Logger.game.info('Player removed', {
+      playerId: this.id,
+      playerName: this.name,
+      message,
+      type,
+      kills: this.kills,
+      coins: this.levels?.coins || 0,
+      playtime: this.playtime,
+      hasClient: !!this.client
+    });
+
     const c = this.client;
     if (c) {
       c.disconnectReason = { message, type };
@@ -392,6 +404,11 @@ class Player extends Entity {
         this.game.map.spawnCoinsInShape(
           this.shape, drop, c?.account?.id,
         );
+        Logger.game.debug('Coins dropped on player death', {
+          playerId: this.id,
+          playerName: this.name,
+          coinsDrop: drop
+        });
       }
     }
 
@@ -407,7 +424,10 @@ class Player extends Entity {
   checkBlockchainGameEnd() {
     // 检查游戏是否已经结束或正在结束
     if (this.game.gamePhase === 'ending' || this.game.gamePhase === 'ended') {
-      console.log(`🔍 Game already in ${this.game.gamePhase} phase, skipping end check`);
+      Logger.game.debug('Game already in ending/ended phase, skipping end check', {
+        gamePhase: this.game.gamePhase,
+        gameId: this.game.blockchainGameId
+      });
       return;
     }
 
@@ -416,18 +436,27 @@ class Player extends Entity {
       try {
         // 再次检查游戏状态（因为有延迟）
         if (this.game.gamePhase === 'ending' || this.game.gamePhase === 'ended') {
-          console.log(`🔍 Game changed to ${this.game.gamePhase} phase during delay, skipping end check`);
+          Logger.game.debug('Game changed to ending/ended phase during delay, skipping end check', {
+            gamePhase: this.game.gamePhase
+          });
           return;
         }
 
         const alivePlayers = [...this.game.players].filter(player => !player.removed);
         const registeredPlayers = this.game.registeredPlayers ? this.game.registeredPlayers.size : 0;
         
-        console.log(`🔍 Checking game end condition: ${alivePlayers.length} alive, ${registeredPlayers} registered`);
+        Logger.game.info('Checking game end condition', { 
+          alivePlayers: alivePlayers.length, 
+          registeredPlayers,
+          gameId: this.game.blockchainGameId
+        });
         
         // 如果只剩下1个或0个玩家，结束游戏
         if (alivePlayers.length <= 1) {
-          console.log('🏁 Game ending: Only 1 or 0 players remaining');
+          Logger.game.warn('Game ending: Only 1 or 0 players remaining', {
+            gameId: this.game.blockchainGameId,
+            alivePlayers: alivePlayers.length
+          });
           this.game.endBlockchainGame('last_player_standing');
         }
         // 如果所有注册玩家都死了，也结束游戏
@@ -438,12 +467,20 @@ class Player extends Entity {
           );
           
           if (aliveRegisteredPlayers.length === 0) {
-            console.log('🏁 Game ending: No registered players remaining');
+            Logger.game.warn('Game ending: No registered players remaining', {
+              gameId: this.game.blockchainGameId,
+              registeredPlayers,
+              aliveRegisteredPlayers: aliveRegisteredPlayers.length
+            });
             this.game.endBlockchainGame('no_registered_players');
           }
         }
       } catch (error) {
-        console.error('Error checking blockchain game end:', error);
+        Logger.game.error('Error checking blockchain game end', { 
+          error: error.message,
+          playerId: this.id,
+          playerName: this.name
+        });
       }
     }, 1000); // 1秒延迟
   }

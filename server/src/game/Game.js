@@ -11,6 +11,7 @@ const filter = require('leo-profanity');
 const Types = require('./Types');
 const { getBannedIps } = require('../moderation');
 const { rectangleRectangle } = require('./collisions');
+const Logger = require('../utils/Logger');
 
 const { prof } = require('../prof');
 
@@ -501,13 +502,18 @@ class Game {
     const registeredCount = this.registeredPlayers.size;
     const activeCount = this.players.size;
 
-    console.log(`🎮 Game status: ${activeCount}/${registeredCount} players joined`);
+    Logger.game.info('Checking game start conditions', { 
+      activeCount, 
+      registeredCount,
+      gamePhase: this.gamePhase,
+      gameId: this.blockchainGameId
+    });
 
     // 可以添加更多开始游戏的条件，比如最小玩家数、时间限制等
     if (activeCount >= Math.min(2, registeredCount)) { // 至少2个玩家或所有注册玩家都加入
       if (this.gamePhase === 'waiting') {
         this.gamePhase = 'active';
-        console.log('🚀 Game started! All players are ready.');
+        Logger.status('Game started! All players are ready', 'game');
 
         // 设置游戏超时定时器
         this.startGameTimeout();
@@ -527,11 +533,17 @@ class Game {
     }
 
     this.gameTimeoutTimer = setTimeout(() => {
-      console.log('⏰ Game timeout reached, ending game automatically');
+      Logger.game.warn('Game timeout reached, ending game automatically', {
+        gameId: this.blockchainGameId,
+        duration: this.maxGameDuration
+      });
       this.endBlockchainGame('timeout');
     }, this.maxGameDuration);
 
-    console.log(`⏱️ Game timeout set for ${this.maxGameDuration / 1000 / 60} minutes`);
+    Logger.game.info('Game timeout set', { 
+      gameId: this.blockchainGameId,
+      timeoutMinutes: this.maxGameDuration / 1000 / 60 
+    });
   }
 
   /**
@@ -541,7 +553,7 @@ class Game {
     if (this.gameTimeoutTimer) {
       clearTimeout(this.gameTimeoutTimer);
       this.gameTimeoutTimer = null;
-      console.log('⏱️ Game timeout cleared');
+      Logger.game.info('Game timeout cleared', { gameId: this.blockchainGameId });
     }
   }
 
@@ -556,15 +568,30 @@ class Game {
       playerCount: this.players.size,
     };
 
+    let successCount = 0;
+    let errorCount = 0;
+
     for (const player of this.players) {
       if (player.client && player.client.socket) {
         try {
           player.client.socket.send(JSON.stringify(message));
+          successCount++;
         } catch (error) {
-          console.error('Error sending game start message to player:', error);
+          Logger.game.error('Error sending game start message to player', { 
+            playerId: player.id,
+            error: error.message 
+          });
+          errorCount++;
         }
       }
     }
+
+    Logger.game.info('Game start message broadcasted', {
+      gameId: this.blockchainGameId,
+      successCount,
+      errorCount,
+      totalPlayers: this.players.size
+    });
   }
 
   isNameReserved(name) {
@@ -641,7 +668,7 @@ class Game {
     }
 
     if (this.isGameCreationInProgress) {
-      console.log('⏳ Game creation already in progress...');
+      Logger.server.warn('Game creation already in progress');
       return;
     }
 
@@ -654,35 +681,54 @@ class Game {
       
       // 从配置中获取游戏级别
       const gameLevel = config.blockchain.gameLevel || 0;
-      console.log(`🚀 Creating blockchain game... (Attempt ${currentAttempt}/${maxRetries}, Level: ${gameLevel})`);
+      Logger.server.info('Creating blockchain game', { 
+        attempt: currentAttempt, 
+        maxRetries,
+        gameLevel 
+      });
       
       // 在创建游戏前记录初始计数器
       const initialCounter = await this.blockchainService.getGameCounter();
-      console.log(`📊 Current game counter before creation: ${initialCounter}`);
+      Logger.server.debug('Current game counter before creation', { initialCounter });
       
       // 调用合约创建游戏，传入级别参数
       const createResult = await this.blockchainService.createGame(gameLevel);
-      console.log(`✅ Game creation transaction sent: ${createResult.txHash}`);
-      console.log(`📊 Transaction details: Initial counter = ${createResult.initialCounter}, Level = ${createResult.level}, Timestamp = ${new Date(createResult.timestamp).toISOString()}`);
+      Logger.server.info('Game creation transaction sent', {
+        txHash: createResult.txHash,
+        initialCounter: createResult.initialCounter,
+        level: createResult.level,
+        timestamp: new Date(createResult.timestamp).toISOString()
+      });
       
       // 监听GameCreated事件获取gameId，传递初始计数器
       await this.waitForGameCreated(initialCounter);
 
-      console.log(`✅ Blockchain game initialization completed successfully on attempt ${currentAttempt}`);
+      Logger.status('Blockchain game initialization completed successfully', 'game');
 
     } catch (error) {
-      console.error(`❌ Failed to create blockchain game (attempt ${currentAttempt}/${maxRetries}):`, error);
+      Logger.server.error('Failed to create blockchain game', {
+        attempt: currentAttempt,
+        maxRetries,
+        error: error.message,
+        stack: error.stack
+      });
       this.gamePhase = 'error';
       this.isGameCreationInProgress = false;
 
       // 如果还有重试次数，等待5秒后重试
       if (retryCount < maxRetries - 1) {
-        console.log(`🔄 Retrying game creation in 5 seconds... (${maxRetries - currentAttempt} attempts remaining)`);
+        Logger.server.info('Retrying game creation', {
+          retryDelay: 5000,
+          attemptsRemaining: maxRetries - currentAttempt
+        });
         setTimeout(() => {
           this.initializeBlockchainGame(retryCount + 1);
         }, 5000);
       } else {
-        console.error(`💥 Failed to create blockchain game after ${maxRetries} attempts. Server will continue but blockchain features may not work.`);
+        Logger.server.error('Failed to create blockchain game after all retries', {
+          maxRetries,
+          message: 'Server will continue but blockchain features may not work'
+        });
       }
     }
   }
@@ -699,7 +745,7 @@ class Game {
       const checkGameCreated = async () => {
         try {
           const currentCounter = await this.blockchainService.getGameCounter();
-          console.log(`📊 Checking game counter: ${currentCounter} (initial: ${initialCounter})`);
+          Logger.server.debug('Checking game counter', { currentCounter, initialCounter });
 
           // 检查计数器是否增加了（表示新游戏创建成功）
           if (currentCounter > initialCounter) {
@@ -707,18 +753,22 @@ class Game {
             this.gamePhase = 'waiting';
             this.gameStartTime = Date.now();
 
-            console.log(`🎮 NEW blockchain game created with ID: ${this.blockchainGameId} (previous: ${initialCounter})`);
-            console.log('⏳ Waiting for players to join...');
+            Logger.status('NEW blockchain game created', 'game');
+            Logger.game.info('Game created successfully', {
+              gameId: this.blockchainGameId,
+              previousCounter: initialCounter,
+              phase: this.gamePhase
+            });
 
             clearTimeout(timeout);
             this.isGameCreationInProgress = false;
             resolve();
           } else {
-            console.log(`⏳ Waiting for new game creation... counter still: ${currentCounter}`);
+            Logger.server.debug('Waiting for new game creation', { currentCounter });
             setTimeout(checkGameCreated, 2000);
           }
         } catch (error) {
-          console.error('❌ Error checking game creation:', error);
+          Logger.server.error('Error checking game creation', { error: error.message });
           clearTimeout(timeout);
           this.isGameCreationInProgress = false;
           reject(error);
@@ -790,7 +840,10 @@ class Game {
       this.finalScores.set(player.id, score);
     }
 
-    console.log(`📊 Collected scores for ${this.finalScores.size} players`);
+    Logger.game.info('Collected player scores', { 
+      gameId: this.blockchainGameId,
+      scoreCount: this.finalScores.size 
+    });
     return this.finalScores;
   }
 
@@ -816,7 +869,10 @@ class Game {
     }
 
     if (this.gamePhase === 'ending' || this.gamePhase === 'ended') {
-      console.log('⚠️ Game already ending or ended');
+      Logger.game.warn('Game already ending or ended', { 
+        gameId: this.blockchainGameId,
+        currentPhase: this.gamePhase 
+      });
       return;
     }
 
@@ -827,7 +883,13 @@ class Game {
       this.gamePhase = 'ending';
       this.gameEndTime = Date.now();
 
-      console.log(`🏁 Ending blockchain game (reason: ${reason})`);
+      Logger.status('Ending blockchain game', 'game');
+      Logger.game.info('Game end initiated', {
+        gameId: this.blockchainGameId,
+        reason,
+        playerCount: this.players.size,
+        duration: this.gameEndTime - this.gameStartTime
+      });
 
       // 收集所有玩家分数
       const scores = this.collectPlayerScores();
@@ -837,13 +899,18 @@ class Game {
       try {
         await this.submitPlayerScores(scores);
       } catch (scoreError) {
-        console.error('❌ Failed to submit player scores, but continuing with game end:', scoreError);
+        Logger.game.error('Failed to submit player scores, but continuing with game end', { 
+          error: scoreError.message 
+        });
         // 继续执行游戏结束流程，不让分数提交失败阻止游戏结束
       }
 
       // 调用合约结束游戏
       const txHash = await this.blockchainService.endGame(this.blockchainGameId);
-      console.log(`✅ Game end transaction sent: ${txHash}`);
+      Logger.server.info('Game end transaction sent', { 
+        gameId: this.blockchainGameId,
+        txHash 
+      });
 
       this.gamePhase = 'ended';
 
@@ -856,7 +923,11 @@ class Game {
       }, 10000); // 10秒后创建新游戏
 
     } catch (error) {
-      console.error('❌ Failed to end blockchain game:', error);
+      Logger.game.error('Failed to end blockchain game', { 
+        gameId: this.blockchainGameId,
+        error: error.message,
+        stack: error.stack
+      });
       // 即使出错也要尝试设置状态，避免游戏卡在ending状态
       this.gamePhase = 'error';
     }
@@ -913,6 +984,7 @@ class Game {
         console.log(`📊 Submitting score to blockchain...`);
         const txHash = await this.blockchainService.submitScore(
           this.blockchainGameId,
+          scoreData.walletAddress,
           scoreData.kills,
           scoreData.finalScore,
           nonce,
@@ -1208,7 +1280,7 @@ class Game {
    * 清理当前游戏状态
    */
   cleanupCurrentGame() {
-    console.log('🧹 Cleaning up current game...');
+    Logger.game.info('Cleaning up current game', { gameId: this.blockchainGameId });
 
     // 清理区块链相关状态
     this.blockchainGameId = null;
@@ -1232,7 +1304,9 @@ class Game {
       this.removeEntity(player);
     }
 
-    console.log(`🧹 Game cleanup completed. Removed ${playersToRemove.length} players.`);
+    Logger.game.info('Game cleanup completed', { 
+      removedPlayers: playersToRemove.length 
+    });
   }
 }
 

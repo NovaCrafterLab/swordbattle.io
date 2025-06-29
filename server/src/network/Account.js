@@ -1,3 +1,5 @@
+const Logger = require('../utils/Logger');
+
 class Account {
   constructor(data) {
     this.id = null;
@@ -12,7 +14,10 @@ class Account {
       try {
         this.skins = JSON.parse(this.skins);
       } catch (e) {
-        console.error('Error parsing skins', e);
+        Logger.server.error('Error parsing account skins', { 
+          accountId: this.id,
+          error: e.message 
+        });
       }
     }
   }

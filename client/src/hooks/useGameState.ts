@@ -43,7 +43,7 @@ export interface ServerInfo {
 export const useGameState = (serverUrl?: string) => {
   const { address } = useAccount();
   const blockchain = useBlockchain();
-  
+
   const [gameState, setGameState] = useState<GameState>({
     gameId: null,
     phase: 'initializing',
@@ -63,7 +63,7 @@ export const useGameState = (serverUrl?: string) => {
 
   // 获取当前游戏ID - 优先使用服务器返回的gameId
   const { data: gameCounter } = blockchain.useGameCounter();
-  
+
   // 添加gameCounter调试信息
   logger.debug('🎯 GameCounter debug:', {
     gameCounter,
@@ -75,7 +75,7 @@ export const useGameState = (serverUrl?: string) => {
     condition: (gameCounter !== null && gameCounter !== undefined),
     serverGameId: serverInfo?.gameStatus?.gameId,
   });
-  
+
   // 获取入场费
   const { data: entryFee } = blockchain.useEntryFee();
 
@@ -85,14 +85,14 @@ export const useGameState = (serverUrl?: string) => {
     if (serverInfo?.gameStatus?.gameId !== null && serverInfo?.gameStatus?.gameId !== undefined) {
       return serverInfo.gameStatus.gameId;
     }
-    
+
     // 如果服务器没有返回gameId，使用区块链的gameCounter
     if (gameCounter === null || gameCounter === undefined) return null;
     if (typeof gameCounter === 'number') return gameCounter;
     if (typeof gameCounter === 'bigint') return Number(gameCounter);
     return null;
   })();
-  
+
   logger.debug('🎮 CurrentGameId calculation:', {
     gameCounter,
     serverGameId: serverInfo?.gameStatus?.gameId,
@@ -100,14 +100,14 @@ export const useGameState = (serverUrl?: string) => {
     gameCounterType: typeof gameCounter,
     source: serverInfo?.gameStatus?.gameId !== null && serverInfo?.gameStatus?.gameId !== undefined ? 'server' : 'blockchain',
   });
-  
+
   const { data: gameInfo, refetch: refetchGameInfo } = blockchain.useGameInfo(currentGameId || 0);
-  
+
   // 获取游戏玩家列表
   const { data: gamePlayers, refetch: refetchPlayers } = blockchain.useGamePlayers(currentGameId || 0);
 
   // 检查玩家是否已加入
-  const isPlayerJoined = address && gamePlayers && Array.isArray(gamePlayers) ? 
+  const isPlayerJoined = address && gamePlayers && Array.isArray(gamePlayers) ?
     gamePlayers.includes(address.toLowerCase() as `0x${string}`) : false;
 
   /**
@@ -198,7 +198,7 @@ export const useGameState = (serverUrl?: string) => {
    */
   const refreshGameData = useCallback(async () => {
     logger.info('🔄 Refreshing game data...');
-    
+
     // 强制刷新区块链数据
     const refreshPromises = [
       refetchGameInfo(),
@@ -207,7 +207,7 @@ export const useGameState = (serverUrl?: string) => {
     ].filter(Boolean);
 
     await Promise.all(refreshPromises);
-    
+
     logger.info('✅ Game data refreshed');
   }, [refetchGameInfo, refetchPlayers, fetchServerInfo]);
 
@@ -262,7 +262,7 @@ export const useGameState = (serverUrl?: string) => {
 
     // 立即获取一次数据
     fetchServerInfo();
-    
+
     // 然后定期刷新
     const interval = setInterval(() => {
       fetchServerInfo();
@@ -293,7 +293,7 @@ export const useGameState = (serverUrl?: string) => {
     refreshGameData,
     getGameStatusText,
     getGameStatusColor,
-    
+
     // 便捷访问
     gameId: gameState.gameId,
     phase: gameState.phase,
