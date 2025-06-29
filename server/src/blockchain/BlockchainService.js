@@ -1,6 +1,7 @@
 const { createPublicClient, createWalletClient, http } = require('viem');
 const { bsc, bscTestnet } = require('viem/chains');
 const { privateKeyToAccount } = require('viem/accounts');
+const Logger = require('../utils/Logger');
 
 // 导入模块化配置
 const { CURRENT_RPC_POOL, NETWORK_CONFIG, ENVIRONMENT, isDev } = require('./networkConfig');
@@ -22,22 +23,29 @@ class BlockchainService {
     // 初始化RPC管理器
     this.rpcManager = new RPCManager(CURRENT_RPC_POOL);
     
-    console.log(`Blockchain environment: ${ENVIRONMENT.ENV} (${ENVIRONMENT.networkName})`);
-    console.log(`Chain ID: ${ENVIRONMENT.chainId}`);
+    Logger.server.info('Blockchain environment initialized', {
+      environment: ENVIRONMENT.ENV,
+      networkName: ENVIRONMENT.networkName,
+      chainId: ENVIRONMENT.chainId
+    });
   }
 
   async initialize() {
     try {
-      console.log('Initializing blockchain service...');
-      console.log(`Network: ${this.networkConfig.name}`);
+      Logger.server.info('Initializing blockchain service', {
+        networkName: this.networkConfig.name
+      });
 
       // 确定使用的链
       const chain = isDev ? bscTestnet : bsc;
-      console.log(`Using chain: ${chain.name} (ID: ${chain.id})`);
+      Logger.server.debug('Using blockchain chain', {
+        chainName: chain.name,
+        chainId: chain.id
+      });
 
       // 获取当前RPC URL
       let rpcUrl = this.config.rpcUrl || this.rpcManager.getCurrentRPC();
-      console.log(`Primary RPC: ${rpcUrl}`);
+      Logger.server.debug('Primary RPC selected', { rpcUrl });
 
       // 创建公共客户端用于读取
       this.publicClient = createPublicClient({
@@ -53,29 +61,38 @@ class BlockchainService {
           chain,
           transport: http(rpcUrl),
         });
-        console.log(`Wallet account: ${this.account.address}`);
+        Logger.server.debug('Wallet account initialized', { 
+          address: this.account.address 
+        });
       }
 
       // 测试连接
       const blockNumber = await this.publicClient.getBlockNumber();
-      console.log(`Connected to blockchain, current block: ${blockNumber}`);
+      Logger.server.info('Connected to blockchain', { 
+        currentBlock: Number(blockNumber) 
+      });
 
       // 使用从文件加载的ABI
       this.swordBattleAbi = SWORD_BATTLE_ABI;
       this.usd1TokenAbi = ERC20_ABI;
 
-      console.log(`Loaded SwordBattle ABI: ${this.swordBattleAbi.length} functions`);
-      console.log(`Loaded ERC20 ABI: ${this.usd1TokenAbi.length} functions`);
+      Logger.server.debug('Loaded contract ABIs', {
+        swordBattleFunctions: this.swordBattleAbi.length,
+        erc20Functions: this.usd1TokenAbi.length
+      });
 
       // 启动RPC健康检查
       await this.rpcManager.healthCheck();
       
       this.isInitialized = true;
-      console.log('Blockchain service initialized successfully');
-      console.log(`RPC Manager stats:`, this.rpcManager.getStats());
+      Logger.status('Blockchain service initialized successfully');
+      Logger.server.debug('RPC Manager stats', this.rpcManager.getStats());
 
     } catch (error) {
-      console.error('Failed to initialize blockchain service:', error);
+      Logger.server.error('Failed to initialize blockchain service', { 
+        error: error.message, 
+        stack: error.stack 
+      });
       throw error;
     }
   }
@@ -88,12 +105,14 @@ class BlockchainService {
       await this.publicClient.getBlockNumber();
       return true;
     } catch (error) {
-      console.error('Blockchain connection check failed:', error);
+      Logger.server.error('Blockchain connection check failed', { 
+        error: error.message 
+      });
       
       // 尝试切换RPC节点
       if (this.rpcManager) {
         const newRpc = this.rpcManager.markCurrentRPCFailed();
-        console.log(`Switching to RPC: ${newRpc}`);
+        Logger.server.info('Switching to backup RPC', { newRpc });
         
         // 重新创建客户端
         try {
@@ -112,10 +131,12 @@ class BlockchainService {
           }
           
           await this.publicClient.getBlockNumber();
-          console.log('Successfully switched to backup RPC');
+          Logger.server.info('Successfully switched to backup RPC');
           return true;
         } catch (switchError) {
-          console.error('Failed to switch RPC:', switchError);
+          Logger.server.error('Failed to switch RPC', { 
+            error: switchError.message 
+          });
         }
       }
       
@@ -152,7 +173,10 @@ class BlockchainService {
         args,
       });
     } catch (error) {
-      console.error(`Failed to read contract ${functionName}:`, error);
+      Logger.server.error('Failed to read contract', { 
+        functionName, 
+        error: error.message 
+      });
       
       // 尝试重新连接
       const isConnected = await this.isConnected();
@@ -187,7 +211,10 @@ class BlockchainService {
 
       return await this.walletClient.writeContract(request);
     } catch (error) {
-      console.error(`Failed to write contract ${functionName}:`, error);
+      Logger.server.error('Failed to write contract', { 
+        functionName, 
+        error: error.message 
+      });
       
       // 尝试重新连接
       const isConnected = await this.isConnected();
@@ -294,7 +321,10 @@ class BlockchainService {
           });
         }
         
-        console.log(`Switched to fastest RPC: ${result.rpc} (${result.latency}ms)`);
+        Logger.server.info('Switched to fastest RPC', { 
+          rpc: result.rpc, 
+          latency: result.latency 
+        });
         return result;
       }
     }
@@ -369,18 +399,18 @@ class BlockchainService {
     }
 
     try {
-      console.log(`📝 Creating new game on blockchain with level ${level}...`);
-      console.log('🔍 Checking current game counter before creation...');
+      Logger.server.info('Creating new game on blockchain', { level });
+      Logger.server.debug('Checking current game counter before creation');
       
       // 记录创建前的游戏计数器
       const initialCounter = await this.getGameCounter();
-      console.log(`📊 Current game counter before creation: ${initialCounter}`);
+      Logger.server.debug('Current game counter before creation', { counter: initialCounter });
       
       const contract = this.getSwordBattleContract();
       const txHash = await this.writeContract(contract, 'createGame', [level]);
       
-      console.log(`✅ Game creation transaction sent: ${txHash} (Level: ${level})`);
-      console.log('⏳ Transaction submitted to blockchain, waiting for confirmation...');
+      Logger.server.info('Game creation transaction sent', { txHash });
+      Logger.server.debug('Transaction submitted to blockchain, waiting for confirmation');
       
       return {
         txHash,
@@ -389,15 +419,15 @@ class BlockchainService {
         level
       };
     } catch (error) {
-      console.error('❌ Failed to create game:', error);
+      Logger.server.error('Failed to create game', { error: error.message });
       
       // 提供更详细的错误信息
       if (error.message.includes('insufficient funds')) {
-        console.error('💰 Error: Insufficient funds in wallet for transaction');
+        Logger.server.error('Insufficient funds in wallet for transaction');
       } else if (error.message.includes('nonce')) {
-        console.error('🔢 Error: Nonce issue - possible concurrent transactions');
+        Logger.server.error('Nonce issue - possible concurrent transactions');
       } else if (error.message.includes('gas')) {
-        console.error('⛽ Error: Gas estimation failed or insufficient gas');
+        Logger.server.error('Gas estimation failed or insufficient gas');
       }
       
       throw error;
@@ -413,15 +443,15 @@ class BlockchainService {
     }
 
     try {
-      console.log(`🏁 Ending game ${gameId} on blockchain...`);
+      Logger.server.info('Ending game on blockchain', { gameId });
       
       const contract = this.getSwordBattleContract();
       const txHash = await this.writeContract(contract, 'endGame', [BigInt(gameId)]);
       
-      console.log(`✅ Game end transaction sent: ${txHash}`);
+      Logger.server.info('Game end transaction sent', { txHash });
       return txHash;
     } catch (error) {
-      console.error(`Failed to end game ${gameId}:`, error);
+      Logger.server.error('Failed to end game', { gameId, error: error.message });
       throw error;
     }
   }
@@ -429,27 +459,28 @@ class BlockchainService {
   /**
    * 提交分数
    */
-  async submitScore(gameId, kills, score, nonce, signature) {
+  async submitScore(gameId, playerAddress, kills, score, nonce, signature) {
     if (!this.isInitialized || !this.walletClient) {
       throw new Error('Blockchain service not initialized or no wallet available');
     }
 
     try {
-      console.log(`📊 Submitting score ${score} with ${kills} kills for game ${gameId}...`);
+      Logger.server.info('Submitting score', { score, kills, gameId, playerAddress });
       
       const contract = this.getSwordBattleContract();
       const txHash = await this.writeContract(contract, 'submitScore', [
         BigInt(gameId),
+        playerAddress,
         BigInt(kills),
         BigInt(score),
         BigInt(nonce),
         signature
       ]);
       
-      console.log(`✅ Score submission transaction sent: ${txHash}`);
+      Logger.server.info('Score submission transaction sent', { txHash });
       return txHash;
     } catch (error) {
-      console.error(`Failed to submit score for game ${gameId}:`, error);
+      Logger.server.error('Failed to submit score', { gameId, playerAddress, error: error.message });
       throw error;
     }
   }
@@ -463,15 +494,15 @@ class BlockchainService {
     }
 
     try {
-      console.log(`⏰ Auto-ending game ${gameId} on blockchain...`);
+      Logger.server.info('Auto-ending game on blockchain', { gameId });
       
       const contract = this.getSwordBattleContract();
       const txHash = await this.writeContract(contract, 'autoEndGame', [BigInt(gameId)]);
       
-      console.log(`✅ Auto-end game transaction sent: ${txHash}`);
+      Logger.server.info('Auto-end game transaction sent', { txHash });
       return txHash;
     } catch (error) {
-      console.error(`Failed to auto-end game ${gameId}:`, error);
+      Logger.server.error('Failed to auto-end game', { gameId, error: error.message });
       throw error;
     }
   }
@@ -484,14 +515,14 @@ class BlockchainService {
     
     for (const playerData of playersData) {
       try {
-        const { address, score, nonce, signature } = playerData;
-        const txHash = await this.submitScore(gameId, score, nonce, signature);
+        const { address, kills, score, nonce, signature } = playerData;
+        const txHash = await this.submitScore(gameId, address, kills, score, nonce, signature);
         results.push({ address, success: true, txHash });
         
         // 添加延迟避免nonce冲突
         await new Promise(resolve => setTimeout(resolve, 1000));
       } catch (error) {
-        console.error(`Failed to submit score for ${playerData.address}:`, error);
+        Logger.server.error('Failed to submit score', { address: playerData.address, error: error.message });
         results.push({ address: playerData.address, success: false, error: error.message });
       }
     }

@@ -64,18 +64,6 @@ export const useGameState = (serverUrl?: string) => {
   // 获取当前游戏ID - 优先使用服务器返回的gameId
   const { data: gameCounter } = blockchain.useGameCounter();
   
-  // 添加gameCounter调试信息
-  console.log('🎯 GameCounter debug:', {
-    gameCounter,
-    gameCounterType: typeof gameCounter,
-    gameCounterValue: gameCounter,
-    isNumber: typeof gameCounter === 'number',
-    isBigInt: typeof gameCounter === 'bigint',
-    isGreaterEqualZero: (typeof gameCounter === 'number' && gameCounter >= 0) || (typeof gameCounter === 'bigint' && gameCounter >= 0n),
-    condition: (gameCounter !== null && gameCounter !== undefined),
-    serverGameId: serverInfo?.gameStatus?.gameId,
-  });
-  
   // 获取入场费
   const { data: entryFee } = blockchain.useEntryFee();
 
@@ -129,7 +117,6 @@ export const useGameState = (serverUrl?: string) => {
       setServerInfo(info);
       // 更新游戏状态
       if (info.gameStatus) {
-        console.log('🎮 Server returned gameStatus:', info.gameStatus);
         setGameState(prev => ({
           ...prev,
           gameId: info.gameStatus.gameId,

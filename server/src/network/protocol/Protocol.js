@@ -1,4 +1,5 @@
 const protobuf = require('protobufjs');
+const Logger = require('../../utils/Logger');
 
 const root = protobuf.loadSync(__dirname + '/schema.proto');
 const ServerMessage = root.lookupType('ServerMessage');
@@ -26,7 +27,7 @@ const decode = (msg) => {
   const payload = new Uint8Array(msg);
   const error = ClientMessage.verify(payload);
   if (error) {
-    console.log('[Protocol] Decoding error: ', error);
+    Logger.server.error('Protocol decoding error (verify)', { error });
     return null;
   }
   let decoded;
@@ -34,7 +35,7 @@ const decode = (msg) => {
     decoded = ClientMessage.decode(payload);
     decoded = makeSendable(decoded);
   } catch (e) {
-    console.log('[Protocol] Decoding error: ', e);
+    Logger.server.error('Protocol decoding error (decode)', { error: e.message });
     return null;
   }
   return decoded;

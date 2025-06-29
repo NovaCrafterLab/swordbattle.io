@@ -1,6 +1,3 @@
-// ERC20合约ABI
-// 标准ERC20代币合约接口
-
 export const ERC20_ABI = [
   {
     "inputs": [
