@@ -23358,7 +23358,7 @@ __metadata:
 
 "uWebSockets.js@github:uNetworking/uWebSockets.js#v20.44.0":
   version: 20.44.0
-  resolution: "uWebSockets.js@git+ssh://git@github.com/uNetworking/uWebSockets.js.git#commit=8fa05571bf6ea95be8966ad313d9d39453e381ae"
+  resolution: "uWebSockets.js@https://github.com/uNetworking/uWebSockets.js.git#commit=8fa05571bf6ea95be8966ad313d9d39453e381ae"
   checksum: 10c0/48c64a0da5c92caf7e982fc61f937b7a93db346b4c9006f1f01e62b8da410bb72abf03b108ea11d2089d01bf82a2ff385a88d7a5ccdc3cc3943b73bf189ffe16
   languageName: node
   linkType: hard
