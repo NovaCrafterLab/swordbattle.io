@@ -1123,18 +1123,19 @@ class Game {
         // 从区块链查询真实奖励数据
         const playerReward = await this.blockchainService.readContract(
           this.blockchainService.getSwordBattleContract(),
-          'playerRewards',
+          'getReward',
           [BigInt(this.blockchainGameId), gameData.playerAddress]
         );
 
-        const hasClaimed = await this.blockchainService.readContract(
+        const playerInfo = await this.blockchainService.readContract(
           this.blockchainService.getSwordBattleContract(),
-          'hasClaimed',
+          'getPlayerInfo',
           [BigInt(this.blockchainGameId), gameData.playerAddress]
         );
 
         const rewardEth = Number(playerReward) / 1e18; // 转换为以太币单位
         const isWinner = playerReward > BigInt(0);
+        const hasClaimed = playerInfo[5]; // claimed字段在getPlayerInfo返回数组的第6个位置（索引5）
 
         console.log(`💰 玩家 ${gameData.playerAddress} 区块链奖励: ${rewardEth} USD1 (已领取: ${hasClaimed})`);
 
