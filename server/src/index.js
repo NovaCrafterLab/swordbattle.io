@@ -72,31 +72,34 @@ async function bootstrap() {
   setupShutdownHandlers(game, server);
 
   /* == Periodic restart hook == */
-  initCycleRestart(async () => {
-    Logger.server.info('[CycleRestart] auto hot-restart');
+  if (config.enableCycleRestart) {
+    initCycleRestart(async () => {
+      Logger.server.info('[CycleRestart] auto hot-restart');
 
-    game.pendingMassKill = true;
+      game.pendingMassKill = true;
 
-    await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, 3000));
 
-    game.clearGameTimeout();
-    Object.assign(game, { gamePhase: 'initializing', blockchainGameId: null });
-    game.registeredPlayers.clear();
-    game.finalScores.clear();
-    game.playerScoreSubmitted.clear();
+      game.clearGameTimeout();
+      Object.assign(game, { gamePhase: 'initializing', blockchainGameId: null });
+      game.registeredPlayers.clear();
+      game.finalScores.clear();
+      game.playerScoreSubmitted.clear();
 
-    for (const client of server.clients.values()) {
-      client.player = null;
-      client.spectator.isSpectating = true;
-      client.fullSync = true;
-    }
+      for (const client of server.clients.values()) {
+        client.player = null;
+        client.spectator.isSpectating = true;
+        client.fullSync = true;
+      }
 
-    // for (const client of server.clients.values()) {
-    //   client.socket?.close();
-    // }
+      // for (const client of server.clients.values()) {
+      //   client.socket?.close();
+      // }
 
-    await game.initializeBlockchainGame();
-  });
+      await game.initializeBlockchainGame();
+    });
+  }
+
 }
 
 
@@ -210,7 +213,7 @@ function buildServerInfo(game) {
     }
   }
 
-  return {
+  const payload = {
     tps: game.tps,
     entityCnt: game.entities.size,
     playerCnt: game.players.size,
@@ -227,9 +230,14 @@ function buildServerInfo(game) {
     } : null,
 
     gameStatus,
-    cycleInfo: getCycleInfo(),
     timestamp: Date.now(),
-  };
+  }
+
+  if (config.enableCycleRestart) {
+    payload.cycleInfo = getCycleInfo();
+  }
+
+  return payload;
 }
 
 async function handleEndGameRequest(res, game) {

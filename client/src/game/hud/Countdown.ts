@@ -4,35 +4,44 @@
 import HudComponent from './HudComponent';
 import { getCurrentServer, getServer } from '@/ServerList';
 
-const VISIBLE_THRESHOLD = 600; // 10 min
+/* == constants & types == */
+const VISIBLE_THRESHOLD = 600; // seconds, 10 min
 
 interface CycleInfo {
   epochIso: string;  // ISO-8601 anchor
-  period  : number;  // seconds
-  tz      : string;
+  period: number;  // seconds
+  tz: string;
 }
 
+interface ServerInfoResp {
+  isRaceServer: boolean;
+  cycleInfo?: CycleInfo;
+}
+
+/* == Countdown HUD component== */
 class Countdown extends HudComponent {
   /* == state == */
-  private remain   = 600;           // seconds
-  private anchorMs = 0;             // UTC ms
-  private periodMs = 30 * 60 * 1000;
-  private text    !: Phaser.GameObjects.Text;
+  private remain = Infinity; // seconds left
+  private anchorMs = 0; // UTC ms anchor
+  private periodMs = 30 * 60 * 1000; // default 30 min
 
+  private text!: Phaser.GameObjects.Text;
   private timerEvt?: Phaser.Time.TimerEvent;
-  private started  = false;
+
+  private localVisible = false; // α tween state
+  private raceServer = false; // from /serverinfo
 
   /* == init == */
-  async initialize() {
+  override async initialize() {
+    /* build UI container */
     const cam = this.game.cameras.main;
-
     this.container = this.game.add.container(cam.centerX, cam.height * 0.15);
     this.text = this.game.add
       .text(0, 0, '--:--', {
         fontFamily: 'Arial',
-        fontSize  : '64px',
-        color     : '#ffffff',
-        stroke    : '#000000',
+        fontSize: '64px',
+        color: '#ffffff',
+        stroke: '#000000',
         strokeThickness: 6,
       })
       .setOrigin(0.5);
@@ -42,68 +51,67 @@ class Countdown extends HudComponent {
     this.hud.add(this.container);
 
     await this.syncServerTime();
-    this.refreshVisibility();
+
+    if (!this.raceServer) {
+      super.setShow(false, true);
+      return;
+    }
+
+    this.updateRemain();
+    this.updateText();
+    this.updateLocalVisibility();
   }
 
-  /* == public == */
-  override setShow(show: boolean, force = true) {
-    super.setShow(show, force);
-
-    if (show && !this.started) this.startTimer();
-    else if (!show && this.started) this.stopTimer();
-  }
-
-  resize() {
+  /* == lifecycle hooks == */
+  override resize() {
     const cam = this.game.cameras.main;
     this.container.setPosition(cam.centerX, cam.height * 0.15);
   }
 
-  update() {/* noop */ }
+  override setShow(show: boolean, force = true) {
+    if (this.raceServer) return;
+    super.setShow(show, force);
+    if (show) this.startTimer();
+    else this.stopTimer();
+  }
 
-  /* == sync == */
+  /* == server sync == */
   private async syncServerTime() {
     try {
-      let srv = getCurrentServer();
-      if (!srv) srv = await getServer();
+      let srv = getCurrentServer() ?? (await getServer());
       if (!srv) throw new Error('No server selected');
 
       const url = `${globalThis.location.protocol}//${srv.address}/serverinfo?${Date.now()}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(res.statusText);
 
-      const js   = await res.json();
-      const info: CycleInfo | undefined = js.cycleInfo;
-      if (!info) { this.remain = Number.MAX_SAFE_INTEGER; return; }
+      const js: ServerInfoResp = await res.json();
+      // this.raceServer = js.isRaceServer;
 
-      this.anchorMs = Date.parse(info.epochIso);
-      this.periodMs = info.period * 1000;
+      if (!js.cycleInfo) return;
 
-      this.updateRemain();
-      this.text.setText(this.formatTime(this.remain));
+      this.raceServer = true;
+      this.anchorMs = Date.parse(js.cycleInfo.epochIso);
+      this.periodMs = js.cycleInfo.period * 1000;
     } catch (e) {
       console.error('Countdown sync failed', e);
-      this.remain = Number.MAX_SAFE_INTEGER;
     }
   }
 
-  /* == timer == */
+  /* == timer control == */
   private startTimer() {
-    this.stopTimer();
-    this.started = true;
-
+    if (this.timerEvt) return; // already running
     this.timerEvt = this.game.time.addEvent({
       delay: 1000,
-      loop : true,
+      loop: true,
       callback: () => {
         this.updateRemain();
-        this.text.setText(this.formatTime(this.remain));
+        this.updateText();
+        this.updateLocalVisibility();
 
         if (this.remain === 0) {
           this.hud.scene.events.emit('countdownEnd');
-
-          this.anchorMs += this.periodMs;
-          this.updateRemain();
-          this.refreshVisibility();
+          this.anchorMs += this.periodMs; // roll forward
         }
       },
     });
@@ -112,27 +120,42 @@ class Countdown extends HudComponent {
   private stopTimer() {
     this.timerEvt?.remove(false);
     this.timerEvt = undefined;
-    this.started  = false;
   }
 
-  /* == util == */
+  /* == helpers == */
   private updateRemain() {
-    const now    = Date.now();
-    const diff   = (now - this.anchorMs) % this.periodMs;
-    const leftMs = this.periodMs - diff;
-    this.remain  = Math.floor(leftMs / 1000);
+    if (!this.raceServer) {
+      this.remain = Infinity;
+      return;
+    }
+    const now = Date.now();
+    const diff = (now - this.anchorMs) % this.periodMs;
+    const left = this.periodMs - diff;
+    this.remain = Math.floor(left / 1000);
   }
 
-  private refreshVisibility() {
-    const shouldShow = this.remain <= VISIBLE_THRESHOLD;
-    this.setShow(!shouldShow, /* force = */ false);
+  private updateText() {
+    const mm = String(Math.floor(this.remain / 60)).padStart(2, '0');
+    const ss = String(this.remain % 60).padStart(2, '0');
+    this.text.setText(`${mm}:${ss}`);
   }
 
-  private formatTime(sec: number) {
-    const s  = Math.max(0, sec);
-    const mm = Math.floor(s / 60).toString().padStart(2, '0');
-    const ss = (s % 60).toString().padStart(2, '0');
-    return `${mm}:${ss}`;
+  private updateLocalVisibility() {
+    const wantVisible = this.remain <= VISIBLE_THRESHOLD;
+
+    if (wantVisible === this.localVisible) return;
+    this.localVisible = wantVisible;
+
+    /* tween α */
+    this.game.add.tween({
+      targets: this.container,
+      alpha: wantVisible ? 1 : 0,
+      duration: 300,
+      onComplete: () => {
+        if (wantVisible) this.startTimer();
+        else this.stopTimer();
+      },
+    });
   }
 }
 

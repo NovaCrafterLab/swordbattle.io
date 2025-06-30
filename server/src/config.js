@@ -72,16 +72,17 @@ module.exports = {
   // Server type configuration
   serverType: process.env.SERVER_TYPE || 'NORMAL',
   isRaceServer: process.env.SERVER_TYPE === 'RACE',
+  enableCycleRestart:process.env.ENABLE_CYCLE_RESTART === 'true' || process.env.SERVER_TYPE === 'RACE',
 
   // Blockchain configuration
   blockchain: {
     enabled: process.env.BLOCKCHAIN_ENABLED === 'true',
     rpcUrl: process.env.BLOCKCHAIN_RPC_URL, // 可选，会使用内置RPC池
     contracts: {
-      swordBattle: isDev 
+      swordBattle: isDev
         ? (process.env.SWORD_BATTLE_CONTRACT_TESTNET || process.env.SWORD_BATTLE_CONTRACT)
         : (process.env.SWORD_BATTLE_CONTRACT_MAINNET || process.env.SWORD_BATTLE_CONTRACT),
-      usd1Token: isDev 
+      usd1Token: isDev
         ? (process.env.USD1_TOKEN_CONTRACT_TESTNET || process.env.USD1_TOKEN_CONTRACT)
         : (process.env.USD1_TOKEN_CONTRACT_MAINNET || process.env.USD1_TOKEN_CONTRACT),
     },
