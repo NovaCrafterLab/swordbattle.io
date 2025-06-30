@@ -48,7 +48,7 @@ class GameState {
   recentDeadPlayers: Record<number, { name: string; time: number }> = {};
 
   constructor(game: Game) {
-    
+
     this.game = game;
     this.gameMap = new GameMap(this.game);
     this.spectator = new Spectator(this.game);
@@ -114,14 +114,14 @@ class GameState {
       walletAddressExists: !!walletAddress,
       walletAddressLength: walletAddress?.length,
     });
-    
+
     const afterSent = () => {
       if (!this.game.hud.buffsSelect.minimized)
         this.game.hud.buffsSelect.toggleMinimize();
     };
-    
+
     const gameData: any = { play: true, name };
-    
+
     // 如果提供了钱包地址，包含在请求中（用于区块链比赛服务器）
     if (walletAddress) {
       gameData.walletAddress = walletAddress;
@@ -129,7 +129,7 @@ class GameState {
     } else {
       logger.warn('⚠️ No walletAddress provided, sending without it:', gameData);
     }
-    
+
     Socket.emit(gameData);
     afterSent();
   }

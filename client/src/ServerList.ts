@@ -25,6 +25,8 @@ const servers: Server[] = [
   // { value: 'usbackup', name: 'USA Unblocked', address: config.serverUSBackup, ping: 0 },
 ];
 
+let currentServer: Server | null = null;
+
 if (config.isDev) {
   servers.unshift({
     value: 'dev',
@@ -134,7 +136,15 @@ export async function getServer(): Promise<Server> {
     window.location.reload();
   }
 
+  currentServer = chosen;
   return chosen;
+}
+
+/* === get current server without ping === */
+export function getCurrentServer(): Server | null {
+  /*  If getServer() has not been called yet, value is null.
+      Caller may choose to fallback to await getServer() instead. */
+  return currentServer;
 }
 
 /* ──────────────────────────────────────────────────────────── *

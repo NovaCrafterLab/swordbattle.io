@@ -8,9 +8,15 @@ import Chat from './Chat';
 import MobileControls from './MobileControls';
 import CoinCounter from './CoinCounter';
 
+// add
+import Countdown from './Countdown';
+
 class HUD {
   game: Game;
   scene!: Phaser.Scene;
+
+  countdown: Countdown;
+
   minimap: Minimap;
   stats: Stats;
   progressBar: ProgressBar;
@@ -33,6 +39,8 @@ class HUD {
     this.chat = new Chat(this);
     this.mobileControls = new MobileControls(this);
     this.coinCounter = new CoinCounter(this);
+    this.countdown = new Countdown(this);
+
     this.components = [
       this.minimap,
       this.stats,
@@ -42,6 +50,7 @@ class HUD {
       this.chat,
       this.mobileControls,
       this.coinCounter,
+      this.countdown,
     ];
   }
 

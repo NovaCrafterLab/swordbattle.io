@@ -48,6 +48,7 @@ class Game {
 
     // 游戏最大持续时间 (30分钟)
     this.maxGameDuration = 30 * 60 * 1000;
+    this.pendingMassKill = false;
   }
 
   initialize() {
@@ -58,6 +59,15 @@ class Game {
   }
 
   tick(dt) {
+    if (this.pendingMassKill) {
+      for (const player of this.players) {
+        if (!player.removed && !player.isBot) {
+          player.remove('Race Finished', Types.DisconnectReason.Server);
+        }
+      }
+      this.pendingMassKill = false;
+    }
+
     prof('entities.update', () => {
       for (const entity of this.entities.values()) {
         if (entity.type === Types.Entity.Sword) continue;
@@ -502,8 +512,8 @@ class Game {
     const registeredCount = this.registeredPlayers.size;
     const activeCount = this.players.size;
 
-    Logger.game.info('Checking game start conditions', { 
-      activeCount, 
+    Logger.game.info('Checking game start conditions', {
+      activeCount,
       registeredCount,
       gamePhase: this.gamePhase,
       gameId: this.blockchainGameId
@@ -540,9 +550,9 @@ class Game {
       this.endBlockchainGame('timeout');
     }, this.maxGameDuration);
 
-    Logger.game.info('Game timeout set', { 
+    Logger.game.info('Game timeout set', {
       gameId: this.blockchainGameId,
-      timeoutMinutes: this.maxGameDuration / 1000 / 60 
+      timeoutMinutes: this.maxGameDuration / 1000 / 60
     });
   }
 
@@ -577,9 +587,9 @@ class Game {
           player.client.socket.send(JSON.stringify(message));
           successCount++;
         } catch (error) {
-          Logger.game.error('Error sending game start message to player', { 
+          Logger.game.error('Error sending game start message to player', {
             playerId: player.id,
-            error: error.message 
+            error: error.message
           });
           errorCount++;
         }
@@ -678,19 +688,19 @@ class Game {
     try {
       this.isGameCreationInProgress = true;
       this.gamePhase = 'initializing';
-      
+
       // 从配置中获取游戏级别
       const gameLevel = config.blockchain.gameLevel || 0;
-      Logger.server.info('Creating blockchain game', { 
-        attempt: currentAttempt, 
+      Logger.server.info('Creating blockchain game', {
+        attempt: currentAttempt,
         maxRetries,
-        gameLevel 
+        gameLevel
       });
-      
+
       // 在创建游戏前记录初始计数器
       const initialCounter = await this.blockchainService.getGameCounter();
       Logger.server.debug('Current game counter before creation', { initialCounter });
-      
+
       // 调用合约创建游戏，传入级别参数
       const createResult = await this.blockchainService.createGame(gameLevel);
       Logger.server.info('Game creation transaction sent', {
@@ -699,7 +709,7 @@ class Game {
         level: createResult.level,
         timestamp: new Date(createResult.timestamp).toISOString()
       });
-      
+
       // 监听GameCreated事件获取gameId，传递初始计数器
       await this.waitForGameCreated(initialCounter);
 
@@ -840,9 +850,9 @@ class Game {
       this.finalScores.set(player.id, score);
     }
 
-    Logger.game.info('Collected player scores', { 
+    Logger.game.info('Collected player scores', {
       gameId: this.blockchainGameId,
-      scoreCount: this.finalScores.size 
+      scoreCount: this.finalScores.size
     });
     return this.finalScores;
   }
@@ -869,9 +879,9 @@ class Game {
     }
 
     if (this.gamePhase === 'ending' || this.gamePhase === 'ended') {
-      Logger.game.warn('Game already ending or ended', { 
+      Logger.game.warn('Game already ending or ended', {
         gameId: this.blockchainGameId,
-        currentPhase: this.gamePhase 
+        currentPhase: this.gamePhase
       });
       return;
     }
@@ -899,17 +909,17 @@ class Game {
       try {
         await this.submitPlayerScores(scores);
       } catch (scoreError) {
-        Logger.game.error('Failed to submit player scores, but continuing with game end', { 
-          error: scoreError.message 
+        Logger.game.error('Failed to submit player scores, but continuing with game end', {
+          error: scoreError.message
         });
         // 继续执行游戏结束流程，不让分数提交失败阻止游戏结束
       }
 
       // 调用合约结束游戏
       const txHash = await this.blockchainService.endGame(this.blockchainGameId);
-      Logger.server.info('Game end transaction sent', { 
+      Logger.server.info('Game end transaction sent', {
         gameId: this.blockchainGameId,
-        txHash 
+        txHash
       });
 
       this.gamePhase = 'ended';
@@ -923,7 +933,7 @@ class Game {
       }, 10000); // 10秒后创建新游戏
 
     } catch (error) {
-      Logger.game.error('Failed to end blockchain game', { 
+      Logger.game.error('Failed to end blockchain game', {
         gameId: this.blockchainGameId,
         error: error.message,
         stack: error.stack
@@ -948,10 +958,10 @@ class Game {
     let playersWithWallet = 0;
     let successfulSubmissions = 0;
     let failedSubmissions = 0;
-    
+
     // 收集成功的分数数据用于批量保存到数据库
     const gameDataForDatabase = [];
-    
+
     for (const [playerId, scoreData] of scores) {
       totalPlayers++;
 
@@ -994,7 +1004,7 @@ class Game {
         console.log(`✅ Score submitted for ${scoreData.playerName}: ${scoreData.finalScore} kills: ${scoreData.kills} (tx: ${txHash})`);
         this.playerScoreSubmitted.add(playerId);
         successfulSubmissions++;
-        
+
         // 准备数据库保存数据（暂时假设奖励为0，排名为0，后续可以改进）
         gameDataForDatabase.push({
           gameId: Number(this.blockchainGameId),
@@ -1008,7 +1018,7 @@ class Game {
           gameEnded: true,
           gameEndedAt: new Date(),
         });
-        
+
       } catch (error) {
         console.error(`❌ Failed to submit score for ${scoreData.playerName}:`, error);
         console.error(`❌ Error details: ${error.message}`);
@@ -1021,17 +1031,17 @@ class Game {
     console.log(`   Players with wallet: ${playersWithWallet}`);
     console.log(`   Successful submissions: ${successfulSubmissions}`);
     console.log(`   Failed submissions: ${failedSubmissions}`);
-    
+
     // 保存成功的游戏数据到数据库
     if (gameDataForDatabase.length > 0) {
       try {
         console.log(`💾 Saving ${gameDataForDatabase.length} game records to database...`);
         await this.saveGameDataToDatabase(gameDataForDatabase);
         console.log(`✅ Game data saved to database successfully`);
-        
+
         // 🎯 新增：启动异步延迟更新任务
         this.scheduleBlockchainRewardUpdate(gameDataForDatabase);
-        
+
       } catch (dbError) {
         console.error(`❌ Failed to save game data to database:`, dbError);
         // 不抛出错误，让游戏继续结束
@@ -1060,7 +1070,7 @@ class Game {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.error || 'Failed to save game data');
       }
@@ -1079,7 +1089,7 @@ class Game {
    */
   scheduleBlockchainRewardUpdate(gameDataArray) {
     console.log(`⏰ 安排30秒后的区块链奖励更新任务...`);
-    
+
     // 30秒后执行异步更新
     setTimeout(async () => {
       try {
@@ -1103,32 +1113,32 @@ class Game {
     }
 
     console.log(`🔗 开始查询游戏 ${this.blockchainGameId} 的区块链奖励数据...`);
-    
+
     const updatedGameData = [];
-    
+
     for (const gameData of gameDataArray) {
       try {
         console.log(`🔍 查询玩家 ${gameData.playerAddress} 的奖励...`);
-        
+
         // 从区块链查询真实奖励数据
         const playerReward = await this.blockchainService.readContract(
           this.blockchainService.getSwordBattleContract(),
-          'getReward', 
+          'getReward',
           [BigInt(this.blockchainGameId), gameData.playerAddress]
         );
-        
+
         const playerInfo = await this.blockchainService.readContract(
           this.blockchainService.getSwordBattleContract(),
-          'getPlayerInfo', 
+          'getPlayerInfo',
           [BigInt(this.blockchainGameId), gameData.playerAddress]
         );
-        
+
         const rewardEth = Number(playerReward) / 1e18; // 转换为以太币单位
         const isWinner = playerReward > BigInt(0);
         const hasClaimed = playerInfo[5]; // claimed字段在getPlayerInfo返回数组的第6个位置（索引5）
-        
+
         console.log(`💰 玩家 ${gameData.playerAddress} 区块链奖励: ${rewardEth} USD1 (已领取: ${hasClaimed})`);
-        
+
         // 更新奖励数据
         const updatedData = {
           ...gameData,
@@ -1136,16 +1146,16 @@ class Game {
           hasClaimed: Boolean(hasClaimed),
           isWinner: isWinner,
         };
-        
+
         updatedGameData.push(updatedData);
-        
+
       } catch (error) {
         console.error(`❌ 查询玩家 ${gameData.playerAddress} 奖励失败:`, error);
         // 如果查询失败，保留原始数据
         updatedGameData.push(gameData);
       }
     }
-    
+
     // 批量更新数据库中的奖励信息
     if (updatedGameData.length > 0) {
       try {
@@ -1179,7 +1189,7 @@ class Game {
       }
 
       const result = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.error || 'Failed to update reward data');
       }
@@ -1305,8 +1315,8 @@ class Game {
       this.removeEntity(player);
     }
 
-    Logger.game.info('Game cleanup completed', { 
-      removedPlayers: playersToRemove.length 
+    Logger.game.info('Game cleanup completed', {
+      removedPlayers: playersToRemove.length
     });
   }
 }

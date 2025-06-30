@@ -4720,6 +4720,7 @@ __metadata:
     clinic: "npm:^13.0.0"
     dotenv: "npm:^16.4.5"
     leo-profanity: "npm:^1.7.0"
+    luxon: "npm:^3.6.1"
     nodemon: "npm:^3.1.10"
     poly-decomp: "npm:^0.3.0"
     protobufjs: "npm:^7.2.5"
@@ -16126,6 +16127,13 @@ __metadata:
   version: 7.18.3
   resolution: "lru-cache@npm:7.18.3"
   checksum: 10c0/b3a452b491433db885beed95041eb104c157ef7794b9c9b4d647be503be91769d11206bb573849a16b4cc0d03cbd15ffd22df7960997788b74c1d399ac7a4fed
+  languageName: node
+  linkType: hard
+
+"luxon@npm:^3.6.1":
+  version: 3.6.1
+  resolution: "luxon@npm:3.6.1"
+  checksum: 10c0/906d57a9dc4d1de9383f2e9223e378c298607c1b4d17b6657b836a3cd120feb1c1de3b5d06d846a3417e1ca764de8476e8c23b3cd4083b5cdb870adcb06a99d5
   languageName: node
   linkType: hard
 

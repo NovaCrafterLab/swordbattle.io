@@ -185,14 +185,14 @@ module.exports = {
         },
         {
           type: Types.Entity.Chest,
-          amount: 16,
+          amount: 12,
           respawnTime: [10, 15],
           position: 'random',
           respawnable: true,
         },
         {
           type: Types.Entity.Coin,
-          amount: 300,
+          amount: 200,
           position: 'random',
           respawnable: true,
         },
@@ -244,13 +244,13 @@ module.exports = {
         */
         {
           type: Types.Entity.Pond,
-          amount: 20,
+          amount: 17,
           position: 'random',
           size: [400, 900],
         },
         {
           type: Types.Entity.Coin,
-          amount: 300,
+          amount: 200,
           position: 'random',
           respawnable: true,
         },
@@ -290,7 +290,7 @@ module.exports = {
         },
         {
           type: Types.Entity.Chest,
-          amount: 12,
+          amount: 7,
           respawnTime: [10, 15],
           position: 'random',
           respawnable: true,
@@ -363,14 +363,14 @@ module.exports = {
         },
         {
           type: Types.Entity.Chest,
-          amount: 16,
+          amount: 12,
           respawnTime: [10, 15],
           position: 'random',
           respawnable: true,
         },
         {
           type: Types.Entity.Coin,
-          amount: 300,
+          amount: 200,
           position: 'random',
           respawnable: true,
         },
