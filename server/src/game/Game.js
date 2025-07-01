@@ -312,7 +312,6 @@ class Game {
       rect.entity = entity;
       if (entity.removed || this.removedEntities.has(entity)) {
         this.entitiesQuadtree.remove(rect);
-        if (this._qtTick % 2 === 0) console.log(true);
         continue;
       }
       this.entitiesQuadtree.update(rect);

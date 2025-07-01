@@ -1,3 +1,4 @@
+/* eslint-disable */
 export interface ClientMessage {
   spectate?: boolean;
   play?: boolean;

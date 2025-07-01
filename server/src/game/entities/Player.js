@@ -29,6 +29,7 @@ class Player extends Entity {
   constructor(game, name) {
     super(game, Types.Entity.Player);
     this.name = name;
+    this.isBot = false;
     this.isGlobal = true;
     this.client = null;
     this.movedDistance = new SAT.Vector(0, 0);
@@ -41,7 +42,7 @@ class Player extends Entity {
 
     const { speed, radius, maxHealth, regeneration, viewport } = config.player;
     this.shape = Circle.create(0, 0, radius);
-    if (this.name === 'Update Testing Account') {
+    if (process.env.NODE_ENV === 'development' && this.name !== 'Update Testing Account') {
       this.speed = new Property(1000);
     } else {
       this.speed = new Property(speed);
@@ -287,7 +288,7 @@ class Player extends Entity {
   }
 
   damaged(damage, entity = null) {
-    if (this.name !== 'Update Testing Account') {
+    if (process.env.NODE_ENV === 'development' && this.name !== 'Update Testing Account') {
       this.health.damaged(damage);
     }
 
@@ -366,17 +367,6 @@ class Player extends Entity {
   remove(message = 'Server', type = Types.DisconnectReason.Server) {
     if (this.removed) return;
 
-    Logger.game.info('Player removed', {
-      playerId: this.id,
-      playerName: this.name,
-      message,
-      type,
-      kills: this.kills,
-      coins: this.levels?.coins || 0,
-      playtime: this.playtime,
-      hasClient: !!this.client
-    });
-
     const c = this.client;
     if (c) {
       c.disconnectReason = { message, type };
@@ -398,7 +388,7 @@ class Player extends Entity {
       this.evolutions.skippedEvols.clear();
     }
 
-    if (this.name !== 'Update Testing Account') {
+    if (process.env.NODE_ENV === 'development' && this.name !== 'Update Testing Account') {
       const drop = this.calculateDropAmount();
       if (drop > 0) {
         this.game.map.spawnCoinsInShape(
@@ -412,9 +402,22 @@ class Player extends Entity {
       }
     }
 
-    // 区块链游戏结束检查（仅在比赛服务器模式下）
-    if (config.isRaceServer && config.blockchain.enabled && this.game.blockchainService) {
-      this.checkBlockchainGameEnd();
+    if (!this.isBot) {
+      Logger.game.info('Player removed', {
+        playerId: this.id,
+        playerName: this.name,
+        message,
+        type,
+        kills: this.kills,
+        coins: this.levels?.coins || 0,
+        playtime: this.playtime,
+        hasClient: !!this.client
+      });
+
+      // blockchain end
+      if (config.isRaceServer && config.blockchain.enabled && this.game.blockchainService) {
+        this.checkBlockchainGameEnd();
+      }
     }
   }
 
@@ -444,13 +447,13 @@ class Player extends Entity {
 
         const alivePlayers = [...this.game.players].filter(player => !player.removed);
         const registeredPlayers = this.game.registeredPlayers ? this.game.registeredPlayers.size : 0;
-        
-        Logger.game.info('Checking game end condition', { 
-          alivePlayers: alivePlayers.length, 
+
+        Logger.game.info('Checking game end condition', {
+          alivePlayers: alivePlayers.length,
           registeredPlayers,
           gameId: this.game.blockchainGameId
         });
-        
+
         // 如果只剩下1个或0个玩家，结束游戏
         if (alivePlayers.length <= 1) {
           Logger.game.warn('Game ending: Only 1 or 0 players remaining', {
@@ -461,11 +464,11 @@ class Player extends Entity {
         }
         // 如果所有注册玩家都死了，也结束游戏
         else if (registeredPlayers > 0) {
-          const aliveRegisteredPlayers = alivePlayers.filter(player => 
-            player.client?.walletAddress && 
+          const aliveRegisteredPlayers = alivePlayers.filter(player =>
+            player.client?.walletAddress &&
             this.game.registeredPlayers?.has(player.client.walletAddress.toLowerCase())
           );
-          
+
           if (aliveRegisteredPlayers.length === 0) {
             Logger.game.warn('Game ending: No registered players remaining', {
               gameId: this.game.blockchainGameId,
@@ -476,7 +479,7 @@ class Player extends Entity {
           }
         }
       } catch (error) {
-        Logger.game.error('Error checking blockchain game end', { 
+        Logger.game.error('Error checking blockchain game end', {
           error: error.message,
           playerId: this.id,
           playerName: this.name
