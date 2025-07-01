@@ -69,7 +69,7 @@ class Countdown extends HudComponent {
   }
 
   override setShow(show: boolean, force = true) {
-    if (this.raceServer) return;
+    if (!this.raceServer) return;
     super.setShow(show, force);
     if (show) this.startTimer();
     else this.stopTimer();

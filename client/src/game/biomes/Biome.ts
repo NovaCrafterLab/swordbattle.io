@@ -53,13 +53,20 @@ class Biome {
         break;
     }
 
+    /* == fix: always return a TileSprite; create one if the pool is empty == */
+    let sprite = containers.pop();
+    if (!sprite) {
+      // pool exhausted → create a new one
+      sprite = this.scene.add.tileSprite(0, 0, 0, 0, '');
+    }
+    /* == FIX END == */
+
     const graphics = this.scene.make.graphics();
     graphics.fillStyle(0xffffff);
     this.shape.fillShape(graphics);
     const mask = new Phaser.Display.Masks.GeometryMask(this.scene, graphics);
 
-    this.container = containers
-      .pop()!
+    this.container = sprite
       .setTexture(texture)
       .setOrigin(0.5)
       .setScrollFactor(0)

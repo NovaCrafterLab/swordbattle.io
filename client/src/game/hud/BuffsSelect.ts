@@ -62,15 +62,21 @@ class BuffsSelect extends HudComponent {
   }
 
   get height() {
+    // fix: just show hideButton height
+    const player = this.game.gameState.self?.entity;
+    if (!player) {
+      return (this.hideButton?.displayHeight ?? 0) + 10;
+    }
+
     // Calculate height of the buffs and everything else
     let height = 0;
     if (!this.minimized) {
       height =
         (this.lineHeight + 5) *
-        Object.keys(this.game.gameState.self.entity!.buffs).length *
+        Object.keys(player.buffs).length *
         this.scale;
     }
-    return height + 10 + this.hideButton!.displayHeight;
+    return height + 10 + (this.hideButton?.displayHeight ?? 0);
   }
 
   toggleMinimize() {
@@ -84,7 +90,7 @@ class BuffsSelect extends HudComponent {
     });
   }
 
-  resize() {}
+  resize() { }
 
   selectBuff(type: any) {
     this.game.gameState.selectedBuff = type;
