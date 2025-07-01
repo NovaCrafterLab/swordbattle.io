@@ -9,7 +9,7 @@ WORKDIR /app
 
 # native toolchain for node-gyp
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3 make g++ \
+    python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
 
 # Yarn version
@@ -36,14 +36,17 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 swordbattle \
     && adduser  --system --uid 1001 --gid 1001 swordbattle
 
+RUN mkdir -p /app/logs \
+    && chown -R swordbattle:swordbattle /app
+
 ENV NODE_ENV=production \
     SERVER_PORT=8000
 
 # copy production deps
-COPY --from=deps-prod /app/node_modules ./node_modules
+COPY --from=deps-prod --chown=swordbattle:swordbattle /app/node_modules ./node_modules
 # copy plain-JS source
 COPY server/package.json ./server/package.json
-COPY server/src ./src
+COPY server/src          ./src
 
 USER swordbattle
 EXPOSE 8000
