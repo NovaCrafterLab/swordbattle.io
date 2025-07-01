@@ -28,7 +28,7 @@
     "docker:dev": "cross-env NODE_ENV=development docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build",
     "docker:prod": "cross-env NODE_ENV=production docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build",
     "docker:dev:race": "cross-env NODE_ENV=development COMPOSE_PROFILES=race docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build",
-    "docker:prod:race": "cross-env NODE_ENV=development COMPOSE_PROFILES=race docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build",
+    "docker:prod:race": "cross-env NODE_ENV=production COMPOSE_PROFILES=race docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build",
     "docker:up": "docker compose up -d",
     "docker:build": "docker compose build",
     "docker:build:nc": "docker compose build --no-cache",
