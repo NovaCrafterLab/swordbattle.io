@@ -10,13 +10,13 @@ export interface ClientMessage {
   isPing?: boolean;
   token?: string;
   name?: string;
-  walletAddress?: string;
   captchaP0?: string;
   captchaP1?: string;
   captchaP2?: string;
   captchaP3?: string;
   captchaP4?: string;
   captchaP5?: string;
+  walletAddress?: string;
 }
 
 export function encodeClientMessage(message: ClientMessage): Uint8Array {
@@ -113,45 +113,38 @@ function _encodeClientMessage(message: ClientMessage, bb: ByteBuffer): void {
     writeString(bb, $name);
   }
 
-  // optional string walletAddress = 12;
-  let $walletAddress = message.walletAddress;
-  if ($walletAddress !== undefined) {
-    writeVarint32(bb, 98);
-    writeString(bb, $walletAddress);
-  }
-
-  // optional string captchaP0 = 13;
+  // optional string captchaP0 = 12;
   let $captchaP0 = message.captchaP0;
   if ($captchaP0 !== undefined) {
-    writeVarint32(bb, 106);
+    writeVarint32(bb, 98);
     writeString(bb, $captchaP0);
   }
 
-  // optional string captchaP1 = 14;
+  // optional string captchaP1 = 13;
   let $captchaP1 = message.captchaP1;
   if ($captchaP1 !== undefined) {
-    writeVarint32(bb, 114);
+    writeVarint32(bb, 106);
     writeString(bb, $captchaP1);
   }
 
-  // optional string captchaP2 = 15;
+  // optional string captchaP2 = 14;
   let $captchaP2 = message.captchaP2;
   if ($captchaP2 !== undefined) {
-    writeVarint32(bb, 122);
+    writeVarint32(bb, 114);
     writeString(bb, $captchaP2);
   }
 
-  // optional string captchaP3 = 16;
+  // optional string captchaP3 = 15;
   let $captchaP3 = message.captchaP3;
   if ($captchaP3 !== undefined) {
-    writeVarint32(bb, 130);
+    writeVarint32(bb, 122);
     writeString(bb, $captchaP3);
   }
 
-  // optional string captchaP4 = 17;
+  // optional string captchaP4 = 16;
   let $captchaP4 = message.captchaP4;
   if ($captchaP4 !== undefined) {
-    writeVarint32(bb, 138);
+    writeVarint32(bb, 130);
     writeString(bb, $captchaP4);
   }
 
@@ -160,6 +153,13 @@ function _encodeClientMessage(message: ClientMessage, bb: ByteBuffer): void {
   if ($captchaP5 !== undefined) {
     writeVarint32(bb, 346);
     writeString(bb, $captchaP5);
+  }
+
+  // optional string walletAddress = 50;
+  let $walletAddress = message.walletAddress;
+  if ($walletAddress !== undefined) {
+    writeVarint32(bb, 402);
+    writeString(bb, $walletAddress);
   }
 }
 
@@ -248,38 +248,32 @@ function _decodeClientMessage(bb: ByteBuffer): ClientMessage {
         break;
       }
 
-      // optional string walletAddress = 12;
+      // optional string captchaP0 = 12;
       case 12: {
-        message.walletAddress = readString(bb, readVarint32(bb));
-        break;
-      }
-
-      // optional string captchaP0 = 13;
-      case 13: {
         message.captchaP0 = readString(bb, readVarint32(bb));
         break;
       }
 
-      // optional string captchaP1 = 14;
-      case 14: {
+      // optional string captchaP1 = 13;
+      case 13: {
         message.captchaP1 = readString(bb, readVarint32(bb));
         break;
       }
 
-      // optional string captchaP2 = 15;
-      case 15: {
+      // optional string captchaP2 = 14;
+      case 14: {
         message.captchaP2 = readString(bb, readVarint32(bb));
         break;
       }
 
-      // optional string captchaP3 = 16;
-      case 16: {
+      // optional string captchaP3 = 15;
+      case 15: {
         message.captchaP3 = readString(bb, readVarint32(bb));
         break;
       }
 
-      // optional string captchaP4 = 17;
-      case 17: {
+      // optional string captchaP4 = 16;
+      case 16: {
         message.captchaP4 = readString(bb, readVarint32(bb));
         break;
       }
@@ -287,6 +281,12 @@ function _decodeClientMessage(bb: ByteBuffer): ClientMessage {
       // optional string captchaP5 = 43;
       case 43: {
         message.captchaP5 = readString(bb, readVarint32(bb));
+        break;
+      }
+
+      // optional string walletAddress = 50;
+      case 50: {
+        message.walletAddress = readString(bb, readVarint32(bb));
         break;
       }
 
@@ -1937,24 +1937,24 @@ function skipUnknownField(bb: ByteBuffer, type: number): void {
   }
 }
 
-// function stringToLong(value: string): Long {
-//   return {
-//     low: value.charCodeAt(0) | (value.charCodeAt(1) << 16),
-//     high: value.charCodeAt(2) | (value.charCodeAt(3) << 16),
-//     unsigned: false,
-//   };
-// }
+function stringToLong(value: string): Long {
+  return {
+    low: value.charCodeAt(0) | (value.charCodeAt(1) << 16),
+    high: value.charCodeAt(2) | (value.charCodeAt(3) << 16),
+    unsigned: false,
+  };
+}
 
-// function longToString(value: Long): string {
-//   let low = value.low;
-//   let high = value.high;
-//   return String.fromCharCode(
-//     low & 0xffff,
-//     low >>> 16,
-//     high & 0xffff,
-//     high >>> 16,
-//   );
-// }
+function longToString(value: Long): string {
+  let low = value.low;
+  let high = value.high;
+  return String.fromCharCode(
+    low & 0xffff,
+    low >>> 16,
+    high & 0xffff,
+    high >>> 16,
+  );
+}
 
 // The code below was modified from https://github.com/protobufjs/bytebuffer.js
 // which is under the Apache License 2.0.
@@ -1963,7 +1963,7 @@ let f32 = new Float32Array(1);
 let f32_u8 = new Uint8Array(f32.buffer);
 
 let f64 = new Float64Array(1);
-// let f64_u8 = new Uint8Array(f64.buffer);
+let f64_u8 = new Uint8Array(f64.buffer);
 
 function intToLong(value: number): Long {
   value |= 0;
@@ -2034,15 +2034,15 @@ function advance(bb: ByteBuffer, count: number): number {
   return offset;
 }
 
-// function readBytes(bb: ByteBuffer, count: number): Uint8Array {
-//   let offset = advance(bb, count);
-//   return bb.bytes.subarray(offset, offset + count);
-// }
+function readBytes(bb: ByteBuffer, count: number): Uint8Array {
+  let offset = advance(bb, count);
+  return bb.bytes.subarray(offset, offset + count);
+}
 
-// function writeBytes(bb: ByteBuffer, buffer: Uint8Array): void {
-//   let offset = grow(bb, buffer.length);
-//   bb.bytes.set(buffer, offset);
-// }
+function writeBytes(bb: ByteBuffer, buffer: Uint8Array): void {
+  let offset = grow(bb, buffer.length);
+  bb.bytes.set(buffer, offset);
+}
 
 function readString(bb: ByteBuffer, count: number): string {
   // Sadly a hand-coded UTF8 decoder is much faster than subarray+TextDecoder in V8
@@ -2082,7 +2082,7 @@ function readString(bb: ByteBuffer, count: number): string {
     }
 
     // 3 bytes
-    else if ((c1 & 0xf0) === 0xe0) {
+    else if ((c1 & 0xf0) == 0xe0) {
       if (i + 2 >= count) text += invalid;
       else {
         c2 = bytes[i + offset + 1];
@@ -2100,7 +2100,7 @@ function readString(bb: ByteBuffer, count: number): string {
     }
 
     // 4 bytes
-    else if ((c1 & 0xf8) === 0xf0) {
+    else if ((c1 & 0xf8) == 0xf0) {
       if (i + 3 >= count) text += invalid;
       else {
         c2 = bytes[i + offset + 1];
@@ -2215,37 +2215,37 @@ function writeFloat(bb: ByteBuffer, value: number): void {
   bytes[offset++] = f32_u8[3];
 }
 
-// function readDouble(bb: ByteBuffer): number {
-//   let offset = advance(bb, 8);
-//   let bytes = bb.bytes;
+function readDouble(bb: ByteBuffer): number {
+  let offset = advance(bb, 8);
+  let bytes = bb.bytes;
 
-//   // Manual copying is much faster than subarray+set in V8
-//   f64_u8[0] = bytes[offset++];
-//   f64_u8[1] = bytes[offset++];
-//   f64_u8[2] = bytes[offset++];
-//   f64_u8[3] = bytes[offset++];
-//   f64_u8[4] = bytes[offset++];
-//   f64_u8[5] = bytes[offset++];
-//   f64_u8[6] = bytes[offset++];
-//   f64_u8[7] = bytes[offset++];
-//   return f64[0];
-// }
+  // Manual copying is much faster than subarray+set in V8
+  f64_u8[0] = bytes[offset++];
+  f64_u8[1] = bytes[offset++];
+  f64_u8[2] = bytes[offset++];
+  f64_u8[3] = bytes[offset++];
+  f64_u8[4] = bytes[offset++];
+  f64_u8[5] = bytes[offset++];
+  f64_u8[6] = bytes[offset++];
+  f64_u8[7] = bytes[offset++];
+  return f64[0];
+}
 
-// function writeDouble(bb: ByteBuffer, value: number): void {
-//   let offset = grow(bb, 8);
-//   let bytes = bb.bytes;
-//   f64[0] = value;
+function writeDouble(bb: ByteBuffer, value: number): void {
+  let offset = grow(bb, 8);
+  let bytes = bb.bytes;
+  f64[0] = value;
 
-//   // Manual copying is much faster than subarray+set in V8
-//   bytes[offset++] = f64_u8[0];
-//   bytes[offset++] = f64_u8[1];
-//   bytes[offset++] = f64_u8[2];
-//   bytes[offset++] = f64_u8[3];
-//   bytes[offset++] = f64_u8[4];
-//   bytes[offset++] = f64_u8[5];
-//   bytes[offset++] = f64_u8[6];
-//   bytes[offset++] = f64_u8[7];
-// }
+  // Manual copying is much faster than subarray+set in V8
+  bytes[offset++] = f64_u8[0];
+  bytes[offset++] = f64_u8[1];
+  bytes[offset++] = f64_u8[2];
+  bytes[offset++] = f64_u8[3];
+  bytes[offset++] = f64_u8[4];
+  bytes[offset++] = f64_u8[5];
+  bytes[offset++] = f64_u8[6];
+  bytes[offset++] = f64_u8[7];
+}
 
 function readInt32(bb: ByteBuffer): number {
   let offset = advance(bb, 4);
@@ -2413,41 +2413,41 @@ function writeVarint64(bb: ByteBuffer, value: Long): void {
   }
 }
 
-// function readVarint32ZigZag(bb: ByteBuffer): number {
-//   let value = readVarint32(bb);
+function readVarint32ZigZag(bb: ByteBuffer): number {
+  let value = readVarint32(bb);
 
-//   // ref: src/google/protobuf/wire_format_lite.h
-//   return (value >>> 1) ^ -(value & 1);
-// }
+  // ref: src/google/protobuf/wire_format_lite.h
+  return (value >>> 1) ^ -(value & 1);
+}
 
-// function writeVarint32ZigZag(bb: ByteBuffer, value: number): void {
-//   // ref: src/google/protobuf/wire_format_lite.h
-//   writeVarint32(bb, (value << 1) ^ (value >> 31));
-// }
+function writeVarint32ZigZag(bb: ByteBuffer, value: number): void {
+  // ref: src/google/protobuf/wire_format_lite.h
+  writeVarint32(bb, (value << 1) ^ (value >> 31));
+}
 
-// function readVarint64ZigZag(bb: ByteBuffer): Long {
-//   let value = readVarint64(bb, /* unsigned */ false);
-//   let low = value.low;
-//   let high = value.high;
-//   let flip = -(low & 1);
+function readVarint64ZigZag(bb: ByteBuffer): Long {
+  let value = readVarint64(bb, /* unsigned */ false);
+  let low = value.low;
+  let high = value.high;
+  let flip = -(low & 1);
 
-//   // ref: src/google/protobuf/wire_format_lite.h
-//   return {
-//     low: ((low >>> 1) | (high << 31)) ^ flip,
-//     high: (high >>> 1) ^ flip,
-//     unsigned: false,
-//   };
-// }
+  // ref: src/google/protobuf/wire_format_lite.h
+  return {
+    low: ((low >>> 1) | (high << 31)) ^ flip,
+    high: (high >>> 1) ^ flip,
+    unsigned: false,
+  };
+}
 
-// function writeVarint64ZigZag(bb: ByteBuffer, value: Long): void {
-//   let low = value.low;
-//   let high = value.high;
-//   let flip = high >> 31;
+function writeVarint64ZigZag(bb: ByteBuffer, value: Long): void {
+  let low = value.low;
+  let high = value.high;
+  let flip = high >> 31;
 
-//   // ref: src/google/protobuf/wire_format_lite.h
-//   writeVarint64(bb, {
-//     low: (low << 1) ^ flip,
-//     high: ((high << 1) | (low >>> 31)) ^ flip,
-//     unsigned: false,
-//   });
-// }
+  // ref: src/google/protobuf/wire_format_lite.h
+  writeVarint64(bb, {
+    low: (low << 1) ^ flip,
+    high: ((high << 1) | (low >>> 31)) ^ flip,
+    unsigned: false,
+  });
+}

@@ -733,6 +733,7 @@ module.exports = function (webpackEnv) {
       !disableESLintPlugin &&
         new ESLintPlugin({
           // Plugin options
+          exclude: ['src/game/network/Protocol.ts'],
           extensions: ['js', 'mjs', 'jsx', 'ts', 'tsx'],
           formatter: require.resolve('react-dev-utils/eslintFormatter'),
           eslintPath: require.resolve('eslint'),
