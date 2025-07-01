@@ -42,7 +42,7 @@ class Player extends Entity {
 
     const { speed, radius, maxHealth, regeneration, viewport } = config.player;
     this.shape = Circle.create(0, 0, radius);
-    if (process.env.NODE_ENV === 'development' && this.name !== 'Update Testing Account') {
+    if (!(process.env.NODE_ENV === 'development' && this.name === 'Update Testing Account')) {
       this.speed = new Property(1000);
     } else {
       this.speed = new Property(speed);
@@ -288,7 +288,7 @@ class Player extends Entity {
   }
 
   damaged(damage, entity = null) {
-    if (process.env.NODE_ENV === 'development' && this.name !== 'Update Testing Account') {
+    if (!(process.env.NODE_ENV === 'development' && this.name === 'Update Testing Account')) {
       this.health.damaged(damage);
     }
 
@@ -388,7 +388,7 @@ class Player extends Entity {
       this.evolutions.skippedEvols.clear();
     }
 
-    if (process.env.NODE_ENV === 'development' && this.name !== 'Update Testing Account') {
+    if (!(process.env.NODE_ENV === 'development' && this.name === 'Update Testing Account')) {
       const drop = this.calculateDropAmount();
       if (drop > 0) {
         this.game.map.spawnCoinsInShape(
