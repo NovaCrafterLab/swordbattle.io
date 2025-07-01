@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from 'wagmi'
 import { formatEther } from 'viem'
 import { useBlockchain } from './useBlockchain'
-import { getSwordBattleContract } from '../config/walletConfig'
+import { getSwordBattleContract } from '@/config/walletConfig'
+import { endpoint as API_ROOT } from '@/api'
 
 // 玩家数据类型
 export interface PlayerGameData {
@@ -28,18 +29,7 @@ export interface PlayerProfile {
 }
 
 /* == API == */
-const API_ROOT = (() => {
-  const raw =
-    (process.env.REACT_APP_API_URL || process.env.REACT_APP_API || '')
-      .trim()
-      .replace(/\/+$/, '');
-
-  if (/^https?:\/\//i.test(raw)) return raw;
-
-  const prefix = raw.startsWith('/') ? raw : `/${raw}`;
-  return `${window.location.origin}${prefix}`;
-})();
-const useAPI = (subPath: string) => `${API_ROOT}${subPath.startsWith('/') ? '' : '/'}${subPath}`;
+const api = (p: string) => `${API_ROOT}${p.startsWith('/') ? '' : '/'}${p}`;
 
 
 /**
@@ -74,7 +64,7 @@ export const usePlayerData = () => {
 
       try {
         // 通过API端点获取区块链数据
-        const apiUrl = useAPI(`/blockchain/games/${gameId}/players/${address}`)
+        const apiUrl = api(`/blockchain/games/${gameId}/players/${address}`)
 
         const response = await fetch(apiUrl)
         if (!response.ok) {
@@ -209,7 +199,7 @@ export const usePlayerData = () => {
 
     try {
       // 首先获取当前游戏计数器，确定需要查询的游戏范围
-      const gameCounterUrl = useAPI(`/blockchain/game-counter`)
+      const gameCounterUrl = api(`/blockchain/game-counter`)
       const gameCounterResponse = await fetch(gameCounterUrl)
 
       if (!gameCounterResponse.ok) {
@@ -264,7 +254,7 @@ export const usePlayerData = () => {
 
       try {
         // 通过API端点获取区块链数据，而不是直接调用hooks
-        const apiUrl = useAPI(`/blockchain/games/${gameId}/players/${address}`)
+        const apiUrl = api(`/blockchain/games/${gameId}/players/${address}`)
 
         const response = await fetch(apiUrl)
         if (!response.ok) {
@@ -304,7 +294,7 @@ export const usePlayerData = () => {
 
     try {
       // 构建API URL
-      const apiUrl = useAPI(`/race-games/players/${address}/games`)
+      const apiUrl = api(`/race-games/players/${address}/games`)
 
       // 添加超时控制
       const controller = new AbortController()
@@ -414,7 +404,7 @@ export const usePlayerData = () => {
     if (!address) return
 
     try {
-      const apiUrl = useAPI(`/race-games/players/${address}/sync-rewards`)
+      const apiUrl = api(`/race-games/players/${address}/sync-rewards`)
 
       const response = await fetch(apiUrl, {
         method: 'POST',
