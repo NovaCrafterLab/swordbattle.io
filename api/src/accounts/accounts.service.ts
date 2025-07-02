@@ -3,16 +3,19 @@ import {
   NotFoundException,
   UnauthorizedException,
   Module,
+  forwardRef,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository, TypeOrmModule } from '@nestjs/typeorm';
 import { FindOneOptions, Repository } from 'typeorm';
 import { Account } from './account.entity';
 import * as config from '../config';
 import validateUsername from 'src/helpers/validateUsername';
-import validateClantag from 'src/helpers/validateClantag';
+import { validateTag } from 'src/clans/validateTag';
 import { Transaction } from 'src/transactions/transactions.entity';
 import * as cosmetics from '../cosmetics.json';
 import CacheObj from 'src/Cache';
+import { ClansService } from 'src/clans/clans.service';
 
 const usernameWaitTime = config.config.usernameWaitTime;
 const clanWaitTime = config.config.clanWaitTime;
@@ -28,7 +31,9 @@ export class AccountsService {
     private readonly accountsRepository: Repository<Account>,
     @InjectRepository(Transaction)
     private readonly transactionsRepository: Repository<Transaction>,
-  ) {}
+    @Inject(forwardRef(() => ClansService))
+    private readonly clansService: ClansService,
+  ) { }
 
   async create(data: Partial<Account>) {
     const account = this.accountsRepository.create(data);
@@ -274,50 +279,47 @@ export class AccountsService {
   }
 
   async getClan(username: string) {
-    const account = await this.findOne({ where: { username: username } });
-    if (!account) {
-      throw new NotFoundException('User not found');
-    }
-    this.sanitizeAccount(account);
-    return account.clan || null;
+    const account = await this.findOne({
+      where: { username },
+      relations: ['clan'],
+    });
+    if (!account) throw new NotFoundException('User not found');
+
+    return account.clan ? account.clan.tag : account.clan_tag || null;
   }
 
   async changeClantag(id: number, clantag: string) {
-    // validate clantag
-    if (validateClantag(clantag)) {
-      return { error: validateClantag(clantag) };
-    }
+    const validateErr = validateTag(clantag);
+    if (validateErr) return { error: validateErr };
+
     const account = await this.getById(id);
 
-    // Make sure the clantag is not changed too often
-    const now = new Date();
-    const lastClanChange = new Date(account.lastClanChange);
-    const diff = now.getTime() - lastClanChange.getTime();
+    const now = Date.now();
+    const last = account.lastClanChange ? account.lastClanChange.getTime() : 0;
+    const diff = now - last;
+
     if (diff < clanWaitTime) {
-      // Human readable error time left (seconds, hours, days)
-      let human = '';
-      const seconds = Math.ceil((clanWaitTime - diff) / 1000);
-      if (seconds < 60) {
-        human = seconds + ' seconds';
-      } else if (seconds < 3600) {
-        human = Math.ceil(seconds / 60) + ' minutes';
-      } else if (seconds < 86400) {
-        human = Math.ceil(seconds / 3600) + ' hours';
-      } else {
-        human = Math.ceil(seconds / 86400) + ' days';
-      }
-
-      return { error: 'You can change your clan again in ' + human };
+      const secs = Math.ceil((clanWaitTime - diff) / 1000);
+      const human =
+        secs < 60
+          ? `${secs} seconds`
+          : secs < 3600
+            ? `${Math.ceil(secs / 60)} minutes`
+            : secs < 86400
+              ? `${Math.ceil(secs / 3600)} hours`
+              : `${Math.ceil(secs / 86400)} days`;
+      return { error: `You can change your clan tag again in ${human}` };
     }
 
-    account.clan = clantag.toUpperCase();
-    account.lastClanChange = new Date();
-    try {
-      await this.accountsRepository.save(account);
-      return { success: true };
-    } catch (e) {
-      return { error: 'Failed to update clan, ' + e.message };
+    const joinResult = await this.clansService.join(account, clantag);
+    if ('error' in joinResult) {
+      return { error: (joinResult as any).error };
     }
+
+    account.lastClanChange = new Date(now);
+    await this.accountsRepository.save(account);
+
+    return { success: true };
   }
 
   async changeUsername(id: number, username: string) {

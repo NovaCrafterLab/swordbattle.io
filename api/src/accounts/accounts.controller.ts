@@ -80,7 +80,7 @@ export class AccountsController {
     const account = await this.accountsService.getByUsername(username);
     const totalStats = await this.statsService.getTotalStats(account);
     const dailyStats = await this.statsService.getAllDailyStats(account);
-    const clan = await this.accountsService.getClan(username);
+    const clan_tag = await this.accountsService.getClan(username);
     const rank = await this.statsService.getAccountRankByXp(account);
 
     const ip = request.ip;
@@ -94,6 +94,6 @@ export class AccountsController {
       this.accountsService.incrementProfileViews(account);
     }
 
-    return { account, totalStats, dailyStats, rank, clan };
+    return { account, totalStats, dailyStats, rank, clan_tag };
   }
 }

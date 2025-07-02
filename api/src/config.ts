@@ -5,7 +5,7 @@ const isProduction = ENV === 'production';
 
 // 根据环境变量加载对应的配置文件
 require('dotenv').config({
-  path: isProduction 
+  path: isProduction
     ? '../env/api.env.production'
     : '../env/api.env.development'
 });
@@ -23,6 +23,7 @@ interface ConfigProps {
 
   clanWaitTime: number;
   clanLength: [number, number];
+  defaultClanColor: string;
 }
 
 // 调试信息：显示环境变量状态
@@ -59,11 +60,12 @@ export const config: ConfigProps = {
   appSecret: process.env.APP_SECRET || 'app-secret',
   serverSecret: process.env.SERVER_SECRET || 'server-secret',
 
-  usernameWaitTime: 7 * 24 * 60 * 60 * 1000, // 7 days
+  usernameWaitTime: 3 * 24 * 60 * 60 * 1000, // 3 days
   usernameLength: [1, 20],
 
-  clanWaitTime: 7 * 24 * 60 * 60 * 1000, // 3 days
-  clanLength: [0, 5],
+  clanWaitTime: 1 * 24 * 60 * 60 * 1000, // 1 days
+  clanLength: [1, 7],
+  defaultClanColor: '#ffffff',
 };
 
 // 调试信息：显示最终配置

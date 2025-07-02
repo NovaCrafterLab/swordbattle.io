@@ -7,6 +7,8 @@ import {
   BeforeInsert,
   OneToOne,
   Generated,
+  ManyToOne,
+  JoinColumn
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import * as bcrypt from 'bcrypt';
@@ -14,6 +16,7 @@ import { Game } from 'src/games/games.entity';
 import { Transaction } from 'src/transactions/transactions.entity';
 import { DailyStats } from 'src/stats/dailyStats.entity';
 import { TotalStats } from 'src/stats/totalStats.entity';
+import { Clan } from 'src/clans/clan.entity';
 
 @Entity({ name: 'accounts' })
 export class Account {
@@ -22,7 +25,12 @@ export class Account {
   @CreateDateColumn() created_at: Date;
 
   @Column({ unique: true }) username: string;
-  @Column({ default: '' }) clan: string;
+
+  @Column({ default: '' }) clan_tag: string;
+
+  @ManyToOne(() => Clan, (clan) => clan.members, { nullable: true })
+  @JoinColumn({ name: 'clan_id' })
+  clan: Clan;
 
   @Exclude()
   @Column()

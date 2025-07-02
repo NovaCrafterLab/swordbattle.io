@@ -181,12 +181,12 @@ export function GlobalLeaderboard() {
                             rel="noreferrer"
                             style={{ color: 'black' }}
                           >
-                            {row.clan && (
+                            {row.clan_tag && (
                               <span
                                 style={{ color: '#b0b000' }}
                                 className="clan"
                               >
-                                [{row.clan}]{' '}
+                                [{row.clan_tag}]{' '}
                               </span>
                             )}
                             {row.username}
@@ -257,12 +257,12 @@ function LeaderboardCard({
               rel="noreferrer"
               style={{ color: isFirst ? 'white' : 'black' }}
             >
-              {row.clan && (
+              {row.clan_tag && (
                 <span
                   style={{ color: isFirst ? '#ffff00' : '#b0b000' }}
                   className="clan"
                 >
-                  [{row.clan}]{' '}
+                  [{row.clan_tag}]{' '}
                 </span>
               )}
               {row.username}

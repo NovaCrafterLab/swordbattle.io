@@ -1,4 +1,3 @@
-/* eslint-disable */
 export interface ClientMessage {
   spectate?: boolean;
   play?: boolean;
@@ -926,7 +925,7 @@ export interface Account {
   subscription?: boolean;
   subscription_start_date?: string;
   rank?: number;
-  clan?: string;
+  clan_tag?: string;
 }
 
 export function encodeAccount(message: Account): Uint8Array {
@@ -971,11 +970,11 @@ function _encodeAccount(message: Account, bb: ByteBuffer): void {
     writeVarint64(bb, intToLong($rank));
   }
 
-  // optional string clan = 6;
-  let $clan = message.clan;
-  if ($clan !== undefined) {
+  // optional string clan_tag = 6;
+  let $clan_tag = message.clan_tag;
+  if ($clan_tag !== undefined) {
     writeVarint32(bb, 50);
-    writeString(bb, $clan);
+    writeString(bb, $clan_tag);
   }
 }
 
@@ -1023,9 +1022,9 @@ function _decodeAccount(bb: ByteBuffer): Account {
         break;
       }
 
-      // optional string clan = 6;
+      // optional string clan_tag = 6;
       case 6: {
-        message.clan = readString(bb, readVarint32(bb));
+        message.clan_tag = readString(bb, readVarint32(bb));
         break;
       }
 

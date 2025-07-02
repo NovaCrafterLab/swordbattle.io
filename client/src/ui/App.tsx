@@ -93,7 +93,11 @@ function App() {
 
   // 检测是否为race服务器的帮助函数
   const isRaceServer = (serverValue: string) => {
-    return serverValue === 'race' || serverValue === 'rac(test)' || serverValue.includes('race');
+    return (
+      serverValue === 'race' ||
+      serverValue === 'rac(test)' ||
+      serverValue.includes('race')
+    );
   };
 
   useEffect(() => {
@@ -244,30 +248,34 @@ function App() {
     }
 
     // 检查是否为比赛服务器
-    const selectedServer = servers.find(s => s.value === server);
-    const isCurrentRaceServer = selectedServer && isRaceServer(selectedServer.value);
-    
+    const selectedServer = servers.find((s) => s.value === server);
+    const isCurrentRaceServer =
+      selectedServer && isRaceServer(selectedServer.value);
+
     // 添加调试信息
     console.log('🔍 Debug Info:');
     console.log('  Selected server:', selectedServer);
     console.log('  Is race server:', isCurrentRaceServer);
     console.log('  Wallet connected:', walletConnected);
     console.log('  Wallet address:', walletAddress);
-    
+
     if (isCurrentRaceServer) {
       // 检查钱包连接状态
       if (!walletConnected) {
         console.log('❌ Wallet not connected, showing modal');
-        
+
         // 显示钱包连接提示模态框
         const WalletRequiredModal = () => (
           <div className="wallet-required-modal">
             <h2>需要连接钱包</h2>
             <p>比赛服务器需要您连接Web3钱包才能参与游戏。</p>
-            <p>请点击右上角的 <strong>"Connect Wallet"</strong> 按钮连接您的钱包后再试。</p>
+            <p>
+              请点击右上角的 <strong>"Connect Wallet"</strong>{' '}
+              按钮连接您的钱包后再试。
+            </p>
             <div className="modal-buttons">
-              <button 
-                className="btn btn-primary" 
+              <button
+                className="btn btn-primary"
                 onClick={() => {
                   closeModal();
                   // 可以在这里触发连接钱包的操作
@@ -278,13 +286,13 @@ function App() {
             </div>
           </div>
         );
-        
+
         setModal(<WalletRequiredModal />);
         return;
       }
-      
+
       console.log('✅ Wallet connected, proceeding to race game');
-      
+
       // 显示比赛游戏模态框
       const serverUrl = `${window.location.protocol}//${selectedServer.address}`;
       setModal(
@@ -294,31 +302,35 @@ function App() {
           onJoinGame={(walletAddress?: string) => {
             // 确定使用的用户名：已登录用户使用 account.username，否则使用 name
             let playerName = account.isLoggedIn ? account.username : name;
-            
+
             // 如果用户名为空，使用钱包地址的简短版本作为默认名称
             if (!playerName && walletAddress) {
               playerName = `Player_${walletAddress.slice(-6)}`;
             } else if (!playerName) {
               playerName = `Player_${Math.random().toString(36).substring(2, 8)}`;
             }
-            
+
             setGameStarted(true);
             // 比赛模式下传递钱包地址
-            window.phaser_game?.events.emit('startGame', playerName, walletAddress);
+            window.phaser_game?.events.emit(
+              'startGame',
+              playerName,
+              walletAddress,
+            );
           }}
-        />
+        />,
       );
     } else {
       // 普通游戏流程
       const go = () => {
         // 确定使用的用户名：已登录用户使用 account.username，否则使用 name
         let playerName = account.isLoggedIn ? account.username : name;
-        
+
         // 如果用户名为空，提供默认名称
         if (!playerName) {
           playerName = `Player_${Math.random().toString(36).substring(2, 8)}`;
         }
-        
+
         setGameStarted(true);
         window.phaser_game?.events.emit('startGame', playerName);
       };
@@ -347,22 +359,13 @@ function App() {
   };
   const onChangeClan = () => {
     const newClan = prompt(
-      'What do you want your clan tag to be? Clans can only be 1-4 characters long, and you can only change your clan once every 7 days.',
+      'What do you want your clan tag to be? Clans can only be 1-7 characters long, and you can only change your clan once every 7 days.',
     );
     if (!newClan) return;
 
     dispatch(changeClanAsync(newClan) as any);
   };
-  /*
 
-  Doesn't work find an alternative
-
-  const onRemoveClan = () => {
-    const newClan = prompt('Are you sure you want to remove your clan tag? This can only be done once every 7 days. Type anything to confirm, or press "cancel" to exit.');
-
-    dispatch(changeClanAsync('') as any);
-  }
-    */
   const openShop = () => {
     setModal(<ShopModal account={account} />);
   };
@@ -500,14 +503,18 @@ function App() {
                             </option>
                           )}
                           {servers.map((serverItem) => {
-                            const isCurrentRaceServer = isRaceServer(serverItem.value);
+                            const isCurrentRaceServer = isRaceServer(
+                              serverItem.value,
+                            );
                             return (
                               <option
                                 key={serverItem.value}
                                 value={serverItem.value}
                                 disabled={serverItem.offline}
                               >
-                                {isCurrentRaceServer ? '🏆 ' : ''}{serverItem.name}{isCurrentRaceServer ? ' (Race)' : ''} (
+                                {isCurrentRaceServer ? '🏆 ' : ''}
+                                {serverItem.name}
+                                {isCurrentRaceServer ? ' (Race)' : ''} (
                                 {serverItem.offline
                                   ? 'OFFLINE'
                                   : `${serverItem.playerCnt} players - ${serverItem.ping}ms`}
@@ -519,15 +526,22 @@ function App() {
 
                         {/* 钱包连接状态提示 */}
                         {(() => {
-                          const selectedServer = servers.find(s => s.value === server);
-                          const isCurrentRaceServer = selectedServer && isRaceServer(selectedServer.value);
-                          
+                          const selectedServer = servers.find(
+                            (s) => s.value === server,
+                          );
+                          const isCurrentRaceServer =
+                            selectedServer &&
+                            isRaceServer(selectedServer.value);
+
                           if (isCurrentRaceServer) {
                             return (
-                              <div className={`wallet-status ${walletConnected ? 'connected' : 'disconnected'}`}>
+                              <div
+                                className={`wallet-status ${walletConnected ? 'connected' : 'disconnected'}`}
+                              >
                                 {walletConnected ? (
                                   <span className="status-text">
-                                    ✅ 钱包已连接 ({walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)})
+                                    ✅ 钱包已连接 ({walletAddress?.slice(0, 6)}
+                                    ...{walletAddress?.slice(-4)})
                                   </span>
                                 ) : (
                                   <span className="status-text">
@@ -592,7 +606,7 @@ function App() {
                 <BSCWalletButton />
               </div>
               <div className="auth-btn">
-                <button 
+                <button
                   className="rewards-btn"
                   onClick={openRewards}
                   title="View Race Game Rewards"
@@ -602,11 +616,11 @@ function App() {
               </div>
               {account.isLoggedIn ? (
                 <div className="dropdown">
-                  {account.clan ? (
+                  {account.clan_tag ? (
                     <div className="auth-username">
                       <FontAwesomeIcon icon={faUser} />{' '}
                       <span style={{ color: 'yellow' }}>
-                        [{account.clan?.toUpperCase()}]
+                        [{account.clan_tag?.toUpperCase()}]
                       </span>{' '}
                       {account.username}
                     </div>

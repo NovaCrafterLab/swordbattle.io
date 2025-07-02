@@ -8,6 +8,7 @@ import { StatsModule } from './stats/stats.module';
 import { AuthService } from './auth/auth.service';
 import { BlockchainModule } from './blockchain/blockchain.module';
 import { RaceGamesModule } from './race-games/race-games.module';
+import { ClansModule } from './clans/clans.module';
 
 @Module({
   imports: [
@@ -16,9 +17,10 @@ import { RaceGamesModule } from './race-games/race-games.module';
       url: config.databaseURL,
       ssl: config.useSSL ? { rejectUnauthorized: false } : false,
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: true,
       logging: true,
       autoLoadEntities: true,
+      // synchronize: process.env.NODE_ENV === 'development',
+      synchronize: true,
     }),
     AuthModule,
     AccountsModule,
@@ -26,6 +28,7 @@ import { RaceGamesModule } from './race-games/race-games.module';
     StatsModule,
     BlockchainModule,
     RaceGamesModule,
+    ClansModule,
   ],
   providers: [AuthService],
 })
