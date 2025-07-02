@@ -176,7 +176,7 @@ export class StatsService {
         )
         .select([
           'account.username as username',
-          'account.clan as clan',
+          'account.clan_tag as clan_tag',
           'total_stats.xp as xp',
           'total_stats.coins as coins',
           'total_stats.kills as kills',
@@ -196,7 +196,7 @@ export class StatsService {
         )
         .select([
           'account.username as username',
-          'account.clan as clan',
+          'account.clan_tag as clan_tag',
           'SUM(daily_stats.xp) as xp',
           'SUM(daily_stats.coins) as coins',
           'SUM(daily_stats.kills) as kills',
@@ -207,7 +207,7 @@ export class StatsService {
         .limit(limit)
         .groupBy('daily_stats.account_id')
         .addGroupBy('account.username')
-        .addGroupBy('account.clan')
+        .addGroupBy('account.clan_tag')
         .orderBy('SUM(daily_stats.' + sortBy + ')', 'DESC')
         .getRawMany();
     }

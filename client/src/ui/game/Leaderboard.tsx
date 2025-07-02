@@ -76,9 +76,9 @@ function LeaderboardLine({ player }: any) {
   return (
     <div className="leaderboard-line">
       <span className="leaderboard-place">#{player.place}: </span>
-      {player.account?.clan && (
+      {player.account?.clan_tag && (
         <span className="leaderboard-clan" style={{ color: 'yellow' }}>
-          [{player.account.clan}]{' '}
+          [{player.account.clan_tag}]{' '}
         </span>
       )}
       <span

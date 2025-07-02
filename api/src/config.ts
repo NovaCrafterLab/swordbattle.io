@@ -5,7 +5,7 @@ const isProduction = ENV === 'production';
 
 // 根据环境变量加载对应的配置文件
 require('dotenv').config({
-  path: isProduction 
+  path: isProduction
     ? '../env/api.env.production'
     : '../env/api.env.development'
 });

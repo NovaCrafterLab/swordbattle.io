@@ -33,7 +33,7 @@ interface Stats {
 }
 interface AccountData {
   username: string;
-  clan: string;
+  clan_tag: string;
   created_at: string;
   profile_views: number;
   skins: { equipped: number; owned: number[] };
@@ -58,7 +58,7 @@ ChartJS.register(
 export default function Profile() {
   const [query] = useSearchParams();
   const username = query.get('username');
-  const clan = query.get('clan');
+  const clan_tag = query.get('clan_tag');
   const [data, setAccountData] = useState<ProfileData | null>(null);
   const [isLoading, setLoading] = useState(true);
 
@@ -148,7 +148,7 @@ export default function Profile() {
             X
           </button>
           <center>
-            {data.account.clan ? (
+            {data.account.clan_tag ? (
               <h1>
                 <img
                   src={
@@ -160,7 +160,9 @@ export default function Profile() {
                   alt="Equipped skin"
                   className="equipped-skin"
                 />
-                <span style={{ color: 'yellow' }}>[{data.account.clan}]</span>{' '}
+                <span style={{ color: 'yellow' }}>
+                  [{data.account.clan_tag}]
+                </span>{' '}
                 {data.account.username}
               </h1>
             ) : (

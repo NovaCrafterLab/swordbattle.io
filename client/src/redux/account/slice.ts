@@ -4,7 +4,7 @@ import api from '../../api';
 export type AccountState = {
   email: string;
   username: string;
-  clan: string;
+  clan_tag: string;
   isLoggedIn: boolean;
   secret: string;
   gems: number;
@@ -17,7 +17,7 @@ export type AccountState = {
 const initialState: AccountState = {
   email: '',
   username: '',
-  clan: '',
+  clan_tag: '',
   secret: '',
   isLoggedIn: false,
   gems: 0,
@@ -133,7 +133,7 @@ const accountSlice = createSlice({
     clearAccount: (state) => {
       state.email = '';
       state.username = '';
-      state.clan = '';
+      state.clan_tag = '';
       state.secret = '';
       state.gems = 0;
       state.ultimacy = 0;
@@ -146,7 +146,7 @@ const accountSlice = createSlice({
     setAccount: (state, action) => {
       state.email = action.payload.email;
       state.username = action.payload.username;
-      state.clan = action.payload.clan;
+      state.clan_tag = action.payload.clan_tag;
       state.isLoggedIn = true;
       const previousToken = state.secret;
       state.secret = action.payload.secret;
@@ -170,7 +170,7 @@ const accountSlice = createSlice({
       state.username = action.payload;
     },
     setClantag: (state, action) => {
-      state.clan = action.payload;
+      state.clan_tag = action.payload;
     },
     setSecret: (state, action) => {
       state.secret = action.payload;

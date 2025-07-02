@@ -4,6 +4,8 @@ services:
   db:
     env_file:
       - ./env/api.env.development
+    ports:
+      - "5432:5432"
 
   api:
     env_file:
