@@ -98,7 +98,7 @@ export class AuthController {
       request.account,
       request.body.newClantag,
     );
-    return result;
+    return { error: 'deprecated' };
   }
 
   setCookie(res: Response, key: string, value: string) {

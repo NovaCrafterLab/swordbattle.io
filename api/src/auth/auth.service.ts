@@ -7,7 +7,7 @@ import { AccountsService } from '../accounts/accounts.service';
 import { SecretLoginDTO, LoginDTO, RegisterDTO } from './auth.dto';
 import { Account } from 'src/accounts/account.entity';
 import validateUsername from 'src/helpers/validateUsername';
-import validateClantag from 'src/helpers/validateClantag';
+import { validateTag } from 'src/clans/validateTag';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()

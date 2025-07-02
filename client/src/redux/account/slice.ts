@@ -104,10 +104,8 @@ export const changeClanAsync = createAsyncThunk(
     // const state: any = getState();
     try {
       const response = await api.postAsync(
-        `${api.endpoint}/auth/change-clantag?now=${Date.now()}`,
-        {
-          newClantag,
-        },
+        `${api.endpoint}/clans/join/${newClantag.toUpperCase()}`,
+        {}
       );
 
       if (response.error) {

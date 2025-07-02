@@ -12,6 +12,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Account } from 'src/accounts/account.entity';
+import { config } from 'src/config';
 
 @Entity({ name: 'clans' })
 @Unique(['tag'])
@@ -28,7 +29,7 @@ export class Clan {
   owner: Account;   // clan owner
 
   /* == client input == */
-  @Column({ length: 7 })
+  @Column({ length: config.clanLength[1] })
   tag: string;          // short tag
 
   @Column({ length: 64 })

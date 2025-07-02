@@ -11,7 +11,7 @@ import { FindOneOptions, Repository } from 'typeorm';
 import { Account } from './account.entity';
 import * as config from '../config';
 import validateUsername from 'src/helpers/validateUsername';
-import validateClantag from 'src/helpers/validateClantag';
+import { validateTag } from 'src/clans/validateTag';
 import { Transaction } from 'src/transactions/transactions.entity';
 import * as cosmetics from '../cosmetics.json';
 import CacheObj from 'src/Cache';
@@ -289,7 +289,7 @@ export class AccountsService {
   }
 
   async changeClantag(id: number, clantag: string) {
-    const validateErr = validateClantag(clantag);
+    const validateErr = validateTag(clantag);
     if (validateErr) return { error: validateErr };
 
     const account = await this.getById(id);

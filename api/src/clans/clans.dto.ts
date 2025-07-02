@@ -2,6 +2,7 @@
 // DTOs for clans module
 
 import { IsBoolean, IsOptional, IsString, Length, Matches } from 'class-validator';
+import { config } from 'src/config';
 
 /**
  * body for POST /clans
@@ -9,7 +10,7 @@ import { IsBoolean, IsOptional, IsString, Length, Matches } from 'class-validato
 export class CreateClanDto {
   /* short tag, 1–6 alnum */
   @IsString()
-  @Length(1, 7)
+  @Length(config.clanLength[0], config.clanLength[1])
   tag: string;
 
   /* full name, 1–64 chars */
