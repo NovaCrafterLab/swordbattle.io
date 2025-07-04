@@ -19,6 +19,7 @@ interface GameReward {
   isWinner: boolean;
   timestamp?: number;
   level?: number; // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH
+  fragmentReward?: bigint; // 碎片奖励
 }
 
 const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
@@ -26,9 +27,15 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
   const blockchain = useBlockchain();
   const playerData = usePlayerData();
 
+  // 获取碎片余额和冷却状态
+  const { data: fragmentBalance } = blockchain.useFragmentBalance(address || '');
+  const { data: cooldownStatus } = blockchain.useCooldownStatus(address || '');
+  const { data: pendingRewards } = blockchain.usePendingRewards(address || '');
+
   const [gameRewards, setGameRewards] = useState<GameReward[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [claimingGameId, setClaimingGameId] = useState<number | null>(null);
+  const [claimingAll, setClaimingAll] = useState(false);
   const [showFilter, setShowFilter] = useState<'all' | 'claimable'>('all');
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [retryTrigger, setRetryTrigger] = useState(0);
@@ -53,7 +60,7 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
           timestamp: game.timestamp,
           level: game.level,
         }));
-        setGameRewards(gameRewardsData);
+        setGameRewards(gameRewardsData);        
         setIsLoading(false);
       } else {
         // 如果没有缓存数据，立即刷新
@@ -95,7 +102,7 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
   }, [retryTrigger]);
 
   /**
-   * 领取奖励
+   * 领取单个游戏奖励
    */
   const handleClaimReward = async (gameId: number) => {
     if (!address) return;
@@ -106,6 +113,21 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
     } catch (error) {
       console.error('Failed to claim reward:', error);
       setClaimingGameId(null);
+    }
+  };
+
+  /**
+   * 领取所有奖励
+   */
+  const handleClaimAllRewards = async () => {
+    if (!address) return;
+
+    try {
+      setClaimingAll(true);
+      blockchain.claimAllRewards();
+    } catch (error) {
+      console.error('Failed to claim all rewards:', error);
+      setClaimingAll(false);
     }
   };
 
@@ -227,6 +249,12 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
               <span className="stat-value claimable">{formatEther(claimableAmount)} USD1</span>
             </div>
             <div className="stat-item">
+              <label>Fragment Balance</label>
+              <span className="stat-value" style={{ color: '#9333ea' }}>
+                {fragmentBalance ? formatEther(fragmentBalance as bigint) : '0'} ⚡
+              </span>
+            </div>
+            <div className="stat-item">
               <label>Games Played</label>
               <span className="stat-value">{totalGames}</span>
             </div>
@@ -258,6 +286,24 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
                   </button>
                 </div>
                 
+                {/* 批量领取按钮 */}
+                {claimableCount > 1 && (
+                  <button 
+                    onClick={handleClaimAllRewards}
+                    disabled={claimingAll || (cooldownStatus ? !cooldownStatus.canClaim : false)}
+                    className="filter-btn"
+                    style={{ 
+                      fontSize: '12px', 
+                      padding: '6px 12px',
+                      backgroundColor: '#10b981',
+                      color: 'white',
+                      opacity: (claimingAll || (cooldownStatus ? !cooldownStatus.canClaim : false)) ? 0.6 : 1
+                    }}
+                  >
+                    {claimingAll ? '🔄 Claiming...' : `💰 Claim All (${claimableCount})`}
+                  </button>
+                )}
+
                 {/* 刷新按钮 */}
                 <button 
                   onClick={handleRetry}

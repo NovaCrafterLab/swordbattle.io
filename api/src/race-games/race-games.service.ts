@@ -248,9 +248,11 @@ export class RaceGamesService {
           const playerInfo = await this.blockchainService.getPlayerInfo(game.gameId, playerAddress);
           
           if (playerInfo) {
-            const rewardAmount = (Number(playerInfo.reward) / 1e18).toString(); // 转换为以太币单位
-            const hasClaimed = Boolean(playerInfo.claimed);
-            const isWinner = Number(playerInfo.reward) > 0;
+            // 使用新合约的getPlayerRewards方法获取奖励信息
+            const playerRewards = await this.blockchainService.getPlayerRewards(game.gameId, playerAddress);
+            const rewardAmount = playerRewards.totalReward; // 已经格式化为以太币单位
+            const hasClaimed = playerRewards.claimed;
+            const isWinner = Number(playerRewards.totalReward) > 0;
 
             // 检查是否需要更新
             const needsUpdate = 

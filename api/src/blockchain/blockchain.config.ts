@@ -27,11 +27,12 @@ export const defaultBlockchainConfig: BlockchainConfig = {
   enabled: process.env.BLOCKCHAIN_ENABLED === 'true',
   rpcUrl: process.env.BLOCKCHAIN_RPC_URL,
   contracts: {
+    // 根据双合约架构，API 主要使用 GameAggregator 进行游戏操作
     swordBattle: isDev 
-      ? (process.env.SWORD_BATTLE_CONTRACT_TESTNET || process.env.SWORD_BATTLE_CONTRACT || '')
-      : (process.env.SWORD_BATTLE_CONTRACT_MAINNET || process.env.SWORD_BATTLE_CONTRACT || ''),
+      ? (process.env.GAME_AGGREGATOR_CONTRACT_TESTNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x99616B1f031aF994a4b2cc940683255cB76Dd596')
+      : (process.env.GAME_AGGREGATOR_CONTRACT_MAINNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x99616B1f031aF994a4b2cc940683255cB76Dd596'),
     usd1Token: isDev 
-      ? (process.env.USD1_TOKEN_CONTRACT_TESTNET || process.env.USD1_TOKEN_CONTRACT || '')
+      ? (process.env.USD1_TOKEN_CONTRACT_TESTNET || process.env.USD1_TOKEN_CONTRACT || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16')
       : (process.env.USD1_TOKEN_CONTRACT_MAINNET || process.env.USD1_TOKEN_CONTRACT || ''),
   },
   trustedSigner: process.env.TRUSTED_SIGNER_PRIVATE_KEY,
@@ -53,8 +54,8 @@ export function validateBlockchainConfig(config: BlockchainConfig): boolean {
   
   if (!config.contracts.swordBattle) {
     const expectedVar = isDev 
-      ? 'SWORD_BATTLE_CONTRACT_TESTNET (或 SWORD_BATTLE_CONTRACT)' 
-      : 'SWORD_BATTLE_CONTRACT_MAINNET (或 SWORD_BATTLE_CONTRACT)';
+      ? 'GAME_AGGREGATOR_CONTRACT_TESTNET (或 SWORD_BATTLE_CONTRACT_TESTNET)' 
+      : 'GAME_AGGREGATOR_CONTRACT_MAINNET (或 SWORD_BATTLE_CONTRACT_MAINNET)';
     missingFields.push(expectedVar);
   }
   

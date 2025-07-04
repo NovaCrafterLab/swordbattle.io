@@ -10,6 +10,7 @@ import {
   faX,
 } from '@fortawesome/free-solid-svg-icons';
 import { useAccount } from 'wagmi';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
 
 import clsx from 'clsx';
 import { useScale } from './Scale';
@@ -71,6 +72,7 @@ function App() {
   const dispatch = useDispatch();
   const account = useSelector(selectAccount);
   const { address: walletAddress, isConnected: walletConnected } = useAccount();
+  const { openConnectModal } = useConnectModal();
 
   const scale = useScale(false);
   const [name, setName] = useState('');
@@ -464,6 +466,7 @@ function App() {
                         account={account}
                         onLogin={onLogin}
                         onSignup={onSignup}
+                        onConnectWallet={openConnectModal}
                       />
                     </div>
 

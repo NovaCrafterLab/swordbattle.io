@@ -2,7 +2,8 @@
 // 适配 BSC 主网与测试网，预留 ABI 路径与类型声明
 
 // ABI导入
-import DeploySwordABI from './DeploySword.json';
+import GameAggregatorABI from './GameAggregator.json';
+import SwordBattleABI from './SwordBattle.json';
 import ERC20ABI from './ERC20.json';
 import { config } from '../config';
 
@@ -12,22 +13,25 @@ export const isDev = config.isDev;
 export const isRelease = ENV === 'release';
 console.log('Environment:', ENV);
 
-// 合约地址配置 - 根据环境选择
+// 合约地址配置 - 根据环境选择  
 export const CONTRACTS = isDev
   ? {
     // BSC测试网合约地址
-    SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_TESTNET || '0x835ad66aE6d6fA8D66fC3fd9Dd58B9871b4FA671',
-    USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_TESTNET || '0x73b8C8c5c81F257832e86A7329123035477C12fA',
+    GAME_AGGREGATOR: process.env.REACT_APP_GAME_AGGREGATOR_CONTRACT_TESTNET || '0x99616B1f031aF994a4b2cc940683255cB76Dd596',
+    SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_TESTNET || '0x788aA9aAb214B3ac525c23bd257e93Ff0f10D9E0',
+    USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_TESTNET || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16',
   }
   : {
     // BSC主网合约地址
-    SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_MAINNET || '0x0000000000000000000000000000000000000000',
-    USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_MAINNET || '0x0000000000000000000000000000000000000000',
+    GAME_AGGREGATOR: process.env.REACT_APP_GAME_AGGREGATOR_CONTRACT_MAINNET || '0x99616B1f031aF994a4b2cc940683255cB76Dd596',
+    SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_MAINNET || '0x788aA9aAb214B3ac525c23bd257e93Ff0f10D9E0',
+    USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_MAINNET || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16',
   } as const;
 
 // ABI导入
 export const ABIS = {
-  SWORD_BATTLE: DeploySwordABI as readonly any[],
+  GAME_AGGREGATOR: GameAggregatorABI.abi as readonly any[],
+  SWORD_BATTLE: SwordBattleABI.abi as readonly any[],
   USD1_TOKEN: ERC20ABI.abi as readonly any[],
 } as const;
 
@@ -38,6 +42,11 @@ export type ContractConfig = {
 };
 
 // 导出合约配置
+export const getGameAggregatorContract = (): ContractConfig => ({
+  address: CONTRACTS.GAME_AGGREGATOR as `0x${string}`,
+  abi: ABIS.GAME_AGGREGATOR,
+});
+
 export const getSwordBattleContract = (): ContractConfig => ({
   address: CONTRACTS.SWORD_BATTLE as `0x${string}`,
   abi: ABIS.SWORD_BATTLE,

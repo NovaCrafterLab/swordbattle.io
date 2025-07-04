@@ -12,10 +12,12 @@ export default function AccountCard({
   account,
   onLogin,
   onSignup,
+  onConnectWallet,
 }: {
   account: AccountState;
   onLogin: () => void;
   onSignup: () => void;
+  onConnectWallet?: () => void;
 }) {
   if (account.isLoggedIn) {
     return (
@@ -57,6 +59,10 @@ export default function AccountCard({
           <a onClick={onLogin}>Login</a> or&nbsp;
           <a onClick={onSignup}>Create an Account</a> to save your progress and
           unlock skins!
+          <br></br>
+          <br></br>
+          <a onClick={onConnectWallet}>Connect wallet</a> to join the race and
+          get rewards!
         </div>
       </span>
     );

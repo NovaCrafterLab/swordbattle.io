@@ -1119,10 +1119,10 @@ class Game {
       try {
         console.log(`🔍 查询玩家 ${gameData.playerAddress} 的奖励...`);
 
-        // 从区块链查询真实奖励数据
-        const playerReward = await this.blockchainService.readContract(
+        // 从区块链查询真实奖励数据（新合约）
+        const playerRewards = await this.blockchainService.readContract(
           this.blockchainService.getSwordBattleContract(),
-          'getReward',
+          'getPlayerRewards',
           [BigInt(this.blockchainGameId), gameData.playerAddress]
         );
 
@@ -1132,9 +1132,18 @@ class Game {
           [BigInt(this.blockchainGameId), gameData.playerAddress]
         );
 
-        const rewardEth = Number(playerReward) / 1e18; // 转换为以太币单位
-        const isWinner = playerReward > BigInt(0);
-        const hasClaimed = playerInfo[5]; // claimed字段在getPlayerInfo返回数组的第6个位置（索引5）
+        // getPlayerRewards返回: [killReward, lotteryReward, guaranteedReward, fragmentReward, claimableTime, canClaim]
+        const killReward = playerRewards[0];
+        const lotteryReward = playerRewards[1];
+        const guaranteedReward = playerRewards[2];
+        const fragmentReward = playerRewards[3];
+        const canClaim = playerRewards[5];
+
+        // 计算总奖励（不包括碎片奖励，因为那不是USD1代币）
+        const totalReward = killReward + lotteryReward + guaranteedReward;
+        const rewardEth = Number(totalReward) / 1e18; // 转换为以太币单位
+        const isWinner = totalReward > BigInt(0);
+        const hasClaimed = !canClaim; // 如果不能领取，说明已经领取了
 
         console.log(`💰 玩家 ${gameData.playerAddress} 区块链奖励: ${rewardEth} USD1 (已领取: ${hasClaimed})`);
 

@@ -5,7 +5,7 @@ const Logger = require('../utils/Logger');
 
 // 导入模块化配置
 const { CURRENT_RPC_POOL, NETWORK_CONFIG, ENVIRONMENT, isDev } = require('./networkConfig');
-const { SWORD_BATTLE_ABI, ERC20_ABI } = require('./abis');
+const { SWORD_BATTLE_ABI, GAME_AGGREGATOR_ABI, ERC20_ABI } = require('./abis');
 const RPCManager = require('./RPCManager');
 
 class BlockchainService {
@@ -55,15 +55,23 @@ class BlockchainService {
 
       // 如果有私钥，创建钱包客户端用于签名和发送交易
       if (this.config.trustedSigner) {
+        Logger.server.debug('Creating wallet account from private key', {
+          privateKeyPresent: !!this.config.trustedSigner,
+          privateKeyLength: this.config.trustedSigner?.length
+        });
+        
         this.account = privateKeyToAccount(this.config.trustedSigner);
         this.walletClient = createWalletClient({
           account: this.account,
           chain,
           transport: http(rpcUrl),
         });
-        Logger.server.debug('Wallet account initialized', { 
-          address: this.account.address 
+        Logger.server.info('Wallet account initialized', { 
+          address: this.account.address,
+          contractAddress: this.config.contracts?.swordBattle
         });
+      } else {
+        Logger.server.error('No trusted signer private key provided!');
       }
 
       // 测试连接
@@ -74,10 +82,12 @@ class BlockchainService {
 
       // 使用从文件加载的ABI
       this.swordBattleAbi = SWORD_BATTLE_ABI;
+      this.gameAggregatorAbi = GAME_AGGREGATOR_ABI;
       this.usd1TokenAbi = ERC20_ABI;
 
       Logger.server.debug('Loaded contract ABIs', {
         swordBattleFunctions: this.swordBattleAbi.length,
+        gameAggregatorFunctions: this.gameAggregatorAbi.length,
         erc20Functions: this.usd1TokenAbi.length
       });
 
@@ -152,6 +162,13 @@ class BlockchainService {
     };
   }
 
+  getGameAggregatorContract() {
+    return {
+      address: this.config.contracts.gameAggregator,
+      abi: this.gameAggregatorAbi,
+    };
+  }
+
   getUsd1TokenContract() {
     return {
       address: this.config.contracts.usd1Token,
@@ -201,6 +218,14 @@ class BlockchainService {
     }
 
     try {
+      Logger.server.debug('Preparing contract write operation', {
+        functionName,
+        contractAddress: contract.address,
+        walletAddress: this.account?.address,
+        accountPresent: !!this.account,
+        walletClientPresent: !!this.walletClient
+      });
+      
       const { request } = await this.publicClient.simulateContract({
         account: this.account,
         address: contract.address,
@@ -246,7 +271,7 @@ class BlockchainService {
       name: 'SwordBattle',
       version: '1',
       chainId: await this.publicClient.getChainId(),
-      verifyingContract: this.config.contracts.swordBattle,
+      verifyingContract: this.config.contracts.gameAggregator,
     };
 
     // 消息类型定义
@@ -341,7 +366,7 @@ class BlockchainService {
   // ============ 区块链读取方法 ============
 
   /**
-   * 获取游戏计数器
+   * 获取游戏计数器 (使用 SwordBattle 合约)
    */
   async getGameCounter() {
     const contract = this.getSwordBattleContract();
@@ -349,39 +374,57 @@ class BlockchainService {
   }
 
   /**
-   * 获取游戏信息
+   * 获取游戏信息 (使用 GameAggregator 合约)
    */
   async getGameInfo(gameId) {
-    const contract = this.getSwordBattleContract();
-    return await this.readContract(contract, 'games', [BigInt(gameId)]);
+    const contract = this.getGameAggregatorContract();
+    return await this.readContract(contract, 'getGameFullInfo', [BigInt(gameId)]);
   }
 
   /**
-   * 获取游戏玩家列表
+   * 获取游戏玩家列表 (使用 GameAggregator 合约)
    */
   async getGamePlayers(gameId) {
-    const contract = this.getSwordBattleContract();
-    return await this.readContract(contract, 'getGamePlayers', [BigInt(gameId)]);
+    const contract = this.getGameAggregatorContract();
+    const gameInfo = await this.readContract(contract, 'getGameFullInfo', [BigInt(gameId)]);
+    // GameAggregator的getGameFullInfo返回的结构中包含activePlayers数组
+    return gameInfo[9]; // activePlayers是第10个字段 (索引9)
   }
 
   /**
-   * 获取入场费
+   * 获取入场费 (使用 GameAggregator 合约查询活跃游戏)
    */
-  async getEntryFee() {
-    const contract = this.getSwordBattleContract();
-    return await this.readContract(contract, 'entryFee', []);
+  async getEntryFee(level = 0) {
+    // GameAggregator 中没有全局的 entryFee 函数
+    // 入场费在游戏配置中，可以通过获取活跃游戏来获取
+    const contract = this.getGameAggregatorContract();
+    try {
+      const activeGames = await this.readContract(contract, 'getActiveGames', [level, 1]);
+      if (activeGames && activeGames.length > 0) {
+        return activeGames[0][11]; // entryFee是GameFullInfo结构的第12个字段
+      }
+      return BigInt(0); // 默认返回0
+    } catch (error) {
+      Logger.server.warn('Failed to get entry fee, returning 0', { error: error.message });
+      return BigInt(0);
+    }
   }
 
   /**
    * 检查玩家是否已加入游戏
    */
   async isPlayerInGame(gameId, playerAddress) {
-    const contract = this.getSwordBattleContract();
-    return await this.readContract(contract, 'isPlayerInGame', [BigInt(gameId), playerAddress]);
+    try {
+      const players = await this.getGamePlayers(gameId);
+      return players.includes(playerAddress.toLowerCase()) || players.includes(playerAddress);
+    } catch (error) {
+      Logger.server.warn('Failed to check if player is in game, returning false', { gameId, playerAddress, error: error.message });
+      return false;
+    }
   }
 
   /**
-   * 获取玩家nonce
+   * 获取玩家nonce (使用 SwordBattle 合约)
    */
   async getPlayerNonce(playerAddress) {
     const contract = this.getSwordBattleContract();
@@ -391,7 +434,7 @@ class BlockchainService {
   // ============ 区块链交易方法 ============
 
   /**
-   * 创建新游戏
+   * 创建新游戏 (使用 GameAggregator 合约)
    */
   async createGame(level = 0) {
     if (!this.isInitialized || !this.walletClient) {
@@ -400,21 +443,26 @@ class BlockchainService {
 
     try {
       Logger.server.info('Creating new game on blockchain', { level });
-      Logger.server.debug('Checking current game counter before creation');
       
-      // 记录创建前的游戏计数器
-      const initialCounter = await this.getGameCounter();
-      Logger.server.debug('Current game counter before creation', { counter: initialCounter });
+      const contract = this.getGameAggregatorContract();
       
-      const contract = this.getSwordBattleContract();
-      const txHash = await this.writeContract(contract, 'createGame', [level]);
+      // GameAggregator的createGame会直接返回gameId
+      Logger.server.debug('Calling createGame on GameAggregator', { level });
+      const { request } = await this.publicClient.simulateContract({
+        account: this.account,
+        address: contract.address,
+        abi: contract.abi,
+        functionName: 'createGame',
+        args: [level],
+      });
+
+      const txHash = await this.walletClient.writeContract(request);
       
       Logger.server.info('Game creation transaction sent', { txHash });
       Logger.server.debug('Transaction submitted to blockchain, waiting for confirmation');
       
       return {
         txHash,
-        initialCounter,
         timestamp: Date.now(),
         level
       };
@@ -435,7 +483,7 @@ class BlockchainService {
   }
 
   /**
-   * 结束游戏
+   * 结束游戏 (使用 GameAggregator 合约)
    */
   async endGame(gameId) {
     if (!this.isInitialized || !this.walletClient) {
@@ -445,7 +493,7 @@ class BlockchainService {
     try {
       Logger.server.info('Ending game on blockchain', { gameId });
       
-      const contract = this.getSwordBattleContract();
+      const contract = this.getGameAggregatorContract();
       const txHash = await this.writeContract(contract, 'endGame', [BigInt(gameId)]);
       
       Logger.server.info('Game end transaction sent', { txHash });
@@ -457,7 +505,7 @@ class BlockchainService {
   }
 
   /**
-   * 提交分数
+   * 提交分数 (使用 GameAggregator 合约)
    */
   async submitScore(gameId, playerAddress, kills, score, nonce, signature) {
     if (!this.isInitialized || !this.walletClient) {
@@ -467,7 +515,7 @@ class BlockchainService {
     try {
       Logger.server.info('Submitting score', { score, kills, gameId, playerAddress });
       
-      const contract = this.getSwordBattleContract();
+      const contract = this.getGameAggregatorContract();
       const txHash = await this.writeContract(contract, 'submitScore', [
         BigInt(gameId),
         playerAddress,
@@ -486,7 +534,7 @@ class BlockchainService {
   }
 
   /**
-   * 自动结束游戏（如果游戏超时）
+   * 强制结束游戏（如果游戏超时或需要管理员干预）(使用 GameAggregator 合约)
    */
   async autoEndGame(gameId) {
     if (!this.isInitialized || !this.walletClient) {
@@ -494,15 +542,15 @@ class BlockchainService {
     }
 
     try {
-      Logger.server.info('Auto-ending game on blockchain', { gameId });
+      Logger.server.info('Force-ending game on blockchain', { gameId });
       
-      const contract = this.getSwordBattleContract();
-      const txHash = await this.writeContract(contract, 'autoEndGame', [BigInt(gameId)]);
+      const contract = this.getGameAggregatorContract();
+      const txHash = await this.writeContract(contract, 'forceEndGame', [BigInt(gameId), "Auto timeout"]);
       
-      Logger.server.info('Auto-end game transaction sent', { txHash });
+      Logger.server.info('Force-end game transaction sent', { txHash });
       return txHash;
     } catch (error) {
-      Logger.server.error('Failed to auto-end game', { gameId, error: error.message });
+      Logger.server.error('Failed to force-end game', { gameId, error: error.message });
       throw error;
     }
   }

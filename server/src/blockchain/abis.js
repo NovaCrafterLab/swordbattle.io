@@ -2,10 +2,24 @@
 const fs = require('fs');
 const path = require('path');
 
-// 加载完整的SwordBattle合约ABI
+// 加载完整的GameAggregator合约ABI
+function loadGameAggregatorABI() {
+  try {
+    const abiPath = path.join(__dirname, 'abis', 'GameAggregator.json');
+    const abiData = fs.readFileSync(abiPath, 'utf8');
+    const parsedData = JSON.parse(abiData);
+    // 如果ABI被包装在对象中，提取abi数组
+    return parsedData.abi || parsedData;
+  } catch (error) {
+    console.error('Failed to load GameAggregator ABI:', error);
+    throw new Error('Unable to load GameAggregator contract ABI');
+  }
+}
+
+// 加载完整的SwordBattle合约ABI（用于基础数据查询）
 function loadSwordBattleABI() {
   try {
-    const abiPath = path.join(__dirname, 'abis', 'DeploySword.json');
+    const abiPath = path.join(__dirname, 'abis', 'swordbattle.abi.json');
     const abiData = fs.readFileSync(abiPath, 'utf8');
     return JSON.parse(abiData);
   } catch (error) {
@@ -141,10 +155,12 @@ function loadERC20ABI() {
 }
 
 // 加载并导出ABI
+const GAME_AGGREGATOR_ABI = loadGameAggregatorABI();
 const SWORD_BATTLE_ABI = loadSwordBattleABI();
 const ERC20_ABI = loadERC20ABI();
 
 module.exports = {
   SWORD_BATTLE_ABI,
+  GAME_AGGREGATOR_ABI,
   ERC20_ABI
 }; 

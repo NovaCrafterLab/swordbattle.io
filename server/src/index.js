@@ -61,6 +61,9 @@ async function bootstrap() {
   const game = new Game();
   const server = new Server(game);
 
+  // Attach blockchain service to game instance
+  game.blockchainService = global.blockchainService;
+
   game.initialize();
   server.initialize(app);
 
@@ -70,6 +73,11 @@ async function bootstrap() {
 
   startGameLoop(game, server);
   setupShutdownHandlers(game, server);
+
+  // Initialize blockchain game for race servers
+  if (config.isRaceServer && config.blockchain.enabled) {
+    await game.initializeBlockchainGame();
+  }
 
   /* == Periodic restart hook == */
   if (config.enableCycleRestart) {

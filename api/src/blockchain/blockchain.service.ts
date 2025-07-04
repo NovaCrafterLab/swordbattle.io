@@ -7,9 +7,12 @@ import { bsc, bscTestnet } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { BlockchainConfig, defaultBlockchainConfig, validateBlockchainConfig } from './blockchain.config';
 
-// 导入ABI（从游戏服务器复制）
-import { SWORD_BATTLE_ABI } from './abis/swordBattle.abi';
+// 导入ABI（使用GameAggregator ABI）
+import { GAME_AGGREGATE_ABI } from './abis/gameAggregate.abi';
 import { ERC20_ABI } from './abis/erc20.abi';
+
+// 保持向后兼容
+const SWORD_BATTLE_ABI = GAME_AGGREGATE_ABI;
 
 // RPC池配置
 const BSC_MAINNET_RPC_POOL = [
@@ -199,7 +202,7 @@ export class BlockchainService implements OnModuleInit {
     }
   }
 
-  // 获取玩家信息
+  // 获取玩家基本信息（新合约结构）
   async getPlayerInfo(gameId: number, playerAddress: string) {
     if (!this.isAvailable()) {
       throw new Error('Blockchain service not available');
@@ -213,19 +216,57 @@ export class BlockchainService implements OnModuleInit {
         args: [BigInt(gameId), playerAddress as `0x${string}`],
       });
 
+      // 新合约getPlayerInfo返回: [playerAddr, kills, score, submitted, fragmentReward]
       return {
         playerAddr: result[0] as string,
         kills: Number(result[1]),
         score: Number(result[2]),
         submitted: result[3] as boolean,
-        claimed: result[4] as boolean,
-        killReward: formatEther(result[5]),
-        survivalReward: formatEther(result[6]),
-        // 计算总奖励
-        reward: formatEther(BigInt(result[5]) + BigInt(result[6])),
+        fragmentReward: formatEther(result[4]),
       };
     } catch (error) {
       this.logger.error(`Failed to get player info for ${playerAddress} in game ${gameId}:`, error);
+      throw error;
+    }
+  }
+
+  // 获取玩家奖励信息（新合约功能）
+  async getPlayerRewards(gameId: number, playerAddress: string) {
+    if (!this.isAvailable()) {
+      throw new Error('Blockchain service not available');
+    }
+
+    try {
+      const result = await this.publicClient.readContract({
+        address: this.config.contracts.swordBattle as `0x${string}`,
+        abi: SWORD_BATTLE_ABI,
+        functionName: 'getPlayerRewards',
+        args: [BigInt(gameId), playerAddress as `0x${string}`],
+      });
+
+      // getPlayerRewards返回: [killReward, lotteryReward, guaranteedReward, fragmentReward, claimableTime, canClaim]
+      const killReward = result[0] as bigint;
+      const lotteryReward = result[1] as bigint;
+      const guaranteedReward = result[2] as bigint;
+      const fragmentReward = result[3] as bigint;
+      const claimableTime = result[4] as bigint;
+      const canClaim = result[5] as boolean;
+
+      // 计算总USD1奖励（不包括碎片奖励）
+      const totalReward = killReward + lotteryReward + guaranteedReward;
+
+      return {
+        killReward: formatEther(killReward),
+        lotteryReward: formatEther(lotteryReward),
+        guaranteedReward: formatEther(guaranteedReward),
+        fragmentReward: formatEther(fragmentReward),
+        totalReward: formatEther(totalReward),
+        claimableTime: Number(claimableTime),
+        canClaim,
+        claimed: !canClaim, // 如果不能领取，说明已经领取了
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get player rewards for ${playerAddress} in game ${gameId}:`, error);
       throw error;
     }
   }
@@ -317,6 +358,7 @@ export class BlockchainService implements OnModuleInit {
           if (players.some(p => p.toLowerCase() === playerLowerCase)) {
             // 获取玩家在这个游戏中的详细信息
             const playerInfo = await this.getPlayerInfo(gameId, playerAddress);
+            const playerRewards = await this.getPlayerRewards(gameId, playerAddress);
             const gameInfo = await this.getGameInfo(gameId);
             
             // 获取排名
@@ -330,7 +372,7 @@ export class BlockchainService implements OnModuleInit {
               if (playerIndex >= 0) {
                 rank = playerIndex + 1;
                 // 假设前3名为获胜者，并且奖励大于0
-                isWinner = rank <= 3 && parseFloat(playerInfo.reward) > 0;
+                isWinner = rank <= 3 && parseFloat(playerRewards.totalReward) > 0;
               }
             } catch (error) {
               this.logger.warn(`Failed to get rankings for game ${gameId}:`, error);
@@ -339,8 +381,8 @@ export class BlockchainService implements OnModuleInit {
             gameHistory.push({
               gameId,
               score: playerInfo.score,
-              reward: playerInfo.reward,
-              hasClaimed: playerInfo.claimed,
+              reward: playerRewards.totalReward,
+              hasClaimed: playerRewards.claimed,
               rank,
               isWinner,
               level: gameInfo.level,
