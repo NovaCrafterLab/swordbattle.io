@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from 'wagmi'
 import { formatEther } from 'viem'
 import { useBlockchain } from './useBlockchain'
-import { getSwordBattleContract } from '@/config/walletConfig'
+import { getGameAggregatorContract, getSwordBattleContract } from '@/config/walletConfig'
 import { endpoint as API_ROOT } from '@/api'
 
 // 玩家数据类型
@@ -47,7 +47,7 @@ export const usePlayerData = () => {
   const { data: usd1Balance, refetch: refetchBalance } =
     blockchain.useUSD1Balance(address || '')
 
-  // 获取USD1授权额度
+  // 获取USD1授权额度 - 查询对SwordBattle合约的授权
   const { data: allowance, refetch: refetchAllowance } =
     blockchain.useUSD1Allowance(address || '', getSwordBattleContract().address)
 
@@ -133,10 +133,10 @@ export const usePlayerData = () => {
         const { data: score } = blockchain.usePlayerScore(gameId, address)
 
         // 获取玩家奖励
-        const { data: reward } = blockchain.usePlayerReward(gameId, address)
+        const { data: reward } = blockchain.usePlayerRewards(gameId, address)
 
         // 检查是否已领取
-        const { data: hasClaimed } = blockchain.useHasClaimedReward(
+        const { data: hasClaimed } = blockchain.useCanClaimReward(
           gameId,
           address
         )

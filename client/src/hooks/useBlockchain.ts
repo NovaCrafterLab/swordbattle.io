@@ -1,6 +1,6 @@
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
-import { getSwordBattleContract, getUSD1TokenContract } from '../config/walletConfig';
+import { getGameAggregatorContract, getSwordBattleContract, getUSD1TokenContract } from '../config/walletConfig';
 
 // 游戏相关数据类型
 export interface GameInfo {
@@ -26,6 +26,7 @@ export interface PlayerData {
  * 区块链交互主hook
  */
 export const useBlockchain = () => {
+  const gameAggregatorContract = getGameAggregatorContract();
   const swordBattleContract = getSwordBattleContract();
   const usd1TokenContract = getUSD1TokenContract();
 
@@ -54,11 +55,11 @@ export const useBlockchain = () => {
   };
 
   /**
-   * 获取入场费（支持级别参数）
+   * 获取入场费（支持级别参数）- 使用 GameAggregator
    */
   const useEntryFee = (level?: number) => {
     return useReadContract({
-      ...swordBattleContract,
+      ...gameAggregatorContract,
       functionName: level !== undefined ? 'levelConfigs' : 'entryFee',
       args: level !== undefined ? [level] : [],
       query: {
@@ -75,11 +76,11 @@ export const useBlockchain = () => {
   };
 
   /**
-   * 获取级别配置
+   * 获取级别配置 - 使用 GameAggregator
    */
   const useLevelConfig = (level: number) => {
     return useReadContract({
-      ...swordBattleContract,
+      ...gameAggregatorContract,
       functionName: 'levelConfigs',
       args: [level],
       query: {
@@ -99,12 +100,12 @@ export const useBlockchain = () => {
   };
 
   /**
-   * 获取游戏信息
+   * 获取游戏信息 (使用 GameAggregator)
    */
   const useGameInfo = (gameId: number) => {
     return useReadContract({
-      ...swordBattleContract,
-      functionName: 'games',
+      ...gameAggregatorContract,
+      functionName: 'getGameFullInfo',
       args: [BigInt(gameId)],
       query: {
         enabled: gameId >= 0,
@@ -113,11 +114,11 @@ export const useBlockchain = () => {
   };
 
   /**
-   * 获取游戏玩家列表
+   * 获取游戏玩家列表 (使用 GameAggregator)
    */
   const useGamePlayers = (gameId: number) => {
     return useReadContract({
-      ...swordBattleContract,
+      ...gameAggregatorContract,
       functionName: 'getGamePlayers',
       args: [BigInt(gameId)],
       query: {
@@ -151,7 +152,7 @@ export const useBlockchain = () => {
       query: {
         enabled: gameId >= 0 && !!playerAddress,
         select: (data: any) => {
-          // getPlayerInfo返回: [playerAddr, kills, score, submitted, claimed, killReward, survivalReward]
+          // 新合约getPlayerInfo返回: [playerAddr, kills, score, submitted, fragmentReward]
           // score在索引2位置
           return Array.isArray(data) ? data[2] : 0;
         },
@@ -160,23 +161,37 @@ export const useBlockchain = () => {
   };
 
   /**
-   * 获取玩家奖励
+   * 获取玩家奖励信息（新合约）
    */
-  const usePlayerReward = (gameId: number, playerAddress: string) => {
+  const usePlayerRewards = (gameId: number, playerAddress: string) => {
     return useReadContract({
       ...swordBattleContract,
-      functionName: 'getReward',
+      functionName: 'getPlayerRewards',
       args: [BigInt(gameId), playerAddress as `0x${string}`],
       query: {
         enabled: gameId >= 0 && !!playerAddress,
+        select: (data: any) => {
+          // getPlayerRewards返回: [killReward, lotteryReward, guaranteedReward, fragmentReward, claimableTime, canClaim]
+          if (Array.isArray(data)) {
+            return {
+              killReward: data[0],
+              lotteryReward: data[1],
+              guaranteedReward: data[2],
+              fragmentReward: data[3],
+              claimableTime: data[4],
+              canClaim: data[5],
+            };
+          }
+          return null;
+        },
       },
     });
   };
 
   /**
-   * 检查玩家是否已领取奖励
+   * 获取玩家基本信息（新合约）
    */
-  const useHasClaimedReward = (gameId: number, playerAddress: string) => {
+  const usePlayerInfo = (gameId: number, playerAddress: string) => {
     return useReadContract({
       ...swordBattleContract,
       functionName: 'getPlayerInfo',
@@ -184,9 +199,156 @@ export const useBlockchain = () => {
       query: {
         enabled: gameId >= 0 && !!playerAddress,
         select: (data: any) => {
-          // getPlayerInfo返回: [playerAddr, kills, score, submitted, claimed, killReward, survivalReward]
-          // claimed在索引4位置
-          return Array.isArray(data) ? data[4] : false;
+          // getPlayerInfo返回: [playerAddr, kills, score, submitted, fragmentReward]
+          if (Array.isArray(data)) {
+            return {
+              playerAddr: data[0],
+              kills: data[1],
+              score: data[2],
+              submitted: data[3],
+              fragmentReward: data[4],
+            };
+          }
+          return null;
+        },
+      },
+    });
+  };
+
+  /**
+   * 检查玩家是否可以领取奖励（使用新的getPlayerRewards函数）
+   */
+  const useCanClaimReward = (gameId: number, playerAddress: string) => {
+    return useReadContract({
+      ...swordBattleContract,
+      functionName: 'getPlayerRewards',
+      args: [BigInt(gameId), playerAddress as `0x${string}`],
+      query: {
+        enabled: gameId >= 0 && !!playerAddress,
+        select: (data: any) => {
+          // getPlayerRewards返回: [killReward, lotteryReward, guaranteedReward, fragmentReward, claimableTime, canClaim]
+          // canClaim在索引5位置
+          return Array.isArray(data) ? data[5] : false;
+        },
+      },
+    });
+  };
+
+  // ============ 碎片系统相关 ============
+
+  /**
+   * 获取玩家碎片余额
+   */
+  const useFragmentBalance = (playerAddress: string) => {
+    return useReadContract({
+      ...swordBattleContract,
+      functionName: 'getFragmentBalance',
+      args: [playerAddress as `0x${string}`],
+      query: {
+        enabled: !!playerAddress,
+      },
+    });
+  };
+
+  /**
+   * 获取碎片价格
+   */
+  const useFragmentPrice = () => {
+    return useReadContract({
+      ...swordBattleContract,
+      functionName: 'getFragmentPrice',
+      query: {
+        enabled: true,
+      },
+    });
+  };
+
+  /**
+   * 计算购买碎片的成本
+   */
+  const useFragmentCost = (amount: number) => {
+    return useReadContract({
+      ...swordBattleContract,
+      functionName: 'calculateFragmentCost',
+      args: [BigInt(amount)],
+      query: {
+        enabled: amount > 0,
+      },
+    });
+  };
+
+  /**
+   * 获取玩家碎片详细信息
+   */
+  const usePlayerFragmentInfo = (playerAddress: string) => {
+    return useReadContract({
+      ...swordBattleContract,
+      functionName: 'getPlayerFragmentInfo',
+      args: [playerAddress as `0x${string}`],
+      query: {
+        enabled: !!playerAddress,
+        select: (data: any) => {
+          // getPlayerFragmentInfo返回: [balance, totalEarned, totalUsed, totalPurchased]
+          if (Array.isArray(data)) {
+            return {
+              balance: data[0],
+              totalEarned: data[1],
+              totalUsed: data[2],
+              totalPurchased: data[3],
+            };
+          }
+          return null;
+        },
+      },
+    });
+  };
+
+  /**
+   * 获取玩家奖励冷却状态
+   */
+  const useCooldownStatus = (playerAddress: string) => {
+    return useReadContract({
+      ...swordBattleContract,
+      functionName: 'getCooldownStatus',
+      args: [playerAddress as `0x${string}`],
+      query: {
+        enabled: !!playerAddress,
+        select: (data: any) => {
+          // getCooldownStatus返回: [lastClaimTime, nextClaimTime, canClaim]
+          if (Array.isArray(data)) {
+            return {
+              lastClaimTime: data[0],
+              nextClaimTime: data[1],
+              canClaim: data[2],
+            };
+          }
+          return null;
+        },
+      },
+    });
+  };
+
+  /**
+   * 获取待领取奖励
+   */
+  const usePendingRewards = (playerAddress: string) => {
+    return useReadContract({
+      ...swordBattleContract,
+      functionName: 'getPendingRewards',
+      args: [playerAddress as `0x${string}`],
+      query: {
+        enabled: !!playerAddress,
+        select: (data: any) => {
+          // getPendingRewards返回: [pendingGames, totalClaimed, nextClaimTime, canClaimNow]
+          if (Array.isArray(data)) {
+            return {
+              pendingGames: data[0],
+              totalClaimed: data[1],
+              nextClaimTime: data[2],
+              canClaimNow: data[3],
+            };
+          }
+          return null;
         },
       },
     });
@@ -225,7 +387,7 @@ export const useBlockchain = () => {
   // ============ 写入方法 ============
 
   /**
-   * 授权USD1代币
+   * 授权USD1代币 - 授权给SwordBattle合约，因为实际转账在SwordBattle中执行
    */
   const approveUSD1 = (amount: bigint) => {
     writeContract({
@@ -236,24 +398,57 @@ export const useBlockchain = () => {
   };
 
   /**
-   * 加入游戏
+   * 加入游戏 (使用 GameAggregator)
    */
   const joinGame = (gameId: number) => {
     writeContract({
-      ...swordBattleContract,
+      ...gameAggregatorContract,
       functionName: 'joinGame',
       args: [BigInt(gameId)],
     });
   };
 
   /**
-   * 领取奖励
+   * 领取单个游戏奖励
    */
   const claimReward = (gameId: number) => {
     writeContract({
       ...swordBattleContract,
       functionName: 'claimReward',
       args: [BigInt(gameId)],
+    });
+  };
+
+  /**
+   * 领取所有奖励
+   */
+  const claimAllRewards = () => {
+    writeContract({
+      ...swordBattleContract,
+      functionName: 'claimAllRewards',
+      args: [],
+    });
+  };
+
+  /**
+   * 分页领取奖励
+   */
+  const claimRewardsPaginated = (startGameId: number, endGameId: number) => {
+    writeContract({
+      ...swordBattleContract,
+      functionName: 'claimRewardsPaginated',
+      args: [BigInt(startGameId), BigInt(endGameId)],
+    });
+  };
+
+  /**
+   * 购买碎片
+   */
+  const purchaseFragments = (amount: number) => {
+    writeContract({
+      ...swordBattleContract,
+      functionName: 'purchaseFragments',
+      args: [BigInt(amount)],
     });
   };
 
@@ -266,8 +461,15 @@ export const useBlockchain = () => {
     useGamePlayers,
     usePlayerNonce,
     usePlayerScore,
-    usePlayerReward,
-    useHasClaimedReward,
+    usePlayerInfo,
+    usePlayerRewards,
+    useCanClaimReward,
+    useFragmentBalance,
+    useFragmentPrice,
+    useFragmentCost,
+    usePlayerFragmentInfo,
+    useCooldownStatus,
+    usePendingRewards,
     useUSD1Balance,
     useUSD1Allowance,
 
@@ -275,6 +477,9 @@ export const useBlockchain = () => {
     approveUSD1,
     joinGame,
     claimReward,
+    claimAllRewards,
+    claimRewardsPaginated,
+    purchaseFragments,
 
     // 交易状态
     isWritePending,
