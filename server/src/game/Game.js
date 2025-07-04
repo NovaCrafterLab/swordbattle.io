@@ -690,54 +690,31 @@ class Game {
 
       // 从配置中获取游戏级别
       const gameLevel = config.blockchain.gameLevel || 0;
-      Logger.server.info('Creating blockchain game', {
-        attempt: currentAttempt,
-        maxRetries,
-        gameLevel
-      });
+      Logger.server.info(`🎮 Creating blockchain game (attempt ${currentAttempt}/${maxRetries})`);
 
       // 在创建游戏前记录初始计数器
       const initialCounter = await this.blockchainService.getGameCounter();
-      Logger.server.debug('Current game counter before creation', { initialCounter });
 
       // 调用合约创建游戏，传入级别参数
       const createResult = await this.blockchainService.createGame(gameLevel);
-      Logger.server.info('Game creation transaction sent', {
-        txHash: createResult.txHash,
-        initialCounter: createResult.initialCounter,
-        level: createResult.level,
-        timestamp: new Date(createResult.timestamp).toISOString()
-      });
+      Logger.server.info('🚀 Game creation TX sent:', createResult.txHash);
 
       // 监听GameCreated事件获取gameId，传递初始计数器
       await this.waitForGameCreated(initialCounter);
 
-      Logger.status('Blockchain game initialization completed successfully', 'game');
-
     } catch (error) {
-      Logger.server.error('Failed to create blockchain game', {
-        attempt: currentAttempt,
-        maxRetries,
-        error: error.message,
-        stack: error.stack
-      });
+      Logger.server.error(`❌ Game creation failed (${currentAttempt}/${maxRetries}):`, error.message);
       this.gamePhase = 'error';
       this.isGameCreationInProgress = false;
 
       // 如果还有重试次数，等待5秒后重试
       if (retryCount < maxRetries - 1) {
-        Logger.server.info('Retrying game creation', {
-          retryDelay: 5000,
-          attemptsRemaining: maxRetries - currentAttempt
-        });
+        Logger.server.info(`🔄 Retrying in 5s... (${maxRetries - currentAttempt} attempts left)`);
         setTimeout(() => {
           this.initializeBlockchainGame(retryCount + 1);
         }, 5000);
       } else {
-        Logger.server.error('Failed to create blockchain game after all retries', {
-          maxRetries,
-          message: 'Server will continue but blockchain features may not work'
-        });
+        Logger.server.error('🚫 All retries exhausted - blockchain features disabled');
       }
     }
   }
@@ -748,7 +725,7 @@ class Game {
   async waitForGameCreated(initialCounter) {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('Game creation timeout'));
+        reject(new Error('⏱️  Game creation timeout (60s) - transaction may still be pending'));
       }, 60000); // 60秒超时
 
       const checkGameCreated = async () => {
@@ -762,18 +739,13 @@ class Game {
             this.gamePhase = 'waiting';
             this.gameStartTime = Date.now();
 
-            Logger.status('NEW blockchain game created', 'game');
-            Logger.game.info('Game created successfully', {
-              gameId: this.blockchainGameId,
-              previousCounter: initialCounter,
-              phase: this.gamePhase
-            });
+            Logger.server.info(`🎯 Game created successfully! ID: ${this.blockchainGameId}`);
 
             clearTimeout(timeout);
             this.isGameCreationInProgress = false;
             resolve();
           } else {
-            Logger.server.debug('Waiting for new game creation', { currentCounter });
+            // 安静等待，不记录日志避免刷屏
             setTimeout(checkGameCreated, 2000);
           }
         } catch (error) {

@@ -32,20 +32,16 @@ class BlockchainService {
 
   async initialize() {
     try {
-      Logger.server.info('Initializing blockchain service', {
-        networkName: this.networkConfig.name
+      Logger.server.info('🔗 Initializing blockchain service', {
+        network: this.networkConfig.name
       });
 
       // 确定使用的链
       const chain = isDev ? bscTestnet : bsc;
-      Logger.server.debug('Using blockchain chain', {
-        chainName: chain.name,
-        chainId: chain.id
-      });
 
       // 获取当前RPC URL
       let rpcUrl = this.config.rpcUrl || this.rpcManager.getCurrentRPC();
-      Logger.server.debug('Primary RPC selected', { rpcUrl });
+      Logger.server.info('📡 Using RPC:', rpcUrl.split('/').pop());
 
       // 创建公共客户端用于读取
       this.publicClient = createPublicClient({
@@ -55,54 +51,100 @@ class BlockchainService {
 
       // 如果有私钥，创建钱包客户端用于签名和发送交易
       if (this.config.trustedSigner) {
-        Logger.server.debug('Creating wallet account from private key', {
-          privateKeyPresent: !!this.config.trustedSigner,
-          privateKeyLength: this.config.trustedSigner?.length
-        });
-        
         this.account = privateKeyToAccount(this.config.trustedSigner);
         this.walletClient = createWalletClient({
           account: this.account,
           chain,
           transport: http(rpcUrl),
         });
-        Logger.server.info('Wallet account initialized', { 
-          address: this.account.address,
-          contractAddress: this.config.contracts?.swordBattle
-        });
+        Logger.server.info('🔑 Wallet initialized:', this.account.address);
       } else {
-        Logger.server.error('No trusted signer private key provided!');
+        Logger.server.error('❌ No trusted signer private key provided!');
       }
 
       // 测试连接
       const blockNumber = await this.publicClient.getBlockNumber();
-      Logger.server.info('Connected to blockchain', { 
-        currentBlock: Number(blockNumber) 
-      });
+      Logger.server.info('✅ Blockchain connected, block:', Number(blockNumber));
 
       // 使用从文件加载的ABI
       this.swordBattleAbi = SWORD_BATTLE_ABI;
       this.gameAggregatorAbi = GAME_AGGREGATOR_ABI;
       this.usd1TokenAbi = ERC20_ABI;
 
-      Logger.server.debug('Loaded contract ABIs', {
-        swordBattleFunctions: this.swordBattleAbi.length,
-        gameAggregatorFunctions: this.gameAggregatorAbi.length,
-        erc20Functions: this.usd1TokenAbi.length
-      });
-
       // 启动RPC健康检查
       await this.rpcManager.healthCheck();
       
       this.isInitialized = true;
-      Logger.status('Blockchain service initialized successfully');
-      Logger.server.debug('RPC Manager stats', this.rpcManager.getStats());
+      Logger.status('🚀 Blockchain service ready');
+      
+      // 启动时查找最快的RPC节点
+      this.findAndSwitchToFastestRPC();
 
     } catch (error) {
       Logger.server.error('Failed to initialize blockchain service', { 
         error: error.message, 
         stack: error.stack 
       });
+      throw error;
+    }
+  }
+
+  // 查找并切换到最快的RPC节点
+  async findAndSwitchToFastestRPC() {
+    try {
+      const fastest = await this.rpcManager.findFastestRPC();
+      
+      if (fastest) {
+        // 重新创建客户端使用最快的RPC
+        const chain = isDev ? bscTestnet : bsc;
+        const newRpcUrl = fastest.rpc;
+        
+        this.publicClient = createPublicClient({
+          chain,
+          transport: http(newRpcUrl),
+        });
+        
+        if (this.account) {
+          this.walletClient = createWalletClient({
+            account: this.account,
+            chain,
+            transport: http(newRpcUrl),
+          });
+        }
+        
+        Logger.server.info(`⚡ Switched to fastest RPC (${fastest.latency}ms):`, newRpcUrl.split('/').pop());
+      }
+    } catch (error) {
+      Logger.server.warn('⚠️  Using current RPC node (fastest search failed)');
+    }
+  }
+
+  // 手动切换RPC节点
+  async switchToRPC(index) {
+    try {
+      const newRpc = this.rpcManager.switchToRPC(index);
+      const chain = isDev ? bscTestnet : bsc;
+      
+      // 重新创建客户端
+      this.publicClient = createPublicClient({
+        chain,
+        transport: http(newRpc),
+      });
+      
+      if (this.account) {
+        this.walletClient = createWalletClient({
+          account: this.account,
+          chain,
+          transport: http(newRpc),
+        });
+      }
+      
+      // 测试连接
+      await this.publicClient.getBlockNumber();
+      Logger.server.info('手动切换RPC成功', { newRpc, index });
+      return newRpc;
+    } catch (error) {
+      Logger.server.error('手动切换RPC失败', { error: error.message, index });
       throw error;
     }
   }
@@ -218,13 +260,13 @@ class BlockchainService {
     }
 
     try {
-      Logger.server.debug('Preparing contract write operation', {
-        functionName,
-        contractAddress: contract.address,
-        walletAddress: this.account?.address,
-        accountPresent: !!this.account,
-        walletClientPresent: !!this.walletClient
-      });
+      // 只记录关键的合约调用
+      if (['createGame', 'endGame', 'submitScore'].includes(functionName)) {
+        Logger.server.info(`📝 Calling ${functionName}`, {
+          contract: contract.address.slice(0, 8) + '...',
+          args: args.map(arg => typeof arg === 'bigint' ? Number(arg) : arg)
+        });
+      }
       
       const { request } = await this.publicClient.simulateContract({
         account: this.account,
@@ -234,7 +276,21 @@ class BlockchainService {
         args,
       });
 
-      return await this.walletClient.writeContract(request);
+      // 添加Gas配置以确保BSC测试网交易正确执行
+      const gasConfig = {
+        ...request,
+        gas: BigInt(500000), // 固定Gas限制
+        gasPrice: BigInt(20000000000), // 20 Gwei，适合BSC测试网
+      };
+
+      const txHash = await this.walletClient.writeContract(gasConfig);
+      
+      // 只记录关键交易的结果
+      if (['createGame', 'endGame', 'submitScore'].includes(functionName)) {
+        Logger.server.info(`✅ ${functionName} transaction sent:`, txHash);
+      }
+      
+      return txHash;
     } catch (error) {
       Logger.server.error('Failed to write contract', { 
         functionName, 
@@ -253,7 +309,14 @@ class BlockchainService {
           args,
         });
 
-        return await this.walletClient.writeContract(request);
+        // 重试时也使用Gas配置
+        const gasConfig = {
+          ...request,
+          gas: BigInt(500000),
+          gasPrice: BigInt(20000000000),
+        };
+
+        return await this.walletClient.writeContract(gasConfig);
       }
       
       throw error;

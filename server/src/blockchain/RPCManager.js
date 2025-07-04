@@ -4,12 +4,13 @@
 class RPCManager {
   constructor(rpcPool) {
     this.rpcPool = rpcPool;
-    this.currentIndex = 0;
+    // 随机选择初始RPC节点
+    this.currentIndex = Math.floor(Math.random() * rpcPool.length);
     this.failedRpcs = new Set();
     this.lastHealthCheck = 0;
     this.healthCheckInterval = 5 * 60 * 1000; // 5分钟
     
-    console.log(`RPC Manager initialized with ${rpcPool.length} nodes`);
+    console.log(`📡 RPC Manager: ${rpcPool.length} nodes available, starting with random node`);
   }
 
   getCurrentRPC() {
@@ -22,11 +23,11 @@ class RPCManager {
 
   markCurrentRPCFailed() {
     const currentRpc = this.getCurrentRPC();
-    console.warn(`RPC ${currentRpc} 标记为失败，切换到下一个节点`);
+    console.warn(`🔄 RPC failed, switching: ${currentRpc.split('/').pop()}`);
     this.failedRpcs.add(this.currentIndex);
     this.switchToNextRPC();
     const newRpc = this.getCurrentRPC();
-    console.log(`切换到RPC: ${newRpc}`);
+    console.log(`✅ Switched to: ${newRpc.split('/').pop()}`);
     return newRpc;
   }
 
@@ -36,15 +37,21 @@ class RPCManager {
     );
     
     if (availableIndices.length === 0) {
-      console.warn('所有RPC节点都失败，重置失败列表');
+      console.warn('⚠️  All RPC nodes failed, resetting and selecting random node');
       this.failedRpcs.clear();
-      this.currentIndex = 0;
+      this.currentIndex = Math.floor(Math.random() * this.rpcPool.length);
       return;
     }
     
-    const currentAvailableIndex = availableIndices.indexOf(this.currentIndex);
-    const nextIndex = (currentAvailableIndex + 1) % availableIndices.length;
-    this.currentIndex = availableIndices[nextIndex];
+    // 从可用节点中随机选择一个（排除当前节点）
+    const otherAvailableIndices = availableIndices.filter(index => index !== this.currentIndex);
+    if (otherAvailableIndices.length > 0) {
+      const randomIndex = Math.floor(Math.random() * otherAvailableIndices.length);
+      this.currentIndex = otherAvailableIndices[randomIndex];
+    } else {
+      // 如果只有当前节点可用，保持不变
+      this.currentIndex = availableIndices[0];
+    }
   }
 
   async healthCheck() {
@@ -54,7 +61,7 @@ class RPCManager {
     }
     this.lastHealthCheck = now;
 
-    console.log('开始RPC健康检查...');
+    // 减少健康检查日志的频率
     
     const healthPromises = this.rpcPool.map(async (rpc, index) => {
       try {
@@ -76,14 +83,17 @@ class RPCManager {
             // RPC节点恢复正常
             if (this.failedRpcs.has(index)) {
               this.failedRpcs.delete(index);
-              console.log(`RPC ${rpc} 已恢复正常`);
+              console.log(`✅ RPC recovered: ${rpc.split('/').pop()}`);
             }
             return { index, status: 'healthy', rpc };
           }
         }
         throw new Error('Invalid response');
       } catch (error) {
-        console.warn(`RPC ${rpc} 健康检查失败:`, error.message);
+        // 只在首次失败时记录日志
+        if (!this.failedRpcs.has(index)) {
+          console.warn(`❌ RPC failed: ${rpc.split('/').pop()}`);
+        }
         this.failedRpcs.add(index);
         return { index, status: 'failed', rpc };
       }
@@ -94,11 +104,13 @@ class RPCManager {
       (r) => r.status === 'fulfilled' && r.value.status === 'healthy'
     ).length;
     
-    console.log(`RPC健康检查完成: ${healthyCount}/${this.rpcPool.length} 节点正常`);
+    // 只在节点状态有变化时记录日志
+    if (healthyCount !== this.rpcPool.length - this.failedRpcs.size) {
+      console.log(`📊 RPC health: ${healthyCount}/${this.rpcPool.length} nodes healthy`);
+    }
     
     // 如果当前RPC节点不可用，自动切换
     if (this.failedRpcs.has(this.currentIndex)) {
-      console.log('当前RPC节点不可用，自动切换...');
       this.switchToNextRPC();
     }
     
@@ -123,7 +135,7 @@ class RPCManager {
   switchToRPC(index) {
     if (index >= 0 && index < this.rpcPool.length) {
       this.currentIndex = index;
-      console.log(`手动切换到RPC[${index}]: ${this.getCurrentRPC()}`);
+      console.log(`🔧 Manual switch to RPC[${index}]: ${this.getCurrentRPC().split('/').pop()}`);
       return this.getCurrentRPC();
     }
     throw new Error(`Invalid RPC index: ${index}`);
@@ -133,13 +145,12 @@ class RPCManager {
   resetFailedRPCs() {
     const previousFailedCount = this.failedRpcs.size;
     this.failedRpcs.clear();
-    console.log(`重置了 ${previousFailedCount} 个失败的RPC节点状态`);
+    console.log(`🔄 Reset ${previousFailedCount} failed RPC nodes`);
     return this.getStats();
   }
 
   // 获取延迟最低的RPC（简单实现）
   async findFastestRPC() {
-    console.log('测试RPC节点延迟...');
     const latencyTests = this.rpcPool.map(async (rpc, index) => {
       if (this.failedRpcs.has(index)) {
         return { index, rpc, latency: Infinity };
@@ -178,12 +189,10 @@ class RPCManager {
 
     if (validResults.length > 0) {
       const fastest = validResults[0];
-      console.log(`最快的RPC: ${fastest.rpc} (延迟: ${fastest.latency}ms)`);
       this.currentIndex = fastest.index;
       return fastest;
     }
 
-    console.warn('没有找到可用的RPC节点');
     return null;
   }
 }

@@ -145,6 +145,20 @@ function registerAdminRoutes(app, game) {
     res.writeHeader('Content-Type', 'application/json');
     await handleRestartRequest(res, req, game);
   });
+
+  // Switch RPC node
+  app.post('/admin/switch-rpc', async (res, req) => {
+    setCors(res);
+    res.writeHeader('Content-Type', 'application/json');
+    await handleSwitchRpcRequest(res, req, game);
+  });
+
+  // Get RPC status
+  app.get('/admin/rpc-status', async (res) => {
+    setCors(res);
+    res.writeHeader('Content-Type', 'application/json');
+    await handleRpcStatusRequest(res, game);
+  });
 }
 
 
@@ -321,6 +335,108 @@ async function handleRestartRequest(res, req, game) {
     }));
   } catch (err) {
     console.error('Admin restart error:', err);
+    res.writeStatus('500 Internal Server Error').end(JSON.stringify({
+      success: false,
+      error: 'Internal server error',
+    }));
+  }
+}
+
+// RPC 切换处理函数
+async function handleSwitchRpcRequest(res, req, game) {
+  try {
+    if (req.getHeader('authorization') !== `Bearer ${config.moderationSecret}`) {
+      res.writeStatus('401 Unauthorized').end(JSON.stringify({
+        success: false,
+        error: 'Unauthorized',
+      }));
+      return;
+    }
+
+    let body = '';
+    res.onData((chunk, isLast) => {
+      body += Buffer.from(chunk).toString();
+      if (isLast) {
+        handleSwitchRpcBody(body, res, game);
+      }
+    });
+  } catch (error) {
+    console.error('Error in switch RPC request:', error);
+    res.writeStatus('500 Internal Server Error').end(JSON.stringify({
+      success: false,
+      error: 'Internal server error',
+    }));
+  }
+}
+
+async function handleSwitchRpcBody(body, res, game) {
+  try {
+    const data = JSON.parse(body || '{}');
+    const { action, index } = data;
+
+    if (!game.blockchainService) {
+      res.writeStatus('400 Bad Request').end(JSON.stringify({
+        success: false,
+        error: 'Blockchain service not available',
+      }));
+      return;
+    }
+
+    let result;
+    if (action === 'fastest') {
+      // 切换到最快的RPC
+      await game.blockchainService.findAndSwitchToFastestRPC();
+      result = { action: 'switched_to_fastest' };
+    } else if (action === 'switch' && typeof index === 'number') {
+      // 切换到指定索引的RPC
+      const newRpc = await game.blockchainService.switchToRPC(index);
+      result = { action: 'switched', index, rpc: newRpc };
+    } else {
+      res.writeStatus('400 Bad Request').end(JSON.stringify({
+        success: false,
+        error: 'Invalid action or missing index',
+      }));
+      return;
+    }
+
+    // 获取切换后的状态
+    const stats = game.blockchainService.rpcManager.getStats();
+    
+    res.end(JSON.stringify({
+      success: true,
+      result,
+      rpcStats: stats,
+    }));
+  } catch (error) {
+    console.error('Error handling switch RPC body:', error);
+    res.writeStatus('500 Internal Server Error').end(JSON.stringify({
+      success: false,
+      error: error.message,
+    }));
+  }
+}
+
+// RPC 状态查询处理函数
+async function handleRpcStatusRequest(res, game) {
+  try {
+    if (!game.blockchainService) {
+      res.writeStatus('400 Bad Request').end(JSON.stringify({
+        success: false,
+        error: 'Blockchain service not available',
+      }));
+      return;
+    }
+
+    const stats = game.blockchainService.rpcManager.getStats();
+    const isConnected = await game.blockchainService.isConnected();
+    
+    res.end(JSON.stringify({
+      success: true,
+      connected: isConnected,
+      rpcStats: stats,
+    }));
+  } catch (error) {
+    console.error('Error in RPC status request:', error);
     res.writeStatus('500 Internal Server Error').end(JSON.stringify({
       success: false,
       error: 'Internal server error',
