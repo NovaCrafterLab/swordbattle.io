@@ -200,3 +200,5 @@ scripts/dev-start.sh
 .scannerwork
 sonar-project.properties
 env/api.env.development
+.history
+env/backup
