@@ -803,11 +803,14 @@ class Game {
 
       // 检查玩家是否在链上游戏中
       const players = await this.blockchainService.getGamePlayers(this.blockchainGameId);
-      console.log(`📋 Found ${players.length} players in game ${this.blockchainGameId}:`);
-      console.log(`   Players: ${players.map(p => p.toLowerCase()).join(', ')}`);
+      
+      // 确保players是数组
+      const playerList = Array.isArray(players) ? players : [];
+      console.log(`📋 Found ${playerList.length} players in game ${this.blockchainGameId}:`);
+      console.log(`   Players: ${playerList.map(p => p.toLowerCase()).join(', ')}`);
       console.log(`   Looking for: ${playerAddress.toLowerCase()}`);
 
-      const isRegistered = players.map(p => p.toLowerCase()).includes(playerAddress.toLowerCase());
+      const isRegistered = playerList.map(p => p.toLowerCase()).includes(playerAddress.toLowerCase());
 
       if (isRegistered) {
         this.registeredPlayers.add(playerAddress.toLowerCase());
@@ -815,7 +818,7 @@ class Game {
         return true;
       } else {
         console.log(`❌ Player ${playerAddress} not registered for game ${this.blockchainGameId}`);
-        console.log(`   Available players: [${players.map(p => p.toLowerCase()).join(', ')}]`);
+        console.log(`   Available players: [${playerList.map(p => p.toLowerCase()).join(', ')}]`);
         console.log(`   Searched for: ${playerAddress.toLowerCase()}`);
         return false;
       }

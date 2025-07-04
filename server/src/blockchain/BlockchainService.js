@@ -385,10 +385,19 @@ class BlockchainService {
    * 获取游戏玩家列表 (使用 GameAggregator 合约)
    */
   async getGamePlayers(gameId) {
-    const contract = this.getGameAggregatorContract();
-    const gameInfo = await this.readContract(contract, 'getGameFullInfo', [BigInt(gameId)]);
-    // GameAggregator的getGameFullInfo返回的结构中包含activePlayers数组
-    return gameInfo[9]; // activePlayers是第10个字段 (索引9)
+    // 从SwordBattle合约获取玩家注册记录，因为实际的玩家数据在那里
+    const contract = this.getSwordBattleContract();
+    try {
+      const players = await this.readContract(contract, 'getGamePlayers', [BigInt(gameId)]);
+      return players || [];
+    } catch (error) {
+      Logger.server.warn(`Failed to get players from SwordBattle for game ${gameId}, trying GameAggregator fallback`, { error: error.message });
+      
+      // 降级到GameAggregator（可能不包含最新的注册信息）
+      const aggregatorContract = this.getGameAggregatorContract();
+      const gameInfo = await this.readContract(aggregatorContract, 'getGameFullInfo', [BigInt(gameId)]);
+      return gameInfo[9] || []; // activePlayers是第10个字段 (索引9)
+    }
   }
 
   /**
