@@ -1,7 +1,7 @@
 // api/src/clans/clans.dto.ts
 // DTOs for clans module
-
-import { IsBoolean, IsOptional, IsString, Length, Matches } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsBoolean, IsOptional, IsString, Length, Matches, IsInt, Min, Max, MaxLength } from 'class-validator';
 import { config } from 'src/config';
 
 /**
@@ -37,5 +37,30 @@ export class CreateClanDto {
   /* allow open join? */
   @IsOptional()
   @IsBoolean()
+  is_public?: boolean;
+}
+
+export class ListClansQueryDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1)
+  page = 1;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(50)
+  size = 20;
+
+  @IsOptional() @IsString() @MaxLength(64)
+  q?: string;
+}
+
+export class UpdateClanDto {
+  @IsOptional() @IsString() @Length(1, 64)
+  name?: string;
+
+  @IsOptional() @IsString() @Length(0, 256)
+  description?: string;
+
+  @IsOptional() @Matches(/^#[0-9A-Fa-f]{6}$/)
+  color?: string;
+
+  @IsOptional() @IsBoolean()
   is_public?: boolean;
 }
