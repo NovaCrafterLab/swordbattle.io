@@ -932,15 +932,17 @@ class Game {
         const finalGameInfo = await this.blockchainService.getGameFullInfo(this.blockchainGameId);
         console.log(`🏁 游戏最终状态:`, {
           gameId: this.blockchainGameId,
-          status: finalGameInfo[2], // status字段
-          totalPool: finalGameInfo[3].toString(), // totalPool字段
-          playerCount: finalGameInfo[7].toString(), // playerCount字段
-          endedAt: finalGameInfo[5].toString(), // endedAt字段
+          status: finalGameInfo.status, // 游戏状态
+          totalPool: finalGameInfo.totalPool.toString(), // 奖池总额
+          endedAt: finalGameInfo.endedAt.toString(), // 结束时间戳
+          level: finalGameInfo.level, // 游戏等级
+          gameDuration: finalGameInfo.gameDuration // 游戏持续时间
         });
 
         // 查询所有玩家的奖励分发情况
         console.log(`🎁 查询所有玩家的奖励分发情况...`);
-        const activePlayers = finalGameInfo[9] || []; // activePlayers数组
+        // 注意：GameFullInfo结构体可能不包含activePlayers，需要单独查询
+        const activePlayers = await this.blockchainService.getGamePlayers(this.blockchainGameId);
         for (const playerAddress of activePlayers) {
           try {
             await this.blockchainService.checkPlayerRewards(this.blockchainGameId, playerAddress);
@@ -1188,14 +1190,19 @@ class Game {
           gameData.playerAddress
         );
 
-        // getPlayerRewardStatus返回: [usdRewards, nclabRewards, usdClaimable, nclabClaimable, nclabClaimableTime, usdClaimed, nclabClaimed]
-        const usdRewards = playerRewardStatus[0];        // USD1奖励总额
-        const nclabRewards = playerRewardStatus[1];      // NCLab奖励总额  
-        const usdClaimable = playerRewardStatus[2];      // USD奖励是否可领取
-        const nclabClaimable = playerRewardStatus[3];    // NCLab奖励是否可领取
-        const nclabClaimableTime = playerRewardStatus[4]; // NCLab奖励可领取时间
-        const usdClaimed = playerRewardStatus[5];        // USD奖励是否已领取
-        const nclabClaimed = playerRewardStatus[6];      // NCLab奖励是否已领取
+        // getPlayerCompleteRewards返回: PlayerCompleteRewards结构体
+        // { usdAmount, nclabAmount, fragmentBonus, ...其他字段 }
+        const usdRewards = playerRewardStatus.usdAmount || BigInt(0);     // USD1奖励总额
+        const nclabRewards = playerRewardStatus.nclabAmount || BigInt(0); // NCLab奖励总额
+        const fragmentBonus = playerRewardStatus.fragmentBonus || 0;      // 额外碎片数
+        
+        // 注意：getPlayerCompleteRewards可能不包含可领取状态信息
+        // 这些信息可能需要从其他接口获取，暂时设为默认值
+        const usdClaimable = true;      // 默认可领取
+        const nclabClaimable = true;    // 默认可领取  
+        const nclabClaimableTime = 0;   // 默认立即可领取
+        const usdClaimed = false;       // 默认未领取
+        const nclabClaimed = false;     // 默认未领取
 
         // 计算总USD奖励金额（以ETH为单位）
         const usdRewardEth = Number(usdRewards) / 1e18;

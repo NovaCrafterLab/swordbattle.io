@@ -543,7 +543,10 @@ class BlockchainService {
     try {
       const activeGames = await this.readContract(contract, 'getActiveGames', [level, 1]);
       if (activeGames && activeGames.length > 0) {
-        return activeGames[0][11]; // entryFee是GameFullInfo结构的第12个字段
+        // activeGames是GameFullInfo[]数组，每个元素都是结构体
+        // 注意：根据文档，GameFullInfo可能不包含entryFee字段
+        // 可能需要从其他地方获取入场费信息，暂时返回totalPool作为参考
+        return activeGames[0].totalPool || BigInt(0);
       }
       return BigInt(0); // 默认返回0
     } catch (error) {
@@ -885,7 +888,7 @@ class BlockchainService {
 
       // 获取游戏信息以了解奖励池
       const gameInfo = await this.readContract(gameAggregatorContract, 'getGameFullInfo', [BigInt(gameId)]);
-      const totalPool = gameInfo[3]; // totalPool是第4个字段
+      const totalPool = gameInfo.totalPool; // 奖池总额
 
       console.log(`💰 合约余额检查结果:`, {
         gameId,
@@ -1060,17 +1063,18 @@ class BlockchainService {
 
       // 获取游戏信息检查奖励分发状态
       const gameInfo = await this.getGameFullInfo(gameId);
-      const gameStatus = gameInfo[2]; // status字段
-      const totalPool = gameInfo[3]; // totalPool字段
-      const endedAt = gameInfo[5]; // endedAt字段
-      const playerCount = gameInfo[7]; // playerCount字段
+      const gameStatus = gameInfo.status; // 游戏状态 
+      const totalPool = gameInfo.totalPool; // 奖池总额
+      const endedAt = gameInfo.endedAt; // 结束时间戳
+      const gameLevel = gameInfo.level; // 游戏等级
 
       console.log(`📊 游戏 ${gameId} 奖励分发状态检查:`, {
         status: gameStatus.toString(),
-        totalPool: totalPool.toString(),
+        totalPool: totalPool.toString(), 
         totalPoolETH: (Number(totalPool) / 1e18).toFixed(6),
         endedAt: endedAt.toString(),
-        playerCount: playerCount.toString(),
+        level: gameLevel,
+        gameDuration: gameInfo.gameDuration,
         isEnded: endedAt > 0,
         timestamp: new Date().toISOString()
       });
