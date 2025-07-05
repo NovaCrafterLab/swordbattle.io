@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import Modal from './Modal';
 import { usePlayerData } from '../../hooks/usePlayerData';
-import { useBlockchain } from '../../hooks/useBlockchain';
+import { useBlockchain, PlayerDashboard } from '../../hooks/useBlockchain';
 import { formatEther } from 'viem';
 import './RewardsModal.scss';
 
@@ -34,10 +34,9 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
   const blockchain = useBlockchain();
   const playerData = usePlayerData();
 
-  // 获取碎片余额和冷却状态
-  const { data: fragmentBalance } = blockchain.useFragmentBalance(address || '');
-  const { data: cooldownStatus } = blockchain.useCooldownStatus(address || '');
-  const { data: pendingRewards } = blockchain.usePendingRewards(address || '');
+  // 获取玩家仪表板数据（包含碎片余额、奖励等所有信息）
+  const { data: playerDashboardRaw } = blockchain.usePlayerDashboard(address || '');
+  const playerDashboard = playerDashboardRaw as PlayerDashboard | undefined;
 
   const [gameRewards, setGameRewards] = useState<GameReward[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -109,7 +108,7 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
 
     try {
       setClaimingGameId(gameId);
-      blockchain.claimGameReward(gameId, address);
+      blockchain.claimGameReward(gameId);
     } catch (error) {
       console.error('Failed to claim reward:', error);
       setClaimingGameId(null);
@@ -124,7 +123,7 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
 
     try {
       setClaimingGameId(gameId);
-      blockchain.claimUSDRewards(gameId, address);
+      blockchain.claimUSDRewards(gameId);
     } catch (error) {
       console.error('Failed to claim USD reward:', error);
       setClaimingGameId(null);
@@ -139,7 +138,7 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
 
     try {
       setClaimingGameId(gameId);
-      blockchain.claimNclabRewards(gameId, address);
+      blockchain.claimNclabRewards(gameId);
     } catch (error) {
       console.error('Failed to claim NCLab reward:', error);
       setClaimingGameId(null);
@@ -154,7 +153,7 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
 
     try {
       setClaimingAll(true);
-      blockchain.claimAllGameRewards(address);
+      blockchain.claimAllPlayerRewards();
     } catch (error) {
       console.error('Failed to claim all rewards:', error);
       setClaimingAll(false);
@@ -286,7 +285,7 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
             <div className="stat-item">
               <label>Fragment Balance</label>
               <span className="stat-value" style={{ color: '#9333ea' }}>
-                {fragmentBalance ? formatEther(fragmentBalance as bigint) : '0'} ⚡
+                {playerDashboard?.fragmentBalance ? formatEther(BigInt(playerDashboard.fragmentBalance)) : '0'} ⚡
               </span>
             </div>
             <div className="stat-item">
@@ -325,14 +324,14 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
                 {claimableCount > 1 && (
                   <button 
                     onClick={handleClaimAllRewards}
-                    disabled={claimingAll || (cooldownStatus ? !cooldownStatus.canClaim : false)}
+                    disabled={claimingAll || (playerDashboard ? !playerDashboard.hasClaimableRewards : false)}
                     className="filter-btn"
                     style={{ 
                       fontSize: '12px', 
                       padding: '6px 12px',
                       backgroundColor: '#10b981',
                       color: 'white',
-                      opacity: (claimingAll || (cooldownStatus ? !cooldownStatus.canClaim : false)) ? 0.6 : 1
+                      opacity: (claimingAll || (playerDashboard ? !playerDashboard.hasClaimableRewards : false)) ? 0.6 : 1
                     }}
                   >
                     {claimingAll ? '🔄 Claiming...' : `💰 Claim All (${claimableCount})`}

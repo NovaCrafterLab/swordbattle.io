@@ -7,30 +7,8 @@ import { bsc, bscTestnet } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { BlockchainConfig, defaultBlockchainConfig, validateBlockchainConfig } from './blockchain.config';
 
-// 导入ABI
-import { GAME_AGGREGATE_ABI } from './abis/gameAggregate.abi';
-import { ERC20_ABI } from './abis/erc20.abi';
-import { RewardManagerABI } from './abis/RewardManager.abi';
-
-// 由于swordbattle.abi.ts有结构问题，临时提取getPlayerInfo函数ABI
-const SWORD_BATTLE_ABI = [
-  {
-    "inputs": [
-      {"internalType": "uint256", "name": "gameId", "type": "uint256"},
-      {"internalType": "address", "name": "player", "type": "address"}
-    ],
-    "name": "getPlayerInfo",
-    "outputs": [
-      {"internalType": "address", "name": "playerAddr", "type": "address"},
-      {"internalType": "uint256", "name": "kills", "type": "uint256"},
-      {"internalType": "uint256", "name": "score", "type": "uint256"},
-      {"internalType": "bool", "name": "submitted", "type": "bool"},
-      {"internalType": "uint256", "name": "fragmentReward", "type": "uint256"}
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  }
-];
+// 导入ABI - 只使用GameAggregator
+import { GAME_AGGREGATOR_ABI } from './abis/GameAggregator.abi';
 
 // RPC池配置
 const BSC_MAINNET_RPC_POOL = [
@@ -127,23 +105,26 @@ export class BlockchainService implements OnModuleInit {
 
     try {
       const result = await this.publicClient.readContract({
-        address: this.config.contracts.swordBattle as `0x${string}`,
-        abi: SWORD_BATTLE_ABI,
-        functionName: 'getGameInfo',
+        address: this.config.contracts.gameAggregator as `0x${string}`,
+        abi: GAME_AGGREGATOR_ABI,
+        functionName: 'getGameFullInfo',
         args: [BigInt(gameId)],
       });
 
+      // GameAggregator返回GameFullInfo结构体
       return {
-        gameId: Number(result[0]),
-        level: Number(result[1]), // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH
-        playerCount: Number(result[2]),
-        totalPool: formatEther(result[3]),
-        ended: result[4],
-        createdAt: Number(result[5]),
-        endedAt: Number(result[6]),
-        cleaned: result[7],
-        gameDuration: Number(result[8]),
-        isExpired: result[9],
+        gameId: Number(result.gameId),
+        level: Number(result.level), // 游戏级别：0=EASY, 1=MEDIUM, 2=HARD
+        status: Number(result.status), // 游戏状态：0=WAITING, 1=ACTIVE, 2=ENDED
+        totalPool: formatEther(result.totalPool),
+        createdAt: Number(result.createdAt),
+        endedAt: Number(result.endedAt),
+        gameDuration: Number(result.gameDuration),
+        playerCount: Number(result.playerCount),
+        maxPlayers: Number(result.maxPlayers),
+        activePlayers: result.activePlayers,
+        canJoin: result.canJoin,
+        entryFee: formatEther(result.entryFee),
       };
     } catch (error) {
       this.logger.error(`Failed to get game info for game ${gameId}:`, error);
@@ -151,99 +132,125 @@ export class BlockchainService implements OnModuleInit {
     }
   }
 
-  // 获取游戏玩家列表
+  // 获取游戏玩家列表 - 现在从getGameFullInfo获取activePlayers
   async getGamePlayers(gameId: number): Promise<string[]> {
-    if (!this.isAvailable()) {
-      throw new Error('Blockchain service not available');
-    }
-
-    try {
-      const players = await this.publicClient.readContract({
-        address: this.config.contracts.swordBattle as `0x${string}`,
-        abi: SWORD_BATTLE_ABI,
-        functionName: 'getGamePlayers',
-        args: [BigInt(gameId)],
-      });
-
-      return players as string[];
-    } catch (error) {
-      this.logger.error(`Failed to get game players for game ${gameId}:`, error);
-      throw error;
-    }
+    const gameInfo = await this.getGameInfo(gameId);
+    return gameInfo.activePlayers || [];
   }
 
-  // 获取游戏分数
-  async getGameScores(gameId: number) {
+  // 游戏分数和排名现在通过GameAggregator的其他方法获取
+  // 可以使用 getPlayerCompleteRewards 或 getPlayerDashboard 等方法
+
+  // ========== 新的GameAggregator函数 ==========
+
+  // 获取游戏完整信息
+  async getGameFullInfo(gameId: number) {
     if (!this.isAvailable()) {
       throw new Error('Blockchain service not available');
     }
 
     try {
       const result = await this.publicClient.readContract({
-        address: this.config.contracts.swordBattle as `0x${string}`,
-        abi: SWORD_BATTLE_ABI,
-        functionName: 'getGameScores',
+        address: this.config.contracts.gameAggregator as `0x${string}`,
+        abi: GAME_AGGREGATOR_ABI,
+        functionName: 'getGameFullInfo',
         args: [BigInt(gameId)],
       });
 
-      const players = result[0] as string[];
-      const scores = result[1] as bigint[];
-
-      return players.map((player, index) => ({
-        player,
-        score: Number(scores[index]),
-      }));
+      return result;
     } catch (error) {
-      this.logger.error(`Failed to get game scores for game ${gameId}:`, error);
+      this.logger.error(`Failed to get game full info for game ${gameId}:`, error);
       throw error;
     }
   }
 
-  // 获取游戏排名
-  async getGameRankings(gameId: number): Promise<string[]> {
-    if (!this.isAvailable()) {
-      throw new Error('Blockchain service not available');
-    }
-
-    try {
-      const rankings = await this.publicClient.readContract({
-        address: this.config.contracts.swordBattle as `0x${string}`,
-        abi: SWORD_BATTLE_ABI,
-        functionName: 'getGameRankings',
-        args: [BigInt(gameId)],
-      });
-
-      return rankings as string[];
-    } catch (error) {
-      this.logger.error(`Failed to get game rankings for game ${gameId}:`, error);
-      throw error;
-    }
-  }
-
-  // 获取玩家基本信息（新合约结构）
-  async getPlayerInfo(gameId: number, playerAddress: string) {
+  // 获取玩家完整奖励信息
+  async getPlayerCompleteRewards(gameId: number, playerAddress: string) {
     if (!this.isAvailable()) {
       throw new Error('Blockchain service not available');
     }
 
     try {
       const result = await this.publicClient.readContract({
-        address: this.config.contracts.swordBattle as `0x${string}`,
-        abi: SWORD_BATTLE_ABI,
-        functionName: 'getPlayerInfo',
+        address: this.config.contracts.gameAggregator as `0x${string}`,
+        abi: GAME_AGGREGATOR_ABI,
+        functionName: 'getPlayerCompleteRewards',
         args: [BigInt(gameId), playerAddress as `0x${string}`],
       });
 
-      // 新合约getPlayerInfo返回: [playerAddr, kills, score, submitted, fragmentReward]
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to get player complete rewards for game ${gameId}, player ${playerAddress}:`, error);
+      throw error;
+    }
+  }
+
+  // 获取玩家仪表板
+  async getPlayerDashboard(playerAddress: string) {
+    if (!this.isAvailable()) {
+      throw new Error('Blockchain service not available');
+    }
+
+    try {
+      const result = await this.publicClient.readContract({
+        address: this.config.contracts.gameAggregator as `0x${string}`,
+        abi: GAME_AGGREGATOR_ABI,
+        functionName: 'getPlayerDashboard',
+        args: [playerAddress as `0x${string}`],
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to get player dashboard for ${playerAddress}:`, error);
+      throw error;
+    }
+  }
+
+  // 获取玩家所有奖励
+  async getPlayerAllRewards(playerAddress: string) {
+    if (!this.isAvailable()) {
+      throw new Error('Blockchain service not available');
+    }
+
+    try {
+      const result = await this.publicClient.readContract({
+        address: this.config.contracts.gameAggregator as `0x${string}`,
+        abi: GAME_AGGREGATOR_ABI,
+        functionName: 'getPlayerAllRewards',
+        args: [playerAddress as `0x${string}`],
+      });
+
+      // 返回: [totalUsd, totalNclab, fragmentBalance, claimableGames, nextClaimTime]
       return {
-        playerAddr: result[0] as string,
-        kills: Number(result[1]),
-        score: Number(result[2]),
-        submitted: result[3] as boolean,
-        fragmentReward: formatEther(result[4]),
+        totalUsd: result[0] as bigint,
+        totalNclab: result[1] as bigint,
+        fragmentBalance: result[2] as bigint,
+        claimableGames: result[3] as bigint,
+        nextClaimTime: result[4] as bigint,
       };
     } catch (error) {
-      this.logger.error(`Failed to get player info for ${playerAddress} in game ${gameId}:`, error);
+      this.logger.error(`Failed to get player all rewards for ${playerAddress}:`, error);
+      throw error;
+    }
+  }
+
+  // 获取可领取奖励的游戏
+  async getPlayerClaimableGames(playerAddress: string, maxGames: number = 25) {
+    if (!this.isAvailable()) {
+      throw new Error('Blockchain service not available');
+    }
+
+    try {
+      const result = await this.publicClient.readContract({
+        address: this.config.contracts.gameAggregator as `0x${string}`,
+        abi: GAME_AGGREGATOR_ABI,
+        functionName: 'getPlayerClaimableGames',
+        args: [playerAddress as `0x${string}`, BigInt(maxGames)],
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to get player claimable games for ${playerAddress}:`, error);
       throw error;
     }
   }
@@ -256,8 +263,8 @@ export class BlockchainService implements OnModuleInit {
 
     try {
       const result = await this.publicClient.readContract({
-        address: this.config.contracts.swordBattle as `0x${string}`,
-        abi: SWORD_BATTLE_ABI,
+        address: this.config.contracts.gameAggregator as `0x${string}`,
+        abi: GAME_AGGREGATOR_ABI,
         functionName: 'getPlayerRewards',
         args: [BigInt(gameId), playerAddress as `0x${string}`],
       });
@@ -297,8 +304,8 @@ export class BlockchainService implements OnModuleInit {
 
     try {
       const nonce = await this.publicClient.readContract({
-        address: this.config.contracts.swordBattle as `0x${string}`,
-        abi: SWORD_BATTLE_ABI,
+        address: this.config.contracts.gameAggregator as `0x${string}`,
+        abi: GAME_AGGREGATOR_ABI,
         functionName: 'getPlayerNonce',
         args: [playerAddress as `0x${string}`],
       });
@@ -306,6 +313,37 @@ export class BlockchainService implements OnModuleInit {
       return Number(nonce);
     } catch (error) {
       this.logger.error(`Failed to get player nonce for ${playerAddress}:`, error);
+      throw error;
+    }
+  }
+
+  // 获取玩家基本信息
+  async getPlayerInfo(gameId: number, playerAddress: string) {
+    if (!this.isAvailable()) {
+      throw new Error('Blockchain service not available');
+    }
+
+    try {
+      const result = await this.publicClient.readContract({
+        address: this.config.contracts.gameAggregator as `0x${string}`,
+        abi: GAME_AGGREGATOR_ABI,
+        functionName: 'getPlayerInfo',
+        args: [BigInt(gameId), playerAddress as `0x${string}`],
+      });
+
+      // getPlayerInfo返回: [playerAddr, kills, score, submitted, fragmentReward]
+      if (Array.isArray(result)) {
+        return {
+          playerAddr: result[0],
+          kills: Number(result[1]),
+          score: Number(result[2]),
+          submitted: result[3],
+          fragmentReward: result[4],
+        };
+      }
+      return null;
+    } catch (error) {
+      this.logger.error(`Failed to get player info for ${playerAddress} in game ${gameId}:`, error);
       throw error;
     }
   }
@@ -318,8 +356,8 @@ export class BlockchainService implements OnModuleInit {
 
     try {
       const entryFee = await this.publicClient.readContract({
-        address: this.config.contracts.swordBattle as `0x${string}`,
-        abi: SWORD_BATTLE_ABI,
+        address: this.config.contracts.gameAggregator as `0x${string}`,
+        abi: GAME_AGGREGATOR_ABI,
         functionName: 'entryFee',
         args: [],
       });
@@ -339,8 +377,8 @@ export class BlockchainService implements OnModuleInit {
 
     try {
       const counter = await this.publicClient.readContract({
-        address: this.config.contracts.swordBattle as `0x${string}`,
-        abi: SWORD_BATTLE_ABI,
+        address: this.config.contracts.gameAggregator as `0x${string}`,
+        abi: GAME_AGGREGATOR_ABI,
         functionName: 'gameCounter',
       });
 
@@ -383,18 +421,10 @@ export class BlockchainService implements OnModuleInit {
             let rank = 0;
             let isWinner = false;
             
-            try {
-              const rankings = await this.getGameRankings(gameId);
-              const playerIndex = rankings.findIndex(p => p.toLowerCase() === playerLowerCase);
-              
-              if (playerIndex >= 0) {
-                rank = playerIndex + 1;
-                // 假设前3名为获胜者，并且奖励大于0
-                isWinner = rank <= 3 && parseFloat(playerRewards.totalReward) > 0;
-              }
-            } catch (error) {
-              this.logger.warn(`Failed to get rankings for game ${gameId}:`, error);
-            }
+            // 排名信息现在从GameAggregator的奖励数据推断
+            // 如果有奖励且大于0，认为是获胜者
+            isWinner = parseFloat(playerRewards.totalReward) > 0;
+            rank = isWinner ? 1 : 0; // 简化排名逻辑
             
             gameHistory.push({
               gameId,
@@ -405,7 +435,7 @@ export class BlockchainService implements OnModuleInit {
               isWinner,
               level: gameInfo.level,
               timestamp: gameInfo.endedAt > 0 ? gameInfo.endedAt * 1000 : gameInfo.createdAt * 1000,
-              gameEnded: gameInfo.ended,
+              gameEnded: gameInfo.status === 2, // status 2 = ENDED
             });
             
             foundGames++;
@@ -437,7 +467,7 @@ export class BlockchainService implements OnModuleInit {
         name: 'SwordBattle',
         version: '1',
         chainId: await this.publicClient.getChainId(),
-        verifyingContract: getAddress(this.config.contracts.swordBattle as `0x${string}`),
+        verifyingContract: getAddress(this.config.contracts.gameAggregator as `0x${string}`),
       };
 
       // 消息类型定义
@@ -484,9 +514,9 @@ export class BlockchainService implements OnModuleInit {
 
     try {
       const result = await this.publicClient.readContract({
-        address: this.config.contracts.rewardManager as `0x${string}`,
-        abi: RewardManagerABI, // 需要导入RewardManager ABI
-        functionName: 'getPlayerRewardStatus',
+        address: this.config.contracts.gameAggregator as `0x${string}`,
+        abi: GAME_AGGREGATOR_ABI,
+        functionName: 'getPlayerCompleteRewards',
         args: [BigInt(gameId), playerAddress as `0x${string}`],
       });
 

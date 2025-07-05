@@ -5,6 +5,7 @@ export interface BlockchainConfig {
   enabled: boolean;
   rpcUrl?: string;
   contracts: {
+    gameAggregator: string;
     swordBattle: string;
     usd1Token: string;
     rewardManager: string;
@@ -28,10 +29,14 @@ export const defaultBlockchainConfig: BlockchainConfig = {
   enabled: process.env.BLOCKCHAIN_ENABLED === 'true',
   rpcUrl: process.env.BLOCKCHAIN_RPC_URL,
   contracts: {
-    // API 使用实际的 SwordBattle 合约进行玩家信息查询
+    // API 现在使用新的 GameAggregator 合约进行所有查询
+    gameAggregator: isDev 
+      ? (process.env.GAME_AGGREGATOR_CONTRACT_TESTNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x08734b96985fB41629FD264981874E1578e6BaC3')
+      : (process.env.GAME_AGGREGATOR_CONTRACT_MAINNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x08734b96985fB41629FD264981874E1578e6BaC3'),
+    // 保留 SwordBattle 合约地址用于某些旧功能
     swordBattle: isDev 
-      ? (process.env.SWORD_BATTLE_CONTRACT_TESTNET || process.env.SWORD_BATTLE_CONTRACT || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD')
-      : (process.env.SWORD_BATTLE_CONTRACT_MAINNET || process.env.SWORD_BATTLE_CONTRACT || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD'),
+      ? (process.env.SWORD_BATTLE_CONTRACT_TESTNET || process.env.SWORD_BATTLE_CONTRACT || '0x2201a02600d55758F14bbC100c35580785BAD622')
+      : (process.env.SWORD_BATTLE_CONTRACT_MAINNET || process.env.SWORD_BATTLE_CONTRACT || '0x2201a02600d55758F14bbC100c35580785BAD622'),
     usd1Token: isDev 
       ? (process.env.USD1_TOKEN_CONTRACT_TESTNET || process.env.USD1_TOKEN_CONTRACT || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16')
       : (process.env.USD1_TOKEN_CONTRACT_MAINNET || process.env.USD1_TOKEN_CONTRACT || ''),
@@ -56,10 +61,10 @@ export function validateBlockchainConfig(config: BlockchainConfig): boolean {
 
   const missingFields: string[] = [];
   
-  if (!config.contracts.swordBattle) {
+  if (!config.contracts.gameAggregator) {
     const expectedVar = isDev 
-      ? 'GAME_AGGREGATOR_CONTRACT_TESTNET (或 SWORD_BATTLE_CONTRACT_TESTNET)' 
-      : 'GAME_AGGREGATOR_CONTRACT_MAINNET (或 SWORD_BATTLE_CONTRACT_MAINNET)';
+      ? 'GAME_AGGREGATOR_CONTRACT_TESTNET' 
+      : 'GAME_AGGREGATOR_CONTRACT_MAINNET';
     missingFields.push(expectedVar);
   }
   
@@ -90,6 +95,7 @@ export function validateBlockchainConfig(config: BlockchainConfig): boolean {
   // 输出当前使用的合约地址配置
   console.log('✅ Blockchain configuration validated');
   console.log(`   环境: ${config.environment.networkName}`);
+  console.log(`   GAME_AGGREGATOR合约: ${config.contracts.gameAggregator}`);
   console.log(`   SWORD_BATTLE合约: ${config.contracts.swordBattle}`);
   console.log(`   USD1_TOKEN合约: ${config.contracts.usd1Token}`);
   console.log(`   REWARD_MANAGER合约: ${config.contracts.rewardManager}`);

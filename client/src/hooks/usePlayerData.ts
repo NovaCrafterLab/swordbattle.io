@@ -2,10 +2,54 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from 'wagmi'
 import { formatEther } from 'viem'
 import { useBlockchain } from './useBlockchain'
-import { getGameAggregatorContract, getSwordBattleContract } from '@/config/walletConfig'
+import { getGameAggregatorContract } from '@/config/walletConfig'
 import { endpoint as API_ROOT } from '@/api'
 
-// 玩家数据类型
+// 新的GameAggregator接口类型定义
+export interface GameFullInfo {
+  gameId: string;           // 游戏ID
+  level: number;            // 游戏等级 (0=EASY, 1=MEDIUM, 2=HARD)
+  status: number;           // 游戏状态 (0=WAITING, 1=ACTIVE, 2=ENDED)
+  totalPool: string;        // 奖池总额 (wei)
+  createdAt: string;        // 创建时间戳
+  endedAt: string;          // 结束时间戳
+  gameDuration: number;     // 游戏持续时间 (秒)
+}
+
+export interface PlayerCompleteRewards {
+  usdRewards: string;        // 🟡 USD1 奖励数量 (wei)
+  nclabRewards: string;      // 🔵 NCLab 奖励数量 (wei)
+  fragmentBalance: string;   // 🟠 碎片余额
+  usdClaimable: boolean;     // USD1 是否可领取
+  nclabClaimable: boolean;   // NCLab 是否可领取
+  nclabClaimableTime: string; // NCLab 可领取时间戳
+  usdClaimed: boolean;       // USD1 是否已领取
+  nclabClaimed: boolean;     // NCLab 是否已领取
+}
+
+export interface PlayerDashboard {
+  // 游戏统计
+  totalGamesPlayed: string;    // 总游戏局数
+  totalKills: string;          // 总击杀数
+  totalScore: string;          // 总分数
+  winRate: string;             // 胜率 (百分比 * 100)
+  
+  // 奖励统计
+  totalUsdEarned: string;      // 🟡 总 USD1 收益 (wei)
+  totalNclabEarned: string;    // 🔵 总 NCLab 收益 (wei)
+  totalFragmentsEarned: string; // 🟠 总碎片收益
+  
+  // 待领取奖励
+  pendingUsdRewards: string;   // 🟡 待领取 USD1 (wei)
+  pendingNclabRewards: string; // 🔵 待领取 NCLab (wei)
+  fragmentBalance: string;     // 🟠 当前碎片余额
+  
+  // 当前状态
+  currentGameCount: string;    // 当前参与游戏数量
+  hasClaimableRewards: boolean; // 是否有可领取奖励
+}
+
+// 兼容现有代码的玩家数据类型
 export interface PlayerGameData {
   gameId: number
   score: number
@@ -20,7 +64,7 @@ export interface PlayerGameData {
   nclabClaimableTime?: number // NCLab可领取时间
   rank: number
   isWinner: boolean
-  level?: number // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH
+  level?: number // 游戏级别：0=EASY, 1=MEDIUM, 2=HARD
   timestamp?: number // 添加时间戳字段
 }
 
@@ -54,9 +98,9 @@ export const usePlayerData = () => {
   const { data: usd1Balance, refetch: refetchBalance } =
     blockchain.useUSD1Balance(address || '')
 
-  // 获取USD1授权额度 - 查询对SwordBattle合约的授权
+  // 获取USD1授权额度 - 查询对GameAggregator合约的授权
   const { data: allowance, refetch: refetchAllowance } =
-    blockchain.useUSD1Allowance(address || '', getSwordBattleContract().address)
+    blockchain.useUSD1Allowance(address || '', getGameAggregatorContract().address)
 
   // 获取玩家nonce
   const { data: playerNonce, refetch: refetchNonce } =
@@ -484,12 +528,10 @@ export const usePlayerData = () => {
       setIsLoading(true)
       setError(null)
 
-      // 刷新基础数据并等待结果
-      const [balanceResult, allowanceResult, nonceResult] = await Promise.all([
-        refetchBalance(),
-        refetchAllowance(),
-        refetchNonce(),
-      ])
+      // 刷新基础数据
+      refetchBalance();
+      refetchAllowance();
+      refetchNonce();
 
       // 使用混合查询获取玩家游戏历史（数据库 + 区块链）
       const gameHistory = await fetchPlayerGameHistory(false) // false = 使用混合查询
@@ -510,10 +552,10 @@ export const usePlayerData = () => {
       const winRate =
         totalGamesPlayed > 0 ? (winCount / totalGamesPlayed) * 100 : 0
 
-      // 使用最新获取的数据
-      const latestBalance = balanceResult.data || BigInt(0)
-      const latestAllowance = allowanceResult.data || BigInt(0)
-      const latestNonce = nonceResult.data || 0
+      // 使用当前数据（因为refetch返回void）
+      const latestBalance = usd1Balance || BigInt(0)
+      const latestAllowance = allowance || BigInt(0)
+      const latestNonce = playerNonce || BigInt(0)
 
       const usd1BalanceBigInt =
         typeof latestBalance === 'bigint'
