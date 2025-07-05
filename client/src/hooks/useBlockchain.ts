@@ -330,8 +330,25 @@ export const useBlockchain = () => {
   const useEntryFee = (level: number = 0) => {
     const { data: activeGames, isLoading, error } = useActiveGames(level, 1);
     const gameInfoArray = activeGames as GameFullInfo[] | undefined;
+    
+    // entryFee从合约返回的已经是wei格式，无需parseEther
+    let entryFeeValue: bigint;
+    if (gameInfoArray && gameInfoArray.length > 0) {
+      const entryFee = gameInfoArray[0].entryFee;
+      // 处理不同的数据类型
+      if (typeof entryFee === 'string') {
+        entryFeeValue = BigInt(entryFee);
+      } else if (typeof entryFee === 'bigint') {
+        entryFeeValue = entryFee;
+      } else {
+        entryFeeValue = parseEther('10'); // 默认值
+      }
+    } else {
+      entryFeeValue = parseEther('10'); // 默认值
+    }
+    
     return {
-      data: gameInfoArray && gameInfoArray.length > 0 ? parseEther(gameInfoArray[0].entryFee) : parseEther('10'),
+      data: entryFeeValue,
       isLoading,
       error,
       refetch: () => {}
@@ -344,9 +361,25 @@ export const useBlockchain = () => {
   const useLevelConfig = (level: number) => {
     const { data: activeGames, isLoading, error } = useActiveGames(level, 1);
     const gameInfoArray = activeGames as GameFullInfo[] | undefined;
+    
+    // 处理entryFee数据类型
+    let entryFeeValue: bigint;
+    if (gameInfoArray && gameInfoArray.length > 0) {
+      const entryFee = gameInfoArray[0].entryFee;
+      if (typeof entryFee === 'string') {
+        entryFeeValue = BigInt(entryFee);
+      } else if (typeof entryFee === 'bigint') {
+        entryFeeValue = entryFee;
+      } else {
+        entryFeeValue = parseEther('10');
+      }
+    } else {
+      entryFeeValue = parseEther('10');
+    }
+    
     return {
       data: gameInfoArray && gameInfoArray.length > 0 ? {
-        entryFee: parseEther(gameInfoArray[0].entryFee),
+        entryFee: entryFeeValue,
         killReward: parseEther('1'), // 默认值
         active: true
       } : null,
