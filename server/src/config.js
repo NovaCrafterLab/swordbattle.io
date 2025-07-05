@@ -81,8 +81,8 @@ module.exports = {
     contracts: {
       // GameAggregator 合约用于游戏操作 - 更新为最新地址
       gameAggregator: isDev
-        ? (process.env.GAME_AGGREGATOR_CONTRACT_TESTNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x08734b96985fB41629FD264981874E1578e6BaC3')
-        : (process.env.GAME_AGGREGATOR_CONTRACT_MAINNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x08734b96985fB41629FD264981874E1578e6BaC3'),
+        ? (process.env.GAME_AGGREGATOR_CONTRACT_TESTNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x30C5fDb3FBdd3247ebEBD82EFFd235c221285dBE')
+        : (process.env.GAME_AGGREGATOR_CONTRACT_MAINNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x30C5fDb3FBdd3247ebEBD82EFFd235c221285dBE'),
       // SwordBattle 原合约用于基础数据查询 - 更新为最新地址
       swordBattle: isDev
         ? (process.env.SWORD_BATTLE_CONTRACT_TESTNET || process.env.SWORD_BATTLE_CONTRACT || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD')

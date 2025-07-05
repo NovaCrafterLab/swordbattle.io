@@ -1,6 +1,6 @@
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
-import { getGameAggregatorContract } from '../config/walletConfig';
+import { getGameAggregatorContract, getUSD1TokenContract } from '../config/walletConfig';
 
 // GameAggregator数据类型定义
 export interface GameFullInfo {
@@ -437,35 +437,100 @@ export const useBlockchain = () => {
   };
 
   /**
-   * 获取USD1余额 - 简化返回
+   * 获取USD1余额 - 真实ERC20查询
    */
   const useUSD1Balance = (address: string) => {
-    return {
-      data: BigInt(0), // 可以通过其他方式获取
-      isLoading: false,
-      error: null,
-      refetch: () => {}
-    };
+    const usd1TokenContract = getUSD1TokenContract();
+    return useReadContract({
+      ...usd1TokenContract,
+      functionName: 'balanceOf',
+      args: [address as `0x${string}`],
+      query: {
+        enabled: !!address,
+        refetchInterval: 10000, // 每10秒刷新一次
+      },
+    });
   };
 
   /**
-   * 获取USD1授权额度 - 简化返回
+   * 获取USD1授权额度 - 真实ERC20查询
    */
   const useUSD1Allowance = (owner: string, spender: string) => {
-    return {
-      data: BigInt(0),
-      isLoading: false,
-      error: null,
-      refetch: () => {}
-    };
+    const usd1TokenContract = getUSD1TokenContract();
+    return useReadContract({
+      ...usd1TokenContract,
+      functionName: 'allowance',
+      args: [owner as `0x${string}`, spender as `0x${string}`],
+      query: {
+        enabled: !!owner && !!spender,
+        refetchInterval: 10000, // 每10秒刷新一次
+      },
+    });
   };
 
   /**
-   * 授权USD1 - 简化实现
+   * 获取SwordBattle合约地址 - 从GameAggregator获取
    */
-  const approveUSD1 = (amount: bigint) => {
-    console.log('approveUSD1 called with amount:', amount);
-    // 在GameAggregator中，授权可能通过其他方式处理
+  const useSwordBattleAddress = () => {
+    const gameAggregatorContract = getGameAggregatorContract();
+    return useReadContract({
+      ...gameAggregatorContract,
+      functionName: 'getSwordBattleAddress',
+      args: [],
+      query: {
+        enabled: true,
+      },
+    });
+  };
+
+  // 获取SwordBattle地址（在hook顶层调用）
+  const { data: swordBattleAddress } = useSwordBattleAddress();
+
+  /**
+   * 授权USD1给SwordBattle合约 - 智能授权
+   */
+  const approveUSD1ToSwordBattle = (amount: bigint) => {
+    if (swordBattleAddress) {
+      const usd1TokenContract = getUSD1TokenContract();
+      writeContract({
+        ...usd1TokenContract,
+        functionName: 'approve',
+        args: [swordBattleAddress as `0x${string}`, amount],
+      });
+    } else {
+      console.error('SwordBattle address not available yet, please wait for it to load');
+    }
+  };
+
+  /**
+   * 授权USD1 - 真实ERC20授权（兼容版本）
+   */
+  const approveUSD1 = (spenderOrAmount: string | bigint, amount?: bigint) => {
+    const usd1TokenContract = getUSD1TokenContract();
+    
+    // 兼容旧的调用方式：approveUSD1(amount) - 授权给SwordBattle
+    if (typeof spenderOrAmount === 'bigint' && !amount) {
+      approveUSD1ToSwordBattle(spenderOrAmount);
+    } 
+    // 新的调用方式：approveUSD1(spender, amount)
+    else if (typeof spenderOrAmount === 'string' && amount) {
+      writeContract({
+        ...usd1TokenContract,
+        functionName: 'approve',
+        args: [spenderOrAmount as `0x${string}`, amount],
+      });
+    } else {
+      console.error('Invalid approveUSD1 parameters');
+    }
+  };
+
+  /**
+   * 授权USD1给GameAggregator合约 - 便捷方法（已废弃，现在使用SwordBattle）
+   * @deprecated 使用 approveUSD1ToSwordBattle 替代
+   */
+  const approveUSD1ToGameAggregator = (amount: bigint) => {
+    console.warn('approveUSD1ToGameAggregator is deprecated, use approveUSD1ToSwordBattle instead');
+    approveUSD1ToSwordBattle(amount);
   };
 
   /**
@@ -518,6 +583,13 @@ export const useBlockchain = () => {
     claimAllUSDRewards,
     claimAllNclabRewards,
 
+    // USD1 授权方法
+    useSwordBattleAddress,
+    swordBattleAddress, // SwordBattle合约地址数据
+    approveUSD1,
+    approveUSD1ToSwordBattle,
+    approveUSD1ToGameAggregator, // @deprecated
+    
     // 兼容性方法 (保持向后兼容)
     useEntryFee,
     useLevelConfig,
@@ -527,7 +599,6 @@ export const useBlockchain = () => {
     useCanClaimReward,
     useUSD1Balance,
     useUSD1Allowance,
-    approveUSD1,
     useGameInfo,
     usePlayerRewards,
     claimReward,

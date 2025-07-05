@@ -29,7 +29,7 @@ function prof(label, fn) {
     for (const [lbl, s] of bucket) {
       if (s.max >= 25) {
         const avg = (s.sum / s.count).toFixed(1);
-        console.warn(`[prof] ${lbl.padEnd(16)} cnt ${s.count.toString().padEnd(4)} avg ${avg} ms  max ${s.max.toFixed(1)} ms`);
+        // console.warn(`[prof] ${lbl.padEnd(16)} cnt ${s.count.toString().padEnd(4)} avg ${avg} ms  max ${s.max.toFixed(1)} ms`);
       }
     }
     bucket.clear();

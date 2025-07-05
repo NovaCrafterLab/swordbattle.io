@@ -703,7 +703,31 @@ class Game {
       await this.waitForGameCreated(initialCounter);
 
     } catch (error) {
-      Logger.server.error(`❌ Game creation failed (${currentAttempt}/${maxRetries}):`, error.message);
+      // 记录详细的错误信息
+      Logger.server.error(`❌ Game creation failed (${currentAttempt}/${maxRetries}):`, {
+        error: error.message,
+        stack: error.stack,
+        gameLevel,
+        blockchainService: !!this.blockchainService,
+        isInitialized: this.blockchainService?.isInitialized,
+        walletClient: !!this.blockchainService?.walletClient,
+        account: this.blockchainService?.account?.address,
+        contractAddress: this.blockchainService?.config?.contracts?.gameAggregator
+      });
+
+      // 如果错误包含特定信息，提供更详细的诊断
+      if (error.message.includes('insufficient funds')) {
+        Logger.server.error('💰 Insufficient funds in wallet for transaction');
+      } else if (error.message.includes('nonce')) {
+        Logger.server.error('🔢 Nonce issue - possible concurrent transactions');
+      } else if (error.message.includes('gas')) {
+        Logger.server.error('⛽ Gas estimation failed or insufficient gas');
+      } else if (error.message.includes('revert')) {
+        Logger.server.error('🔄 Transaction reverted - contract execution failed');
+      } else if (error.message.includes('network')) {
+        Logger.server.error('🌐 Network connection issue');
+      }
+
       this.gamePhase = 'error';
       this.isGameCreationInProgress = false;
 

@@ -1,8 +1,9 @@
 // RainbowKit/Wagmi/Viem 钱包相关配置
 // 适配 BSC 主网与测试网，预留 ABI 路径与类型声明
 
-// ABI导入 - 只使用GameAggregator
+// ABI导入 - GameAggregator和ERC20
 import { GAME_AGGREGATOR_ABI } from '../abis/GameAggregator';
+import { ERC20_ABI } from '../abis/ERC20';
 import { config } from '../config';
 
 // 环境变量检查
@@ -15,22 +16,23 @@ console.log('Environment:', ENV);
 export const CONTRACTS = isDev
   ? {
     // BSC测试网合约地址 - 使用新的GameAggregator地址
-    GAME_AGGREGATOR: process.env.REACT_APP_GAME_AGGREGATOR_CONTRACT_TESTNET || '0x08734b96985fB41629FD264981874E1578e6BaC3',
+    GAME_AGGREGATOR: process.env.REACT_APP_GAME_AGGREGATOR_CONTRACT_TESTNET || '0x30C5fDb3FBdd3247ebEBD82EFFd235c221285dBE',
     SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_TESTNET || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD',
     USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_TESTNET || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16',
     REWARD_MANAGER: process.env.REACT_APP_REWARD_MANAGER_CONTRACT_TESTNET || '0x8732A5ceE8372DFa95Db266086A7FF297245b05c',
   }
   : {
     // BSC主网合约地址 - 使用新的GameAggregator地址
-    GAME_AGGREGATOR: process.env.REACT_APP_GAME_AGGREGATOR_CONTRACT_MAINNET || '0x08734b96985fB41629FD264981874E1578e6BaC3',
+    GAME_AGGREGATOR: process.env.REACT_APP_GAME_AGGREGATOR_CONTRACT_MAINNET || '0x30C5fDb3FBdd3247ebEBD82EFFd235c221285dBE',
     SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_MAINNET || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD',
     USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_MAINNET || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16',
     REWARD_MANAGER: process.env.REACT_APP_REWARD_MANAGER_CONTRACT_MAINNET || '0x8732A5ceE8372DFa95Db266086A7FF297245b05c',
   } as const;
 
-// ABI导出 - 只使用GameAggregator
+// ABI导出 - GameAggregator和ERC20
 export const ABIS = {
   GAME_AGGREGATOR: GAME_AGGREGATOR_ABI as readonly any[],
+  ERC20: ERC20_ABI as readonly any[],
 } as const;
 
 // 合约配置类型
@@ -43,6 +45,12 @@ export type ContractConfig = {
 export const getGameAggregatorContract = (): ContractConfig => ({
   address: CONTRACTS.GAME_AGGREGATOR as `0x${string}`,
   abi: ABIS.GAME_AGGREGATOR,
+});
+
+// USD1 Token合约配置
+export const getUSD1TokenContract = (): ContractConfig => ({
+  address: CONTRACTS.USD1_TOKEN as `0x${string}`,
+  abi: ABIS.ERC20,
 });
 
 // 其他合约现在都通过GameAggregator访问，不再需要单独的配置

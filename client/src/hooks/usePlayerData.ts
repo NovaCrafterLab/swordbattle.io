@@ -98,9 +98,12 @@ export const usePlayerData = () => {
   const { data: usd1Balance, refetch: refetchBalance } =
     blockchain.useUSD1Balance(address || '')
 
-  // 获取USD1授权额度 - 查询对GameAggregator合约的授权
+  // 获取SwordBattle地址
+  const { data: swordBattleAddress } = blockchain.useSwordBattleAddress();
+
+  // 获取USD1授权额度 - 查询对SwordBattle合约的授权
   const { data: allowance, refetch: refetchAllowance } =
-    blockchain.useUSD1Allowance(address || '', getGameAggregatorContract().address)
+    blockchain.useUSD1Allowance(address || '', (swordBattleAddress as string) || '')
 
   // 获取玩家nonce
   const { data: playerNonce, refetch: refetchNonce } =
