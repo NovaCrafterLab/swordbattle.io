@@ -1,0 +1,99 @@
+// client/src/ui/components/Toast/Toast.scss
+// Toast component styles + animations
+
+/* ---------- container ---------- */
+.toast-stack {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1000;
+  pointer-events: none; /* clicks pass through except on toast itself */
+}
+
+/* ---------- toast core ---------- */
+.toast {
+  pointer-events: auto;
+  min-width: 220px;
+  max-width: 320px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid #444;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  animation: toast-in 0.3s ease forwards;
+}
+
+.toast--leave {
+  animation: toast-out 0.3s ease forwards;
+}
+
+/* color variants */
+.toast--success {
+  background: #284428;
+  border-color: #3c6e3c;
+}
+.toast--error {
+  background: #552626;
+  border-color: #7a3535;
+}
+.toast--info {
+  background: #1e3047;
+  border-color: #2f4a6b;
+}
+
+.toast-msg {
+  flex: 1;
+  word-break: break-word;
+}
+
+.toast-close {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  color: #ccc;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* ---------- animations ---------- */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* ---------- responsive (mobile) ---------- */
+@media (max-width: 480px) {
+  .toast-stack {
+    top: auto;
+    bottom: 16px;
+    right: 50%;
+    transform: translateX(50%);
+  }
+  .toast {
+    max-width: 90vw;
+  }
+}

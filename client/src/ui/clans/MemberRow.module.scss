@@ -1,0 +1,37 @@
+// client/src/ui/clans/MemberRow.module.scss
+// sb-clans-cm-* styles; rely on sb design tokens
+
+.sb-clans-cm-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space-3);
+  background: #1f1f1f;
+  border: 1px solid #333;
+  border-radius: var(--sb-radius-md);
+  padding: 8px 12px;
+  margin-bottom: var(--sb-space-1);
+}
+.sb-clans-cm-name {
+  flex: 1 1 auto;
+  font-weight: 600;
+  word-break: break-word;
+}
+.sb-clans-cm-role {
+  font-size: 13px;
+  opacity: 0.8;
+}
+.sb-clans-cm-btn {
+  padding: 4px 8px;
+  background: var(--sb-color-primary);
+  border: none;
+  border-radius: var(--sb-radius-sm);
+  cursor: pointer;
+  color: #000;
+  font-size: 12px;
+  font-weight: 600;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}

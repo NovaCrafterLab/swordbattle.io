@@ -1,0 +1,50 @@
+/* client/src/styles/sb-tokens.css */
+/* global design tokens, use as CSS variables */
+
+:root {
+  /* color */
+  --sb-color-primary: #e0c97d;
+  --sb-color-bg: #1e1e1e;
+  --sb-color-text: #f8f8f2;
+  --sb-color-success: #4caf50;
+  --sb-color-error: #f44336;
+
+  /* typography */
+  --sb-font-family: 'Inter', sans-serif;
+  --sb-font-size-xs: 12px;
+  --sb-font-size-sm: 14px;
+  --sb-font-size-md: 16px;
+  --sb-font-size-lg: 20px;
+  --sb-line-height: 1.5;
+
+  /* spacing (4px scale) */
+  --sb-space-0: 0;
+  --sb-space-1: 4px;
+  --sb-space-2: 8px;
+  --sb-space-3: 12px;
+  --sb-space-4: 16px;
+  --sb-space-6: 24px;
+  --sb-space-8: 32px;
+
+  /* radius & border */
+  --sb-radius-none: 0;
+  --sb-radius-sm: 4px;
+  --sb-radius-md: 8px;
+  --sb-radius-round: 9999px;
+  --sb-border-thin: 1px solid rgba(0,0,0,0.2);
+
+  /* shadow */
+  --sb-shadow-0: none;
+  --sb-shadow-1: 0 1px 2px rgba(0,0,0,0.15);
+  --sb-shadow-2: 0 4px 8px rgba(0,0,0,0.25);
+
+  /* z-index */
+  --sb-z-base: 0;
+  --sb-z-float: 10;
+  --sb-z-modal: 20;
+
+  /* breakpoints (for reference in JS) */
+  --sb-break-xs: 480px;
+  --sb-break-sm: 768px;
+  --sb-break-md: 1024px;
+}

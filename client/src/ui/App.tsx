@@ -26,13 +26,14 @@ import ConnectionError from './modals/ConnectionError';
 import RaceGameModal from './modals/RaceGameModal';
 import RewardsModal from './modals/RewardsModal';
 
+import { useToast } from './components/Toast';
+
 import {
   clearAccount,
   setAccount,
   logoutAsync,
   changeNameAsync,
-  changeClanAsync,
-} from '../redux/account/slice';
+} from '@/redux/account/slice';
 import { selectAccount } from '../redux/account/selector';
 import api from '../api';
 
@@ -66,7 +67,7 @@ import BSCWalletButton from './BSCWalletButton';
 let debugMode = false;
 try {
   debugMode = window.location.search.includes('debugAlertMode');
-} catch (e) {}
+} catch (e) { }
 
 function App() {
   const dispatch = useDispatch();
@@ -92,6 +93,7 @@ function App() {
   });
 
   const navigate = useNavigate();
+  const { addToast } = useToast();
 
   // 检测是否为race服务器的帮助函数
   const isRaceServer = (serverValue: string) => {
@@ -171,7 +173,7 @@ function App() {
         dispatch(clearAccount());
         setAccountReady(true);
       } else {
-        api.post(`${api.endpoint}/auth/loginWithSecret`, null, (data) => {
+        api.post(`${api.endpoint}/auth/loginWithSecret`, {}, (data) => {
           setAccountReady(true);
           if (data.account) {
             data.account.secret = data.secret;
@@ -246,6 +248,7 @@ function App() {
     console.log('Starting game');
     if (!isConnected) {
       alert('Not connected yet');
+      addToast('error', 'Not connected yet');
       return;
     }
 
@@ -360,12 +363,7 @@ function App() {
     dispatch(changeNameAsync(newName) as any);
   };
   const onChangeClan = () => {
-    const newClan = prompt(
-      'What do you want your clan tag to be? Clans can only be 1-7 characters long, and you can only change your clan once every 7 days.',
-    );
-    if (!newClan) return;
-
-    dispatch(changeClanAsync(newClan) as any);
+    navigate('/clans')
   };
 
   const openShop = () => {
@@ -374,8 +372,9 @@ function App() {
 
   const openLeaderboard = () => {
     // TODO
-    navigate('leaderboard');
+    navigate('/leaderboard');
   };
+
 
   useEffect(() => {
     if (modal?.type?.displayName === 'ShopModal') {
@@ -633,28 +632,14 @@ function App() {
                     </div>
                   )}
                   <ul className="dropdown-menu">
-                    <li>
-                      <a
-                        className="dropdown-item"
-                        href="#"
-                        onClick={onChangeName}
-                      >
-                        <FontAwesomeIcon icon={faICursor} /> Change Name
-                      </a>
+                    <li className="dropdown-item" onClick={onChangeName}>
+                      <FontAwesomeIcon icon={faICursor} /> Change Name
                     </li>
-                    <li>
-                      <a
-                        className="dropdown-item"
-                        href="#"
-                        onClick={onChangeClan}
-                      >
-                        <FontAwesomeIcon icon={faICursor} /> Change Clan
-                      </a>
+                    <li className="dropdown-item" onClick={onChangeClan}>
+                      <FontAwesomeIcon icon={faICursor} /> Change Clan
                     </li>
-                    <li>
-                      <a className="dropdown-item" href="#" onClick={onLogout}>
-                        <FontAwesomeIcon icon={faSignOut} /> Logout
-                      </a>
+                    <li className="dropdown-item" onClick={onLogout}>
+                      <FontAwesomeIcon icon={faSignOut} /> Logout
                     </li>
                   </ul>
                 </div>
@@ -677,64 +662,6 @@ function App() {
                 </>
               )}
             </div>
-
-            {/* <!-- LINKS CONTAINERS --> */}
-            {/* <div id="linksContainer" className='panel'>
-            <a href="./docs/terms.txt" target="_blank">Policy</a> |
-            <a href="./docs/privacy.txt" target="_blank">Privacy</a>
-          </div> */}
-
-            {/* TODO footer */}
-            <footer
-              className={clsx('links', isLoaded && 'animation')}
-              style={scale.styles}
-            >
-              {/* <div>
-                <a href="https://github.com/codergautam/swordbattle.io" target="_blank" rel="nofollow">About</a>
-              </div> */}
-              {/* <div>
-                <a href="https://discord.com/invite/9A9dNTGWb9" target="_blank" className='discord' rel="nofollow">
-                  Discord
-                </a>
-              </div> */}
-
-              {/* <div>
-                <a href="#"
-                  onClick={() => {
-                    try {
-                      (window as any)?.showPlaylight()
-                    } catch (e) {
-                      console.log('Error showing playlight', e);
-                    }
-                  }}
-                  rel="nofollow">
-                  More Games
-                </a>
-              </div> */}
-              {/* <div>
-                <a href="https://worldguessr.com/" target="_blank"
-                  style={{
-                    position: 'fixed',
-                    right: '95%',
-                    bottom: '150%',
-                    fontSize: '0.1em',
-                    color: 'white',
-                  }}
-                  rel="dofollow">
-                  Free GeoGuessr!
-                </a>
-              </div> */}
-              {/* <div>
-               <a href="https://swordbattle.io/partners" target="_blank" className='partners' rel="nofollow">
-                 Partners
-               </a>
-             </div> */}
-              <div>
-                {/* <a href="https://iogames.forum/t/official-swordbattle-changelog/17400/last" target="_blank" className='changelog' style={{color: 'yellow'}} rel="nofollow">
-                Changelog
-              </a> */}
-              </div>
-            </footer>
           </div>
         </>
       )}

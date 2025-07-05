@@ -131,7 +131,6 @@ export async function getServer(): Promise<Server> {
   /* auto-switch when selected server is offline */
   if (Settings.server !== chosen.value) {
     logger.warn(`Switched server to ${chosen.value} because ${Settings.server} is offline`);
-    alert(`Switched server to ${chosen.value} because ${Settings.server} is offline`);
     Settings.server = chosen.value;
     window.location.reload();
   }

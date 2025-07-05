@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import api from '@/api';
-import { setClantag } from '@/redux/account/slice';
+import { setClanTag } from '@/redux/account/slice';
 
 export default function ClanPage() {
   const dispatch = useDispatch();
@@ -22,8 +22,8 @@ export default function ClanPage() {
 
   /* -------- 基础 -------- */
   const create = () => api.post(`${api.endpoint}/clans`, { tag, name: tag }, logResp.bind(null, 'create'));
-  const join = () => api.post(`${api.endpoint}/clans/join/${tag}`, {}, d => { if (d.success) dispatch(setClantag(tag)); logResp('join', d); });
-  const leave = () => api.post(`${api.endpoint}/clans/leave`, {}, d => { if (d.success) dispatch(setClantag('')); logResp('leave', d); });
+  const join = () => api.post(`${api.endpoint}/clans/join/${tag}`, {}, d => { if (d.success) dispatch(setClanTag(tag)); logResp('join', d); });
+  const leave = () => api.post(`${api.endpoint}/clans/leave`, {}, d => { if (d.success) dispatch(setClanTag('')); logResp('leave', d); });
   const info = () => api.get(`${api.endpoint}/clans/info/${tag}`, logResp.bind(null, 'info'));
   const list = () => api.get(`${api.endpoint}/clans?page=1&size=10&q=${encodeURIComponent(query)}`, logResp.bind(null, 'list'));
   const members = () => api.get(`${api.endpoint}/clans/${tag}/members`, logResp.bind(null, 'members'));
