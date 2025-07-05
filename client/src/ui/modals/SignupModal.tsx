@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { setAccount } from '../../redux/account/slice';
-import api from '../../api';
+import { setAccount } from '@/redux/account/slice';
+import api from '@/api';
+
+import { useToast } from '@/ui/components/Toast';
 
 import './SignupModal.scss';
 
@@ -12,6 +14,8 @@ function SignupModal({ onSuccess }: any) {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false); // New state for loading indicator
 
+  const { addToast } = useToast();
+
   const onSignup = () => {
     setIsLoading(true); // Start loading
     api.post(
@@ -20,11 +24,7 @@ function SignupModal({ onSuccess }: any) {
       (data) => {
         setIsLoading(false); // Stop loading on response
         if (data.message) {
-          window.alert(
-            Array.isArray(data.message)
-              ? data.message.join('\n')
-              : data.message,
-          );
+          addToast( 'error', Array.isArray(data.message) ? data.message.join('\n') : data.message);
         } else {
           data.account.secret = data.secret;
           dispatch(setAccount(data.account));

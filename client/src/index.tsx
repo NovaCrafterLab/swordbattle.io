@@ -6,14 +6,23 @@ import { RouterProvider } from 'react-router-dom';
 import { WagmiProvider } from 'wagmi';
 import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
 import '@rainbow-me/rainbowkit/styles.css';
+
+import { refreshAccountAsync } from '@/redux/account/slice'
+import { ToastProvider, ToastContainer } from '@/ui/components/Toast'
 
 import { router } from './router';
 import { wagmiConfig } from './blockchain';
 import { initRecaptcha } from './utils/recaptcha';
 import { store } from './redux/store';
 import { config } from './config';
+
+import './styles/sb-tokens.css';
 import './global.scss';
+
+/* dispatch refresh so account.id and clan_tag are loaded even on deep link */
+store.dispatch(refreshAccountAsync())
 
 /* global flags */
 const qs = window.location.search;
@@ -37,7 +46,10 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
           <Provider store={store}>
-            <RouterProvider router={router} />
+            <ToastProvider>
+              <RouterProvider router={router} />
+              <ToastContainer />
+            </ToastProvider>
           </Provider>
         </RainbowKitProvider>
       </QueryClientProvider>

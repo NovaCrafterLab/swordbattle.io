@@ -1,20 +1,27 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import api from '../../api';
+// client/src/redux/account/slice.ts
+// Refined account slice: smaller surface, clear side-effects, clan helpers added
 
-export type AccountState = {
-  email: string;
-  username: string;
-  clan_tag: string;
-  isLoggedIn: boolean;
-  secret: string;
-  gems: number;
-  ultimacy: number;
-  skins: { equipped: number; owned: number[] };
-  is_v1: boolean;
-  xp: number;
-};
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
+import api from '@/api'
+
+/* ---------- models ---------- */
+
+export interface AccountState {
+  id: number
+  email: string
+  username: string
+  clan_tag: string
+  secret: string
+  isLoggedIn: boolean
+  gems: number
+  ultimacy: number
+  skins: { equipped: number; owned: number[] }
+  is_v1: boolean
+  xp: number
+}
 
 const initialState: AccountState = {
+  id: 0,
   email: '',
   username: '',
   clan_tag: '',
@@ -25,171 +32,104 @@ const initialState: AccountState = {
   skins: { equipped: 1, owned: [1] },
   is_v1: false,
   xp: 0,
-};
+}
 
-// Async Thunks
-export const logoutAsync = createAsyncThunk(
-  'account/logout',
-  async (_, { dispatch }) => {
-    try {
-      console.log('Clearing secret');
-      window.localStorage.removeItem('secret');
-    } catch (e) {
-      console.log('Failed to clear secret', e);
+/* ---------- helpers ---------- */
+
+const storeSecret = (token: string) => {
+  try {
+    window.localStorage.setItem('secret', token)
+  } catch { }
+  window.phaser_game?.events.emit('tokenUpdate', token)
+}
+
+/* ---------- async thunks ---------- */
+
+export const logoutAsync = createAsyncThunk('account/logout', (_, { dispatch }) => {
+  storeSecret('')
+  dispatch(clearAccount())
+})
+
+export const refreshAccountAsync = createAsyncThunk(
+  'account/refresh',
+  async (_: void, { getState, dispatch }) => {
+    const secret = (getState() as any).account.secret
+    const resp: any = await api.postAsync(`${api.endpoint}/profile/getPrivateUserInfo`, {})
+    if (resp.account) {
+      dispatch(setAccount({ ...resp.account, secret }))
+      return resp.account
     }
-
-    dispatch(clearAccount());
+    throw new Error(resp.error || 'Refresh failed')
   },
-);
+)
 
-export const updateAccountAsync = createAsyncThunk(
-  'account/updateAccount',
-  (_, { getState, dispatch }) => {
-    return new Promise((resolve, reject) => {
-      const state: any = getState();
-      api.post(
-        `${api.endpoint}/profile/getPrivateUserInfo`,
-        {},
-        (response: any) => {
-          if (response.error) {
-            alert(response.error);
-            reject(response.error);
-          } else if (response.account) {
-            response.account.secret = state.account.secret;
-            dispatch(setAccount(response.account));
-            window.phaser_game?.events.emit(
-              'tokenUpdate',
-              state.account.secret,
-            );
-            resolve(response.account);
-          }
-        },
-        state.account.secret,
-      );
-    });
-  },
-);
-
-export const changeNameAsync = createAsyncThunk(
-  'account/changeName',
-  async (newUsername: string, { getState, dispatch }) => {
-    // const state: any = getState();
-    try {
-      const response = await api.postAsync(
-        `${api.endpoint}/auth/change-username?now=${Date.now()}`,
-        {
-          newUsername,
-        },
-      );
-
-      if (response.error) {
-        alert(response.error);
-      } else if (response.success) {
-        alert('Username changed successfully');
-        // Dispatching actions to update name and token in the state
-        dispatch(setName(newUsername));
-        dispatch(setSecret(response.secret));
-      }
-    } catch (error) {
-      // Handle any other errors, such as network issues
-      console.error(error);
-      alert('An error occurred while changing the name.');
-    }
-  },
-);
-
-export const changeClanAsync = createAsyncThunk(
-  'account/changeClan',
-  async (newClantag: string, { getState, dispatch }) => {
-    // const state: any = getState();
-    try {
-      const response = await api.postAsync(
-        `${api.endpoint}/clans/join/${newClantag.toUpperCase()}`,
-        {}
-      );
-
-      if (response.error) {
-        alert(response.error);
-      } else if (response.success) {
-        alert('Clan tag changed successfully');
-        // Dispatching actions to update clan and token in the state
-        dispatch(setClantag(newClantag));
-        dispatch(setSecret(response.secret));
-      }
-    } catch (error) {
-      // Handle any other errors, such as network issues
-      console.error(error);
-      alert('An error occurred while changing the clan tag.');
-    }
-  },
-);
+/* ---------- slice ---------- */
 
 const accountSlice = createSlice({
   name: 'account',
   initialState,
   reducers: {
-    clearAccount: (state) => {
-      state.email = '';
-      state.username = '';
-      state.clan_tag = '';
-      state.secret = '';
-      state.gems = 0;
-      state.ultimacy = 0;
-      state.isLoggedIn = false;
-      state.skins = { equipped: 1, owned: [1] };
-      window.phaser_game?.events.emit('tokenUpdate', '');
-      state.is_v1 = false;
-      state.xp = 0;
+    clearAccount(state) {
+      Object.assign(state, initialState)
+      /* keep token in localStorage; only emit blank to Phaser,
+         real removal happens explicitly in logoutAsync  */
+      window.phaser_game?.events.emit('tokenUpdate', '')
     },
-    setAccount: (state, action) => {
-      state.email = action.payload.email;
-      state.username = action.payload.username;
-      state.clan_tag = action.payload.clan_tag;
-      state.isLoggedIn = true;
-      const previousToken = state.secret;
-      state.secret = action.payload.secret;
-      state.gems = action.payload.gems;
-      state.ultimacy = action.payload.ultimacy;
-      state.skins = action.payload.skins;
-      state.is_v1 = action.payload.is_v1;
-      state.xp = action.payload.xp;
-      if (previousToken !== state.secret) {
-        console.log('Token updated');
-        window.phaser_game?.events.emit('tokenUpdate', state.secret);
 
-        try {
-          window.localStorage.setItem('secret', state.secret);
-        } catch (e) {
-          console.log('Error setting secret', e);
-        }
+    setAccount(state, action: PayloadAction<Partial<AccountState>>) {
+      const prev = state.secret
+      Object.assign(state, action.payload, { isLoggedIn: true })
+      if (action.payload.secret && action.payload.secret !== prev) {
+        state.secret = action.payload.secret
+        storeSecret(state.secret)
       }
     },
-    setName: (state, action) => {
-      state.username = action.payload;
-    },
-    setClantag: (state, action) => {
-      state.clan_tag = action.payload;
-    },
-    setSecret: (state, action) => {
-      state.secret = action.payload;
-      console.log('Token updated');
 
-      if (state.secret) {
-        window.phaser_game?.events.emit('tokenUpdate', state.secret);
-      }
+    setName(state, action: PayloadAction<string>) {
+      state.username = action.payload
+    },
 
-      try {
-        window.localStorage.setItem('secret', state.secret);
-      } catch (e) {
-        console.log('Error setting secret', e);
-      }
+    setClanTag(state, action: PayloadAction<string>) {
+      state.clan_tag = action.payload
+    },
+
+    setSecret(state, action: PayloadAction<string>) {
+      state.secret = action.payload
+      storeSecret(state.secret)
     },
   },
-  extraReducers: (builder) => {
-    // Handle async thunks here if needed
-  },
-});
+})
 
-export const { setAccount, clearAccount, setName, setClantag, setSecret } =
-  accountSlice.actions;
-export default accountSlice.reducer;
+/* ---------- exports ---------- */
+
+export const { clearAccount, setAccount, setName, setClanTag, setSecret } =
+  accountSlice.actions
+export default accountSlice.reducer
+
+/* -----------------------------------------------------------------
+   TEMP compat thunk
+   changeNameAsync is deprecated; keep until name-change UI is migrated
+   TODO: remove after dedicated username-change modal refactor
+------------------------------------------------------------------- */
+export const changeNameAsync = createAsyncThunk(
+  'account/compat/changeName',
+  async (newUsername: string, { dispatch }) => {
+    try {
+      const res: any = await api.postAsync(
+        `${api.endpoint}/auth/change-username?now=${Date.now()}`,
+        { newUsername },
+      )
+      if (res.success) {
+        dispatch(setName(newUsername))
+        dispatch(setSecret(res.secret))
+      } else if (res.error) {
+        throw new Error(res.error)
+      }
+      return res
+    } catch (e) {
+      /* swallow to prevent unhandled rejection */
+      console.error('changeNameAsync deprecated thunk error', e)
+      return { error: (e as Error).message }
+    }
+  },
+)

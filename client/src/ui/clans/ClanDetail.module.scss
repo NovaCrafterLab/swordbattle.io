@@ -1,0 +1,138 @@
+// client/src/ui/clans/ClanDetail.module.scss
+// sb-clans-cd-* styles; rely on sb design tokens
+
+/* page root */
+.sb-clans-cd-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100vh;
+  padding: var(--sb-space-4);
+  background: var(--sb-color-bg);
+  color: var(--sb-color-text);
+}
+
+/* ---------- tab bar ---------- */
+.sb-clans-cd-tabs {
+  display: flex;
+  gap: var(--sb-space-3);
+  margin-bottom: var(--sb-space-4);
+  overflow-x: auto;
+}
+
+.sb-clans-cd-tab {
+  flex: 0 0 auto;
+  padding: 6px 14px;
+  border: var(--sb-border-thin);
+  border-radius: var(--sb-radius-sm);
+  cursor: pointer;
+  background: #222;
+  user-select: none;
+  white-space: nowrap;
+
+  &.active {
+    background: #2d2d2d;
+    border-color: var(--sb-color-primary);
+    color: var(--sb-color-primary);
+  }
+}
+
+/* ---------- body section ---------- */
+.sb-clans-cd-section {
+  max-width: 960px;
+  margin: 0 auto;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-bottom: var(--sb-space-4);
+}
+
+/* overview card */
+.sb-clans-cd-card {
+  background: #1b1b1b;
+  border: 1px solid #333;
+  box-shadow: var(--sb-shadow-1);
+  border-radius: var(--sb-radius-md);
+  padding: var(--sb-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-2);
+  width: 100%;
+  max-width: 400px;
+}
+
+/* ---------- settings form ---------- */
+.sb-clans-cd-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-3);
+  max-width: 500px;
+  width: 100%;
+}
+
+.sb-clans-cd-label {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--sb-font-size-sm);
+}
+
+.sb-clans-cd-input {
+  margin-top: var(--sb-space-1);
+  padding: 6px 8px;
+  background: #1e1e1e;
+  border: var(--sb-border-thin);
+  border-radius: var(--sb-radius-sm);
+  color: var(--sb-color-text);
+}
+
+.sb-clans-cd-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space-1);
+  font-size: var(--sb-font-size-sm);
+}
+
+.sb-clans-cd-btn {
+  padding: 6px 12px;
+  background: var(--sb-color-primary);
+  border: none;
+  border-radius: var(--sb-radius-sm);
+  cursor: pointer;
+  color: #000;
+  font-weight: 600;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.sb-clans-cd-empty {
+  opacity: 0.6;
+  font-style: italic;
+  margin-top: var(--sb-space-2);
+}
+
+.sb-clans-cd-tag {
+  color: var(--sb-color-primary);
+  margin-left: 4px;
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 768px) {
+  .sb-clans-cd-tabs {
+    gap: var(--sb-space-2);
+  }
+
+  .sb-clans-cd-card {
+    padding: var(--sb-space-3);
+  }
+
+  .sb-clans-cd-form {
+    gap: var(--sb-space-2);
+  }
+
+  .sb-clans-cd-btn {
+    width: 100%;
+    text-align: center;
+  }
+}

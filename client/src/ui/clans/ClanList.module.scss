@@ -1,0 +1,144 @@
+// client/src/ui/clans/ClanList.module.scss
+// sb-clans-cl-* styles; rely on sb design tokens
+
+/* root */
+.sb-clans-cl-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--sb-space-4);
+  background: var(--sb-color-bg);
+  color: var(--sb-color-text);
+}
+
+/* ---------- toolbar ---------- */
+.sb-clans-cl-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sb-space-2);
+  margin-bottom: var(--sb-space-3);
+}
+
+/* search box */
+.sb-clans-cl-search {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: var(--sb-space-1);
+}
+.sb-clans-cl-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 8px;
+  background: #1e1e1e;
+  border: var(--sb-border-thin);
+  border-radius: var(--sb-radius-sm);
+  color: var(--sb-color-text);
+}
+.sb-clans-cl-btn {
+  padding: 6px 10px;
+  background: var(--sb-color-primary);
+  border: none;
+  border-radius: var(--sb-radius-sm);
+  cursor: pointer;
+  color: #000;
+  font-weight: 600;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+/* right-hand action buttons */
+.sb-clans-cl-actions {
+  display: flex;
+  gap: var(--sb-space-2);
+}
+.sb-clans-cl-leave {
+  background: #4b2f2f;
+}
+
+/* ---------- rows ---------- */
+.sb-clans-cl-rows {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-2);
+}
+
+/* item card */
+.sb-clans-cl-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space-3);
+  padding: 10px;
+  background: #1f1f1f;
+  border: 1px solid #333;
+  border-radius: var(--sb-radius-md);
+
+  &:hover {
+    background: #2a2a2a;
+  }
+}
+
+/* click-area */
+.sb-clans-cl-main {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sb-space-3);
+  min-width: 0;
+  cursor: pointer;
+}
+.sb-clans-cl-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-clans-cl-tag {
+  color: var(--sb-color-primary);
+}
+.sb-clans-cl-meta {
+  margin-left: auto;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+/* ---------- pagination ---------- */
+.sb-clans-cl-pages {
+  margin-top: var(--sb-space-3);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--sb-space-3);
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 768px) {
+  .sb-clans-cl-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sb-clans-cl-search {
+    width: 100%;
+  }
+  .sb-clans-cl-rows {
+    gap: var(--sb-space-1);
+  }
+  .sb-clans-cl-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .sb-clans-cl-meta {
+    margin-left: 0;
+    margin-top: 4px;
+  }
+  .sb-clans-cl-actions {
+    justify-content: flex-start;
+  }
+}

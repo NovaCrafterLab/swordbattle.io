@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { setAccount } from '../../redux/account/slice';
-import api from '../../api';
+import { setAccount } from '@/redux/account/slice';
+import api from '@/api';
+import { useToast } from '@/ui/components/Toast';
 
 import './LoginModal.scss';
 
@@ -10,12 +11,12 @@ function LoginModal({ onSuccess }: any) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
+  const { addToast } = useToast()
+
   const onLogin = () => {
     api.post(`${api.endpoint}/auth/login`, { username, password }, (data) => {
       if (data.message) {
-        window.alert(
-          Array.isArray(data.message) ? data.message.join('\n') : data.message,
-        );
+        addToast('error', Array.isArray(data.message) ? data.message.join('\n') : data.message);
       } else {
         data.account.secret = data.secret;
 
@@ -39,7 +40,7 @@ function LoginModal({ onSuccess }: any) {
         onChange={(e) => setPassword(e.target.value)}
       />
       <p style={{ marginTop: 5, marginBottom: 0 }}>
-        Forgot your password? 
+        Forgot your password?
         {/* Email support@swordbattle.io<br></br>(Note: NEVER
         share your password with others!) */}
       </p>

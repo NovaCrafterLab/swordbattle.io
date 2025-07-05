@@ -32,6 +32,13 @@ export class Account {
   @JoinColumn({ name: 'clan_id' })
   clan: Clan;
 
+  @Column({
+    type: 'enum',
+    enum: ['owner', 'admin', 'member'],
+    default: 'member',
+  })
+  clan_role: 'owner' | 'admin' | 'member';
+
   @Exclude()
   @Column()
   password: string;

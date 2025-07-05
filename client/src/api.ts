@@ -1,4 +1,6 @@
 // client/src/api.ts
+
+/* == imports & constants == */
 import { config } from './config';
 
 const endpoint = config.apiEndpoint.startsWith('http') 
@@ -9,147 +11,117 @@ const backupEndpoint = config.apiEndpointBackup
       ? config.apiEndpointBackup 
       : `${window.location.protocol}//${config.apiEndpointBackup}`)
   : null;
+
 let currentEndpoint: string | null = null;
-
 const unavialableMessage = 'Server is temporarily unavailable, try again later';
+const debugMode = window.location.search.includes('debugAlertMode');
 
-let debugMode = false;
-try {
-  debugMode = window.location.search.includes('debugAlertMode');
-} catch (e) {}
-
-async function checkEndpoint() {
-  if (!currentEndpoint) {
-    currentEndpoint = endpoint;
-    await fetch(`${currentEndpoint}/games/ping`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'text/plain',
-      },
-    }).catch(() => {
-      console.log('Endpoint is not available, switching to backup');
-      currentEndpoint = backupEndpoint;
-    });
+/* == helpers == */
+async function ensureEndpoint() {
+  if (currentEndpoint) return;
+  currentEndpoint = endpoint;
+  try {
+    await fetch(`${currentEndpoint}/games/ping`, { method: 'GET' });
+  } catch {
+    console.log('Endpoint down, switching to backup');
+    currentEndpoint = backupEndpoint;
   }
 }
 
-function get(url: string, callback = (data: any) => {}): any {
-  if (!currentEndpoint) {
-    checkEndpoint().then(() => {
-      call();
-    });
-  } else {
-    call();
+function getSecret() {
+  try {
+    return window.localStorage.getItem('secret') || '';
+  } catch {
+    return '';
   }
+}
 
-  function call() {
-    fetch(url, {
-      method: 'GET',
+/* == core request == */
+function _request(
+  url: string,
+  init: RequestInit & { body?: any } = {},
+  useRecaptcha = false,
+  cb: (d: any) => void = () => {},
+) {
+  ensureEndpoint().then(() => {
+    const secret = getSecret();
+    if (!secret && debugMode) console.warn('secret empty');
+
+    const headers: any = {
+      'Access-Control-Allow-Origin': endpoint,
+      'Content-Type': 'application/json',
+      ...(init.headers || {}),
+    };
+    if (secret) headers.Authorization = `Bearer ${secret}`;
+
+    /* inject secret into JSON body */
+    let body = init.body;
+    if (body && typeof body !== 'string') body = JSON.stringify(body);
+    if (body && secret) {
+      try {
+        const obj = JSON.parse(body);
+        obj.secret ??= secret;
+        body = JSON.stringify(obj);
+      } catch { /* ignore */ }
+    }
+
+    const fetchOptions: RequestInit = {
       mode: 'cors',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': endpoint,
-      },
-    })
-      .then((res) => res.json())
-      .then(callback)
-      .catch((err) => callback({ message: err }));
-  }
-}
-
-function post(
-  url: string,
-  body: any,
-  callback = (data: any) => {},
-  token?: string,
-  useRecaptcha = false,
-) {
-  if (!body) body = {};
-
-  let secret: string | null = null;
-  try {
-    secret = window.localStorage.getItem('secret');
-  } catch (e) {
-    console.log('Error getting secret', e);
-  }
-  if (!currentEndpoint) {
-    checkEndpoint().then(() => {
-      call();
-    });
-  } else {
-    call();
-  }
-
-  function call() {
-    const recaptchaClientKey = config.recaptchaClientKey;
-
-    const sendRequest = (recaptchaToken = '') => {
-      const headers = {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': endpoint,
-        Authorization: token ? `Bearer ${token}` : '',
-        'Recaptcha-Token': '',
-      };
-
-      if (recaptchaToken) {
-        body.recaptchaToken = recaptchaToken;
-      }
-      if (secret) {
-        body.secret = secret;
-      }
-
-      fetch(url, {
-        method: 'POST',
-        mode: 'cors',
-        credentials: 'include',
-        body: JSON.stringify(body),
-        headers: headers,
-      })
-        .then((res) => res.json())
-        .then(callback)
-        .catch(() => callback({ message: unavialableMessage }));
+      ...init,
+      headers,
+      body,
     };
 
-    if (useRecaptcha && recaptchaClientKey && (window as any).recaptcha) {
+    /* recaptcha wrap */
+    if (useRecaptcha && config.recaptchaClientKey && (window as any).recaptcha) {
       const endpointName = url.split('/').pop() as string;
-      (window as any).recaptcha
-        .execute(endpointName, {})
-        .then((recaptchaToken: string) => {
-          if (debugMode)
-            alert('got recaptcha of length ' + recaptchaToken.length);
-          sendRequest(recaptchaToken);
-        });
-    } else {
-      sendRequest();
+      (window as any).recaptcha.execute(endpointName, {}).then((token: string) => {
+        if (token) {
+          const obj = JSON.parse(body as string);
+          obj.recaptchaToken = token;
+          fetchOptions.body = JSON.stringify(obj);
+        }
+        fetch(url, fetchOptions)
+          .then((r) => r.json())
+          .then(cb)
+          .catch(() => cb({ message: unavialableMessage }));
+      });
+      return;
     }
-  }
-}
 
-async function postAsync(url: string, body: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    post(url, body, (data: any) => {
-      resolve(data);
-    });
+    fetch(url, fetchOptions)
+      .then((r) => r.json())
+      .then(cb)
+      .catch(() => cb({ message: unavialableMessage }));
   });
 }
 
-function method(url: string, options: {}, callback = (data: any) => {}): any {
-  fetch(url, {
-    mode: 'cors',
-    credentials: 'include',
-    headers: {
-      'Access-Control-Allow-Origin': endpoint,
-    },
-    ...options,
-  })
-    .then((res) => res.json())
-    .then(callback)
-    .catch(() => callback({ message: unavialableMessage }));
+/* == public wrappers == */
+function get(url: string, cb?: (d: any) => void) {
+  _request(url, { method: 'GET' }, false, cb);
+}
+function post(url: string, body?: any, cb?: (d: any) => void, token?: string, rec = false) {
+  _request(url, { method: 'POST', body, headers: { Authorization: token ? `Bearer ${token}` : '' } }, rec, cb);
+}
+function patch(url: string, body?: any, cb?: (d: any) => void) {
+  _request(url, { method: 'PATCH', body }, false, cb);
+}
+function put(url: string, body?: any, cb?: (d: any) => void) {
+  _request(url, { method: 'PUT', body }, false, cb);
+}
+function del(url: string, body?: any, cb?: (d: any) => void) {
+  _request(url, { method: 'DELETE', body }, false, cb);
+}
+function postAsync<T = any>(url: string, body?: any): Promise<T> {
+  return new Promise<T>((resolve) => post(url, body, resolve));
 }
 
+/** @deprecated use patch/put/del  */
+function method(url: string, opts: RequestInit, cb?: (d: any) => void) {
+  _request(url, opts, false, cb);
+}
 
-export { endpoint, get, post, method, postAsync };
-
-const api = { endpoint, get, post, method, postAsync };
-export default api;
+/* == exports == */
+export { endpoint, get, post, patch, put, del, method, postAsync };
+export default { endpoint, get, post, patch, put, del, method, postAsync };

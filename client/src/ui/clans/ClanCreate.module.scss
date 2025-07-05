@@ -1,0 +1,79 @@
+// client/src/ui/clans/ClanCreate.module.scss
+// sb-clans-cc-* styles; rely on sb design tokens
+
+/* overlay */
+.sb-clans-cc-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: var(--sb-z-modal);
+}
+
+/* modal card */
+.sb-clans-cc-modal {
+  background: var(--sb-color-bg);
+  color: var(--sb-color-text);
+  width: 320px;
+  padding: var(--sb-space-4);
+  border-radius: var(--sb-radius-md);
+  box-shadow: var(--sb-shadow-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sb-space-3);
+}
+
+/* heading */
+.sb-clans-cc-modal h3 {
+  margin: 0 0 var(--sb-space-2) 0;
+  text-align: center;
+  font-size: var(--sb-font-size-lg);
+}
+
+/* field block */
+.sb-clans-cc-label {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--sb-font-size-sm);
+}
+
+.sb-clans-cc-input {
+  margin-top: var(--sb-space-1);
+  padding: 6px 8px;
+  background: #2b2b2b; /* keep slight contrast */
+  border: var(--sb-border-thin);
+  border-radius: var(--sb-radius-sm);
+  color: var(--sb-color-text);
+}
+
+/* bottom action row */
+.sb-clans-cc-actions {
+  margin-top: var(--sb-space-2);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sb-space-2);
+}
+
+.sb-clans-cc-btn {
+  padding: 6px 12px;
+  cursor: pointer;
+  background: var(--sb-color-primary);
+  border: none;
+  border-radius: var(--sb-radius-sm);
+  color: #000;
+  font-weight: 600;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+/* error text */
+.sb-clans-cc-error {
+  color: var(--sb-color-error);
+  font-size: 13px;
+  text-align: center;
+}

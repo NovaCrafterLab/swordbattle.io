@@ -3,11 +3,12 @@ import { useDispatch } from 'react-redux';
 import {
   AccountState,
   setAccount,
-  updateAccountAsync,
-} from '../../redux/account/slice';
-import { Settings } from '../../game/Settings';
-import api from '../../api';
-import * as cosmetics from '../../game/cosmetics.json';
+  refreshAccountAsync,
+} from '@/redux/account/slice';
+import { Settings } from '@/game/Settings';
+import api from '@/api';
+import { useToast } from '@/ui/components/Toast';
+import * as cosmetics from '@/game/cosmetics.json';
 
 import './ShopModal.scss';
 import { buyFormats, numberWithCommas } from '@/utils/helpers';
@@ -56,6 +57,8 @@ const ShopModal: React.FC<ShopModalProps> = ({ account }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBadge, setSelectedBadge] = useState('norm');
 
+  const { addToast } = useToast();
+
   const skinRefs = useRef<(HTMLImageElement | null)[]>(
     new Array(Object.keys(skins).length).fill(null),
   );
@@ -88,8 +91,8 @@ const ShopModal: React.FC<ShopModalProps> = ({ account }) => {
         `${api.endpoint}/profile/cosmetics/skins${apiPath}${id}`,
         null,
         (data) => {
-          if (data.error) alert(data.error);
-          dispatch(updateAccountAsync() as any);
+          if (data.error) addToast('error', data.error);
+          dispatch(refreshAccountAsync() as any);
           setSkinStatus((prev) => ({ ...prev, [id]: '' }));
         },
       );
@@ -135,7 +138,10 @@ const ShopModal: React.FC<ShopModalProps> = ({ account }) => {
 
     // Fetch skin counts
     api.get(`${api.endpoint}/profile/skins/buys`, (data) => {
-      if (data.error) return alert('Error fetching skin cnts ' + data.error);
+      if (data.error) {
+        addToast('error', `Error fetching skin counts: ${data.error}`);
+        return
+      }
       setSkinCounts(data);
     });
 
