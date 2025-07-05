@@ -90,6 +90,9 @@ module.exports = {
       usd1Token: isDev
         ? (process.env.USD1_TOKEN_CONTRACT_TESTNET || process.env.USD1_TOKEN_CONTRACT || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16')
         : (process.env.USD1_TOKEN_CONTRACT_MAINNET || process.env.USD1_TOKEN_CONTRACT),
+      rewardManager: isDev
+        ? (process.env.REWARD_MANAGER_CONTRACT_TESTNET || process.env.REWARD_MANAGER_CONTRACT)
+        : (process.env.REWARD_MANAGER_CONTRACT_MAINNET || process.env.REWARD_MANAGER_CONTRACT),
     },
     trustedSigner: process.env.TRUSTED_SIGNER_PRIVATE_KEY,
     gameLevel: parseInt(process.env.GAME_LEVEL || '0'), // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH

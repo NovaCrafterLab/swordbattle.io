@@ -13,8 +13,15 @@ interface RewardsModalProps {
 interface GameReward {
   gameId: number;
   score: number;
-  reward: bigint;
-  hasClaimed: boolean;
+  reward: bigint; // 总奖励
+  usdReward: bigint; // USD奖励
+  nclabReward: bigint; // NCLab奖励
+  hasClaimed: boolean; // 是否已领取任何奖励
+  usdClaimed: boolean; // USD是否已领取
+  nclabClaimed: boolean; // NCLab是否已领取
+  usdClaimable: boolean; // USD是否可领取
+  nclabClaimable: boolean; // NCLab是否可领取
+  nclabClaimableTime?: number; // NCLab可领取时间
   rank: number;
   isWinner: boolean;
   timestamp?: number;
@@ -48,24 +55,9 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
   // 组件挂载时立即刷新playerData
   useEffect(() => {
     if (address && isConnected) {
-      // 立即检查是否已有缓存的数据
-      if (playerData.playerProfile?.gameHistory && playerData.playerProfile.gameHistory.length > 0) {
-        const gameRewardsData: GameReward[] = playerData.playerProfile.gameHistory.map(game => ({
-          gameId: game.gameId,
-          score: game.score,
-          reward: game.reward,
-          hasClaimed: game.hasClaimed,
-          rank: game.rank,
-          isWinner: game.isWinner,
-          timestamp: game.timestamp,
-          level: game.level,
-        }));
-        setGameRewards(gameRewardsData);        
-        setIsLoading(false);
-      } else {
-        // 如果没有缓存数据，立即刷新
-        playerData.refreshPlayerData();
-      }
+      // 每次打开RewardsModal都强制刷新数据，确保显示最新奖励
+      setIsLoading(true);
+      playerData.refreshPlayerData();
     } else {
       // 如果没有连接钱包，设置为非加载状态
       setIsLoading(false);
@@ -80,7 +72,14 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
         gameId: game.gameId,
         score: game.score,
         reward: game.reward,
+        usdReward: game.usdReward,
+        nclabReward: game.nclabReward,
         hasClaimed: game.hasClaimed,
+        usdClaimed: game.usdClaimed,
+        nclabClaimed: game.nclabClaimed,
+        usdClaimable: game.usdClaimable,
+        nclabClaimable: game.nclabClaimable,
+        nclabClaimableTime: game.nclabClaimableTime,
         rank: game.rank,
         isWinner: game.isWinner,
         timestamp: game.timestamp,
@@ -97,21 +96,52 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
     if (retryTrigger > 0 && address && isConnected) {
       setIsLoading(true);
       setFetchError(null);
+      // 强制刷新，不使用缓存数据
       playerData.refreshPlayerData();
     }
-  }, [retryTrigger]);
+  }, [retryTrigger, address, isConnected]);
 
   /**
-   * 领取单个游戏奖励
+   * 领取单个游戏奖励 (所有类型)
    */
   const handleClaimReward = async (gameId: number) => {
     if (!address) return;
 
     try {
       setClaimingGameId(gameId);
-      blockchain.claimReward(gameId);
+      blockchain.claimGameReward(gameId, address);
     } catch (error) {
       console.error('Failed to claim reward:', error);
+      setClaimingGameId(null);
+    }
+  };
+
+  /**
+   * 领取指定游戏的USD奖励
+   */
+  const handleClaimUSDReward = async (gameId: number) => {
+    if (!address) return;
+
+    try {
+      setClaimingGameId(gameId);
+      blockchain.claimUSDRewards(gameId, address);
+    } catch (error) {
+      console.error('Failed to claim USD reward:', error);
+      setClaimingGameId(null);
+    }
+  };
+
+  /**
+   * 领取指定游戏的NCLab奖励
+   */
+  const handleClaimNclabReward = async (gameId: number) => {
+    if (!address) return;
+
+    try {
+      setClaimingGameId(gameId);
+      blockchain.claimNclabRewards(gameId, address);
+    } catch (error) {
+      console.error('Failed to claim NCLab reward:', error);
       setClaimingGameId(null);
     }
   };
@@ -124,7 +154,7 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
 
     try {
       setClaimingAll(true);
-      blockchain.claimAllRewards();
+      blockchain.claimAllGameRewards(address);
     } catch (error) {
       console.error('Failed to claim all rewards:', error);
       setClaimingAll(false);
@@ -189,20 +219,25 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
 
   // 计算统计数据
   const totalRewards = gameRewards.reduce((sum, reward) => sum + reward.reward, BigInt(0));
-  const unclaimedRewards = gameRewards
-    .filter(reward => !reward.hasClaimed && reward.reward > BigInt(0))
-    .reduce((sum, reward) => sum + reward.reward, BigInt(0));
+  const unclaimedUsdRewards = gameRewards
+    .filter(reward => reward.usdClaimable)
+    .reduce((sum, reward) => sum + reward.usdReward, BigInt(0));
+  const unclaimedNclabRewards = gameRewards
+    .filter(reward => reward.nclabClaimable)
+    .reduce((sum, reward) => sum + reward.nclabReward, BigInt(0));
   const totalGames = gameRewards.length;
   const winCount = gameRewards.filter(reward => reward.isWinner).length;
   const winRate = totalGames > 0 ? (winCount / totalGames * 100).toFixed(1) : '0';
 
   // 可claim的奖励数量
-  const claimableCount = gameRewards.filter(reward => reward.reward > BigInt(0) && !reward.hasClaimed).length;
-  const claimableAmount = unclaimedRewards;
+  const claimableUsdCount = gameRewards.filter(reward => reward.usdClaimable).length;
+  const claimableNclabCount = gameRewards.filter(reward => reward.nclabClaimable).length;
+  const claimableCount = claimableUsdCount + claimableNclabCount;
+  const claimableAmount = unclaimedUsdRewards + unclaimedNclabRewards;
 
   // 根据过滤条件过滤对局
   const filteredRewards = showFilter === 'claimable' 
-    ? gameRewards.filter(reward => reward.reward > BigInt(0) && !reward.hasClaimed)
+    ? gameRewards.filter(reward => reward.usdClaimable || reward.nclabClaimable)
     : gameRewards;
 
   // 检查是否正在获取数据
@@ -372,25 +407,53 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
                       
                       <div className="game-stats">
                         <span className="score">Score: {reward.score.toLocaleString()}</span>
-                        <span className={`reward-amount ${reward.reward > BigInt(0) ? 'positive' : 'zero'}`}>
-                          {formatEther(reward.reward)} USD1
-                        </span>
+                        <div className="reward-amounts">
+                          <span className={`reward-amount ${reward.usdReward > BigInt(0) ? 'positive' : 'zero'}`}>
+                            💰 {formatEther(reward.usdReward)} USD1
+                          </span>
+                          {reward.nclabReward > BigInt(0) && (
+                            <span className={`reward-amount ${reward.nclabReward > BigInt(0) ? 'positive' : 'zero'}`}>
+                              ⚡ {formatEther(reward.nclabReward)} NCLab
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
                     <div className="reward-actions">
-                      {reward.reward > BigInt(0) ? (
-                        reward.hasClaimed ? (
-                          <span className="claimed-badge">✅ Claimed</span>
-                        ) : (
-                          <button
-                            className="claim-btn"
-                            onClick={() => handleClaimReward(reward.gameId)}
-                            disabled={claimingGameId === reward.gameId || blockchain.isWritePending}
-                          >
-                            {claimingGameId === reward.gameId ? 'Claiming...' : 'Claim'}
-                          </button>
-                        )
+                      {reward.usdReward > BigInt(0) || reward.nclabReward > BigInt(0) ? (
+                        <div className="claim-buttons">
+                          {reward.usdReward > BigInt(0) && (
+                            reward.usdClaimed ? (
+                              <span className="claimed-badge">💰 USD Claimed</span>
+                            ) : reward.usdClaimable ? (
+                              <button
+                                className="claim-btn usd"
+                                onClick={() => handleClaimUSDReward(reward.gameId)}
+                                disabled={claimingGameId === reward.gameId || blockchain.isWritePending}
+                              >
+                                {claimingGameId === reward.gameId ? 'Claiming...' : '💰 Claim USD'}
+                              </button>
+                            ) : (
+                              <span className="not-claimable">💰 USD Not Claimable</span>
+                            )
+                          )}
+                          {reward.nclabReward > BigInt(0) && (
+                            reward.nclabClaimed ? (
+                              <span className="claimed-badge">⚡ NCLab Claimed</span>
+                            ) : reward.nclabClaimable ? (
+                              <button
+                                className="claim-btn nclab"
+                                onClick={() => handleClaimNclabReward(reward.gameId)}
+                                disabled={claimingGameId === reward.gameId || blockchain.isWritePending}
+                              >
+                                {claimingGameId === reward.gameId ? 'Claiming...' : '⚡ Claim NCLab'}
+                              </button>
+                            ) : (
+                              <span className="not-claimable">⚡ NCLab Cooldown</span>
+                            )
+                          )}
+                        </div>
                       ) : (
                         <span className="no-reward">No reward</span>
                       )}

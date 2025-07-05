@@ -890,11 +890,21 @@ class Game {
       }
 
       // 调用合约结束游戏
-      const txHash = await this.blockchainService.endGame(this.blockchainGameId);
+      const endTxHash = await this.blockchainService.endGame(this.blockchainGameId);
       Logger.server.info('Game end transaction sent', {
         gameId: this.blockchainGameId,
-        txHash
+        txHash: endTxHash
       });
+
+      // 等待游戏结束交易确认后，分发奖励到RewardManager
+      try {
+        console.log(`🎁 开始分发游戏 ${this.blockchainGameId} 的奖励...`);
+        const rewardTxHash = await this.blockchainService.distributeGameRewards(this.blockchainGameId);
+        console.log(`✅ 奖励分发交易已发送: ${rewardTxHash}`);
+      } catch (rewardError) {
+        console.error(`❌ 奖励分发失败:`, rewardError.message);
+        // 不让奖励分发失败阻止游戏结束流程
+      }
 
       this.gamePhase = 'ended';
 
@@ -986,7 +996,14 @@ class Game {
           score: scoreData.finalScore,
           kills: scoreData.kills, // 添加击杀数据
           rewardAmount: '0', // 临时值，后续可以从区块链查询实际奖励
+          usdRewardAmount: '0', // USD奖励金额
+          nclabRewardAmount: '0', // NCLab奖励金额
           hasClaimed: false,
+          usdClaimed: false, // USD奖励是否已领取
+          nclabClaimed: false, // NCLab奖励是否已领取
+          usdClaimable: false, // USD奖励是否可领取
+          nclabClaimable: false, // NCLab奖励是否可领取
+          nclabClaimableTime: 0, // NCLab奖励可领取时间
           rank: 0, // 临时值，后续可以计算实际排名
           isWinner: false, // 临时值，后续可以根据排名确定
           gameEnded: true,
@@ -1013,8 +1030,8 @@ class Game {
         await this.saveGameDataToDatabase(gameDataForDatabase);
         console.log(`✅ Game data saved to database successfully`);
 
-        // 🎯 新增：启动异步延迟更新任务
-        this.scheduleBlockchainRewardUpdate(gameDataForDatabase);
+        // 🎯 新增：启动异步延迟更新任务，传递当前游戏ID
+        this.scheduleBlockchainRewardUpdate(gameDataForDatabase, this.blockchainGameId);
 
       } catch (dbError) {
         console.error(`❌ Failed to save game data to database:`, dbError);
@@ -1059,34 +1076,35 @@ class Game {
 
   /**
    * 安排区块链奖励数据的异步更新任务
-   * 游戏结束30秒后查询区块链真实奖励并更新数据库
+   * 游戏结束60秒后查询区块链真实奖励并更新数据库
    */
-  scheduleBlockchainRewardUpdate(gameDataArray) {
-    console.log(`⏰ 安排30秒后的区块链奖励更新任务...`);
+  scheduleBlockchainRewardUpdate(gameDataArray, gameId) {
+    console.log(`⏰ 安排60秒后的区块链奖励更新任务 (游戏ID: ${gameId})...`);
 
-    // 30秒后执行异步更新
+    // 60秒后执行异步更新，使用保存的gameId而不是当前的this.blockchainGameId
+    // 增加延迟时间给奖励分发交易更多确认时间
     setTimeout(async () => {
       try {
-        console.log(`🔄 开始执行区块链奖励更新任务 (游戏ID: ${this.blockchainGameId})`);
-        await this.updateBlockchainRewards(gameDataArray);
+        console.log(`🔄 开始执行区块链奖励更新任务 (游戏ID: ${gameId})`);
+        await this.updateBlockchainRewards(gameDataArray, gameId);
         console.log(`✅ 区块链奖励更新任务完成`);
       } catch (error) {
         console.error(`❌ 区块链奖励更新任务失败:`, error);
         // 可以考虑重试机制或者记录到错误日志中
       }
-    }, 30000); // 30秒延迟
+    }, 60000); // 60秒延迟
   }
 
   /**
    * 从区块链查询真实奖励数据并更新数据库
    */
-  async updateBlockchainRewards(gameDataArray) {
+  async updateBlockchainRewards(gameDataArray, gameId) {
     if (!gameDataArray || gameDataArray.length === 0) {
       console.log('⚠️ 没有游戏数据需要更新奖励');
       return;
     }
 
-    console.log(`🔗 开始查询游戏 ${this.blockchainGameId} 的区块链奖励数据...`);
+    console.log(`🔗 开始查询游戏 ${gameId} 的区块链奖励数据...`);
 
     const updatedGameData = [];
 
@@ -1094,47 +1112,62 @@ class Game {
       try {
         console.log(`🔍 查询玩家 ${gameData.playerAddress} 的奖励...`);
 
-        // 从区块链查询真实奖励数据（新合约）
-        const playerRewards = await this.blockchainService.readContract(
-          this.blockchainService.getSwordBattleContract(),
-          'getPlayerRewards',
-          [BigInt(this.blockchainGameId), gameData.playerAddress]
+        // 从区块链查询真实奖励数据（使用RewardManager合约）
+        const playerRewardStatus = await this.blockchainService.readContract(
+          this.blockchainService.getRewardManagerContract(),
+          'getPlayerRewardStatus',
+          [BigInt(gameId), gameData.playerAddress]
         );
 
-        const playerInfo = await this.blockchainService.readContract(
-          this.blockchainService.getSwordBattleContract(),
-          'getPlayerInfo',
-          [BigInt(this.blockchainGameId), gameData.playerAddress]
-        );
+        // getPlayerRewardStatus返回: [usdRewards, nclabRewards, usdClaimable, nclabClaimable, nclabClaimableTime, usdClaimed, nclabClaimed]
+        const usdRewards = playerRewardStatus[0];        // USD1奖励总额
+        const nclabRewards = playerRewardStatus[1];      // NCLab奖励总额  
+        const usdClaimable = playerRewardStatus[2];      // USD奖励是否可领取
+        const nclabClaimable = playerRewardStatus[3];    // NCLab奖励是否可领取
+        const nclabClaimableTime = playerRewardStatus[4]; // NCLab奖励可领取时间
+        const usdClaimed = playerRewardStatus[5];        // USD奖励是否已领取
+        const nclabClaimed = playerRewardStatus[6];      // NCLab奖励是否已领取
 
-        // getPlayerRewards返回: [killReward, lotteryReward, guaranteedReward, fragmentReward, claimableTime, canClaim]
-        const killReward = playerRewards[0];
-        const lotteryReward = playerRewards[1];
-        const guaranteedReward = playerRewards[2];
-        const fragmentReward = playerRewards[3];
-        const canClaim = playerRewards[5];
+        // 计算总USD奖励金额（以ETH为单位）
+        const usdRewardEth = Number(usdRewards) / 1e18;
+        const nclabRewardEth = Number(nclabRewards) / 1e18;
+        const totalRewardEth = usdRewardEth + nclabRewardEth;
 
-        // 计算总奖励（不包括碎片奖励，因为那不是USD1代币）
-        const totalReward = killReward + lotteryReward + guaranteedReward;
-        const rewardEth = Number(totalReward) / 1e18; // 转换为以太币单位
-        const isWinner = totalReward > BigInt(0);
-        const hasClaimed = !canClaim; // 如果不能领取，说明已经领取了
+        // 判断是否为获胜者（有任何奖励）
+        const isWinner = usdRewards > BigInt(0) || nclabRewards > BigInt(0);
+        
+        // 判断是否已全部领取完毕
+        const hasClaimedAll = usdClaimed && nclabClaimed;
+        
+        // 判断是否有可领取的奖励
+        const hasClaimableRewards = usdClaimable || nclabClaimable;
 
-        console.log(`💰 玩家 ${gameData.playerAddress} 区块链奖励: ${rewardEth} USD1 (已领取: ${hasClaimed})`);
+        console.log(`💰 玩家 ${gameData.playerAddress} 区块链奖励:`);
+        console.log(`   USD奖励: ${usdRewardEth} USD1 (可领取: ${usdClaimable}, 已领取: ${usdClaimed})`);
+        console.log(`   NCLab奖励: ${nclabRewardEth} NCLab (可领取: ${nclabClaimable}, 已领取: ${nclabClaimed})`);
+        console.log(`   总奖励: ${totalRewardEth}, 全部已领取: ${hasClaimedAll}`);
 
         // 更新奖励数据
         const updatedData = {
           ...gameData,
-          rewardAmount: rewardEth.toString(),
-          hasClaimed: Boolean(hasClaimed),
+          rewardAmount: totalRewardEth.toString(),
+          usdRewardAmount: usdRewardEth.toString(),
+          nclabRewardAmount: nclabRewardEth.toString(),
+          hasClaimed: hasClaimedAll,
+          usdClaimed: Boolean(usdClaimed),
+          nclabClaimed: Boolean(nclabClaimed),
+          usdClaimable: Boolean(usdClaimable),
+          nclabClaimable: Boolean(nclabClaimable),
+          nclabClaimableTime: Number(nclabClaimableTime),
           isWinner: isWinner,
         };
 
         updatedGameData.push(updatedData);
 
       } catch (error) {
-        console.error(`❌ 查询玩家 ${gameData.playerAddress} 奖励失败:`, error);
-        // 如果查询失败，保留原始数据
+        console.error(`❌ 查询玩家 ${gameData.playerAddress} 奖励失败:`, error.message);
+        console.log(`⚠️ 可能原因: 游戏 ${gameId} 的奖励尚未分发到RewardManager合约，或合约地址配置错误`);
+        // 如果查询失败，保留原始数据（奖励为0，表示尚未分发）
         updatedGameData.push(gameData);
       }
     }
@@ -1301,6 +1334,44 @@ class Game {
     Logger.game.info('Game cleanup completed', {
       removedPlayers: playersToRemove.length
     });
+  }
+
+  /**
+   * 分析奖励领取策略
+   * 根据奖励状态返回最优的领取策略
+   */
+  analyzeRewardClaimStrategy(rewardStatus) {
+    const {
+      usdRewards,
+      nclabRewards, 
+      usdClaimable,
+      nclabClaimable,
+      usdClaimed,
+      nclabClaimed
+    } = rewardStatus;
+
+    const strategy = {
+      shouldClaimUSD: usdClaimable && !usdClaimed && usdRewards > BigInt(0),
+      shouldClaimNCLab: nclabClaimable && !nclabClaimed && nclabRewards > BigInt(0),
+      canClaimAll: false,
+      recommendedMethod: 'none'
+    };
+
+    // 如果两种奖励都可以领取，推荐一键领取
+    if (strategy.shouldClaimUSD && strategy.shouldClaimNCLab) {
+      strategy.canClaimAll = true;
+      strategy.recommendedMethod = 'claimReward'; // 一键领取所有
+    } 
+    // 如果只有USD奖励可领取
+    else if (strategy.shouldClaimUSD && !strategy.shouldClaimNCLab) {
+      strategy.recommendedMethod = 'claimAllUSDRewards'; // 只领取USD
+    }
+    // 如果只有NCLab奖励可领取
+    else if (!strategy.shouldClaimUSD && strategy.shouldClaimNCLab) {
+      strategy.recommendedMethod = 'claimAllNclabRewards'; // 只领取NCLab
+    }
+
+    return strategy;
   }
 }
 

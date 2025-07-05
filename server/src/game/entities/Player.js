@@ -394,11 +394,11 @@ class Player extends Entity {
         this.game.map.spawnCoinsInShape(
           this.shape, drop, c?.account?.id,
         );
-        Logger.game.debug('Coins dropped on player death', {
-          playerId: this.id,
-          playerName: this.name,
-          coinsDrop: drop
-        });
+        // Logger.game.debug('Coins dropped on player death', {
+        //   playerId: this.id,
+        //   playerName: this.name,
+        //   coinsDrop: drop
+        // });
       }
     }
 

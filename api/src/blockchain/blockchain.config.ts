@@ -7,6 +7,7 @@ export interface BlockchainConfig {
   contracts: {
     swordBattle: string;
     usd1Token: string;
+    rewardManager: string;
   };
   trustedSigner?: string;
   environment: {
@@ -27,13 +28,16 @@ export const defaultBlockchainConfig: BlockchainConfig = {
   enabled: process.env.BLOCKCHAIN_ENABLED === 'true',
   rpcUrl: process.env.BLOCKCHAIN_RPC_URL,
   contracts: {
-    // 根据双合约架构，API 主要使用 GameAggregator 进行游戏操作
+    // API 使用实际的 SwordBattle 合约进行玩家信息查询
     swordBattle: isDev 
-      ? (process.env.GAME_AGGREGATOR_CONTRACT_TESTNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x99616B1f031aF994a4b2cc940683255cB76Dd596')
-      : (process.env.GAME_AGGREGATOR_CONTRACT_MAINNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x99616B1f031aF994a4b2cc940683255cB76Dd596'),
+      ? (process.env.SWORD_BATTLE_CONTRACT_TESTNET || process.env.SWORD_BATTLE_CONTRACT || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD')
+      : (process.env.SWORD_BATTLE_CONTRACT_MAINNET || process.env.SWORD_BATTLE_CONTRACT || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD'),
     usd1Token: isDev 
       ? (process.env.USD1_TOKEN_CONTRACT_TESTNET || process.env.USD1_TOKEN_CONTRACT || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16')
       : (process.env.USD1_TOKEN_CONTRACT_MAINNET || process.env.USD1_TOKEN_CONTRACT || ''),
+    rewardManager: isDev 
+      ? (process.env.REWARD_MANAGER_CONTRACT_TESTNET || process.env.REWARD_MANAGER_CONTRACT || '0x8732A5ceE8372DFa95Db266086A7FF297245b05c')
+      : (process.env.REWARD_MANAGER_CONTRACT_MAINNET || process.env.REWARD_MANAGER_CONTRACT || '0x8732A5ceE8372DFa95Db266086A7FF297245b05c'),
   },
   trustedSigner: process.env.TRUSTED_SIGNER_PRIVATE_KEY,
   environment: {
@@ -66,6 +70,13 @@ export function validateBlockchainConfig(config: BlockchainConfig): boolean {
     missingFields.push(expectedVar);
   }
   
+  if (!config.contracts.rewardManager) {
+    const expectedVar = isDev 
+      ? 'REWARD_MANAGER_CONTRACT_TESTNET (或 REWARD_MANAGER_CONTRACT)' 
+      : 'REWARD_MANAGER_CONTRACT_MAINNET (或 REWARD_MANAGER_CONTRACT)';
+    missingFields.push(expectedVar);
+  }
+  
   if (!config.trustedSigner) {
     missingFields.push('TRUSTED_SIGNER_PRIVATE_KEY');
   }
@@ -81,6 +92,7 @@ export function validateBlockchainConfig(config: BlockchainConfig): boolean {
   console.log(`   环境: ${config.environment.networkName}`);
   console.log(`   SWORD_BATTLE合约: ${config.contracts.swordBattle}`);
   console.log(`   USD1_TOKEN合约: ${config.contracts.usd1Token}`);
+  console.log(`   REWARD_MANAGER合约: ${config.contracts.rewardManager}`);
 
   return true;
 } 

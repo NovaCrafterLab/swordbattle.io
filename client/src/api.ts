@@ -1,9 +1,13 @@
 // client/src/api.ts
 import { config } from './config';
 
-const endpoint = `${window.location.protocol}//${config.apiEndpoint}`;
+const endpoint = config.apiEndpoint.startsWith('http') 
+  ? config.apiEndpoint 
+  : `${window.location.protocol}//${config.apiEndpoint}`;
 const backupEndpoint = config.apiEndpointBackup
-  ? `${window.location.protocol}//${config.apiEndpointBackup}`
+  ? (config.apiEndpointBackup.startsWith('http') 
+      ? config.apiEndpointBackup 
+      : `${window.location.protocol}//${config.apiEndpointBackup}`)
   : null;
 let currentEndpoint: string | null = null;
 

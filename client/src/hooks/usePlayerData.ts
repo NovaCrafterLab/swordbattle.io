@@ -9,8 +9,15 @@ import { endpoint as API_ROOT } from '@/api'
 export interface PlayerGameData {
   gameId: number
   score: number
-  reward: bigint
-  hasClaimed: boolean
+  reward: bigint // 总奖励（USD + NCLab）
+  usdReward: bigint // USD奖励
+  nclabReward: bigint // NCLab奖励
+  hasClaimed: boolean // 是否已领取（任何奖励）
+  usdClaimed: boolean // USD是否已领取
+  nclabClaimed: boolean // NCLab是否已领取
+  usdClaimable: boolean // USD是否可领取
+  nclabClaimable: boolean // NCLab是否可领取
+  nclabClaimableTime?: number // NCLab可领取时间
   rank: number
   isWinner: boolean
   level?: number // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH
@@ -107,7 +114,13 @@ export const usePlayerData = () => {
           gameId,
           score,
           reward,
+          usdReward: reward, // 假设都是USD奖励
+          nclabReward: BigInt(0),
           hasClaimed,
+          usdClaimed: hasClaimed,
+          nclabClaimed: false,
+          usdClaimable: !hasClaimed && reward > BigInt(0),
+          nclabClaimable: false,
           rank,
           isWinner: reward > BigInt(0),
           level,
@@ -150,7 +163,13 @@ export const usePlayerData = () => {
           gameId,
           score: score ? Number(score) : 0,
           reward: rewardBigInt,
+          usdReward: rewardBigInt, // 假设都是USD奖励
+          nclabReward: BigInt(0),
           hasClaimed: hasClaimedBool,
+          usdClaimed: hasClaimedBool,
+          nclabClaimed: false,
+          usdClaimable: !hasClaimedBool && rewardBigInt > BigInt(0),
+          nclabClaimable: false,
           rank: 0, // TODO: 计算排名
           isWinner: rewardBigInt > BigInt(0),
           timestamp: 0, // TODO: 获取真实时间戳
@@ -319,16 +338,29 @@ export const usePlayerData = () => {
 
       // 转换API数据为组件需要的格式
       const databaseGames: PlayerGameData[] = result.data.games.map(
-        (game: any) => ({
-          gameId: game.gameId,
-          score: game.score,
-          reward: BigInt(Math.floor(parseFloat(game.reward || '0') * 1e18)),
-          hasClaimed: game.hasClaimed || false,
-          rank: game.rank || 0,
-          isWinner: game.isWinner,
-          timestamp: game.timestamp, // 使用API返回的真实时间戳
-        })
+        (game: any) => {
+          const rewardAmount = BigInt(Math.floor(parseFloat(game.reward || '0') * 1e18))
+          console.log(`🎮 Processing game ${game.gameId}: reward="${game.reward}" -> ${rewardAmount.toString()} wei`)
+          return {
+            gameId: game.gameId,
+            score: game.score,
+            reward: rewardAmount,
+            usdReward: rewardAmount, // 暂时假设所有奖励都是USD
+            nclabReward: BigInt(0),
+            hasClaimed: game.hasClaimed || false,
+            usdClaimed: game.hasClaimed || false,
+            nclabClaimed: false,
+            usdClaimable: !game.hasClaimed && rewardAmount > BigInt(0),
+            nclabClaimable: false,
+            rank: game.rank || 0,
+            isWinner: game.isWinner,
+            timestamp: game.timestamp, // 使用API返回的真实时间戳
+          }
+        }
       )
+
+      console.log('📊 Database API returned', databaseGames.length, 'games')
+      console.log('💰 Total rewards from database:', databaseGames.reduce((sum, g) => sum + g.reward, BigInt(0)).toString())
 
       return databaseGames.sort((a, b) => b.gameId - a.gameId) // 按游戏ID降序排列
     } catch (err) {
@@ -461,6 +493,12 @@ export const usePlayerData = () => {
 
       // 使用混合查询获取玩家游戏历史（数据库 + 区块链）
       const gameHistory = await fetchPlayerGameHistory(false) // false = 使用混合查询
+      
+      console.log('🔄 Refreshing player data for:', address)
+      console.log('📊 Game history loaded:', gameHistory.length, 'games')
+      if (gameHistory.length > 0) {
+        console.log('🎮 Latest game:', gameHistory[0].gameId, 'reward:', gameHistory[0].reward.toString())
+      }
 
       // 计算统计数据
       const totalRewards = gameHistory.reduce(

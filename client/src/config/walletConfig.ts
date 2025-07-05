@@ -5,6 +5,7 @@
 import GameAggregatorABI from './GameAggregator.json';
 import SwordBattleABI from './SwordBattle.json';
 import ERC20ABI from './ERC20.json';
+import RewardManagerABI from './RewardManager.json';
 import { config } from '../config';
 
 // 环境变量检查
@@ -20,12 +21,14 @@ export const CONTRACTS = isDev
     GAME_AGGREGATOR: process.env.REACT_APP_GAME_AGGREGATOR_CONTRACT_TESTNET || '0x99616B1f031aF994a4b2cc940683255cB76Dd596',
     SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_TESTNET || '0x788aA9aAb214B3ac525c23bd257e93Ff0f10D9E0',
     USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_TESTNET || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16',
+    REWARD_MANAGER: process.env.REACT_APP_REWARD_MANAGER_CONTRACT_TESTNET || '0x8732A5ceE8372DFa95Db266086A7FF297245b05c',
   }
   : {
     // BSC主网合约地址
     GAME_AGGREGATOR: process.env.REACT_APP_GAME_AGGREGATOR_CONTRACT_MAINNET || '0x99616B1f031aF994a4b2cc940683255cB76Dd596',
     SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_MAINNET || '0x788aA9aAb214B3ac525c23bd257e93Ff0f10D9E0',
     USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_MAINNET || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16',
+    REWARD_MANAGER: process.env.REACT_APP_REWARD_MANAGER_CONTRACT_MAINNET || '0x8732A5ceE8372DFa95Db266086A7FF297245b05c',
   } as const;
 
 // ABI导入
@@ -33,6 +36,7 @@ export const ABIS = {
   GAME_AGGREGATOR: GameAggregatorABI.abi as readonly any[],
   SWORD_BATTLE: SwordBattleABI.abi as readonly any[],
   USD1_TOKEN: ERC20ABI.abi as readonly any[],
+  REWARD_MANAGER: RewardManagerABI.abi as readonly any[],
 } as const;
 
 // 合约配置类型
@@ -55,6 +59,11 @@ export const getSwordBattleContract = (): ContractConfig => ({
 export const getUSD1TokenContract = (): ContractConfig => ({
   address: CONTRACTS.USD1_TOKEN as `0x${string}`,
   abi: ABIS.USD1_TOKEN,
+});
+
+export const getRewardManagerContract = (): ContractConfig => ({
+  address: CONTRACTS.REWARD_MANAGER as `0x${string}`,
+  abi: ABIS.REWARD_MANAGER,
 });
 
 // BSC主网RPC池配置

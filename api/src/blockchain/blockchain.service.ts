@@ -7,12 +7,30 @@ import { bsc, bscTestnet } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { BlockchainConfig, defaultBlockchainConfig, validateBlockchainConfig } from './blockchain.config';
 
-// 导入ABI（使用GameAggregator ABI）
+// 导入ABI
 import { GAME_AGGREGATE_ABI } from './abis/gameAggregate.abi';
 import { ERC20_ABI } from './abis/erc20.abi';
+import { RewardManagerABI } from './abis/RewardManager.abi';
 
-// 保持向后兼容
-const SWORD_BATTLE_ABI = GAME_AGGREGATE_ABI;
+// 由于swordbattle.abi.ts有结构问题，临时提取getPlayerInfo函数ABI
+const SWORD_BATTLE_ABI = [
+  {
+    "inputs": [
+      {"internalType": "uint256", "name": "gameId", "type": "uint256"},
+      {"internalType": "address", "name": "player", "type": "address"}
+    ],
+    "name": "getPlayerInfo",
+    "outputs": [
+      {"internalType": "address", "name": "playerAddr", "type": "address"},
+      {"internalType": "uint256", "name": "kills", "type": "uint256"},
+      {"internalType": "uint256", "name": "score", "type": "uint256"},
+      {"internalType": "bool", "name": "submitted", "type": "bool"},
+      {"internalType": "uint256", "name": "fragmentReward", "type": "uint256"}
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+];
 
 // RPC池配置
 const BSC_MAINNET_RPC_POOL = [
@@ -454,6 +472,28 @@ export class BlockchainService implements OnModuleInit {
       return signature;
     } catch (error) {
       this.logger.error(`Failed to sign score submission:`, error);
+      throw error;
+    }
+  }
+
+  // 获取玩家奖励状态（使用新的RewardManager合约）
+  async getPlayerRewardStatus(gameId: number, playerAddress: string) {
+    if (!this.isAvailable()) {
+      throw new Error('Blockchain service not available');
+    }
+
+    try {
+      const result = await this.publicClient.readContract({
+        address: this.config.contracts.rewardManager as `0x${string}`,
+        abi: RewardManagerABI, // 需要导入RewardManager ABI
+        functionName: 'getPlayerRewardStatus',
+        args: [BigInt(gameId), playerAddress as `0x${string}`],
+      });
+
+      // getPlayerRewardStatus返回: [usdRewards, nclabRewards, usdClaimable, nclabClaimable, nclabClaimableTime, usdClaimed, nclabClaimed]
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to get player reward status for game ${gameId}, player ${playerAddress}:`, error);
       throw error;
     }
   }

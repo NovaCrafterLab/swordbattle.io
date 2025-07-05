@@ -5,7 +5,7 @@ const Logger = require('../utils/Logger');
 
 // 导入模块化配置
 const { CURRENT_RPC_POOL, NETWORK_CONFIG, ENVIRONMENT, isDev } = require('./networkConfig');
-const { SWORD_BATTLE_ABI, GAME_AGGREGATOR_ABI, ERC20_ABI } = require('./abis');
+const { SWORD_BATTLE_ABI, GAME_AGGREGATOR_ABI, ERC20_ABI, REWARD_MANAGER_ABI } = require('./abis');
 const RPCManager = require('./RPCManager');
 
 class BlockchainService {
@@ -70,6 +70,7 @@ class BlockchainService {
       this.swordBattleAbi = SWORD_BATTLE_ABI;
       this.gameAggregatorAbi = GAME_AGGREGATOR_ABI;
       this.usd1TokenAbi = ERC20_ABI;
+      this.rewardManagerAbi = REWARD_MANAGER_ABI;
 
       // 启动RPC健康检查
       await this.rpcManager.healthCheck();
@@ -215,6 +216,13 @@ class BlockchainService {
     return {
       address: this.config.contracts.usd1Token,
       abi: this.usd1TokenAbi,
+    };
+  }
+
+  getRewardManagerContract() {
+    return {
+      address: this.config.contracts.rewardManager,
+      abi: this.rewardManagerAbi,
     };
   }
 
@@ -648,6 +656,111 @@ class BlockchainService {
     }
     
     return results;
+  }
+
+  /**
+   * 分发游戏奖励到RewardManager合约
+   */
+  async distributeGameRewards(gameId) {
+    if (!this.isInitialized || !this.walletClient) {
+      throw new Error('Blockchain service not initialized or no wallet available');
+    }
+
+    try {
+      Logger.server.info('Distributing game rewards', { gameId });
+      
+      const contract = this.getRewardManagerContract();
+      const txHash = await this.writeContract(contract, 'calculateAndDistributeRewards', [BigInt(gameId)]);
+      
+      Logger.server.info('Reward distribution transaction sent', { gameId, txHash });
+      return txHash;
+    } catch (error) {
+      Logger.server.error('Failed to distribute rewards', { gameId, error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * 领取USD奖励 (使用 RewardManager 合约)
+   */
+  async claimUSDRewards(gameIds) {
+    if (!this.isInitialized || !this.walletClient) {
+      throw new Error('Blockchain service not initialized or no wallet available');
+    }
+
+    try {
+      Logger.server.info('Claiming USD rewards', { gameIds });
+      
+      const contract = this.getRewardManagerContract();
+      const txHash = await this.writeContract(contract, 'claimAllUSDRewards', [gameIds.map(id => BigInt(id))]);
+      
+      Logger.server.info('USD rewards claim transaction sent', { txHash });
+      return txHash;
+    } catch (error) {
+      Logger.server.error('Failed to claim USD rewards', { gameIds, error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * 领取NCLab奖励 (使用 RewardManager 合约)
+   */
+  async claimNclabRewards(gameIds) {
+    if (!this.isInitialized || !this.walletClient) {
+      throw new Error('Blockchain service not initialized or no wallet available');
+    }
+
+    try {
+      Logger.server.info('Claiming NCLab rewards', { gameIds });
+      
+      const contract = this.getRewardManagerContract();
+      const txHash = await this.writeContract(contract, 'claimAllNclabRewards', [gameIds.map(id => BigInt(id))]);
+      
+      Logger.server.info('NCLab rewards claim transaction sent', { txHash });
+      return txHash;
+    } catch (error) {
+      Logger.server.error('Failed to claim NCLab rewards', { gameIds, error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * 一键领取所有奖励 (使用 RewardManager 合约)
+   */
+  async claimAllRewards(gameId) {
+    if (!this.isInitialized || !this.walletClient) {
+      throw new Error('Blockchain service not initialized or no wallet available');
+    }
+
+    try {
+      Logger.server.info('Claiming all rewards', { gameId });
+      
+      const contract = this.getRewardManagerContract();
+      const txHash = await this.writeContract(contract, 'claimReward', [BigInt(gameId)]);
+      
+      Logger.server.info('All rewards claim transaction sent', { txHash });
+      return txHash;
+    } catch (error) {
+      Logger.server.error('Failed to claim all rewards', { gameId, error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * 获取玩家奖励状态 (使用 RewardManager 合约)
+   */
+  async getPlayerRewardStatus(gameId, playerAddress) {
+    if (!this.isInitialized) {
+      throw new Error('Blockchain service not initialized');
+    }
+
+    try {
+      const contract = this.getRewardManagerContract();
+      return await this.readContract(contract, 'getPlayerRewardStatus', [BigInt(gameId), playerAddress]);
+    } catch (error) {
+      Logger.server.error('Failed to get player reward status', { gameId, playerAddress, error: error.message });
+      throw error;
+    }
   }
 }
 

@@ -1,6 +1,6 @@
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
-import { getGameAggregatorContract, getSwordBattleContract, getUSD1TokenContract } from '../config/walletConfig';
+import { getGameAggregatorContract, getSwordBattleContract, getUSD1TokenContract, getRewardManagerContract } from '../config/walletConfig';
 
 // 游戏相关数据类型
 export interface GameInfo {
@@ -29,6 +29,7 @@ export const useBlockchain = () => {
   const gameAggregatorContract = getGameAggregatorContract();
   const swordBattleContract = getSwordBattleContract();
   const usd1TokenContract = getUSD1TokenContract();
+  const rewardManagerContract = getRewardManagerContract();
 
   // 写入合约hook
   const { writeContract, data: writeData, isPending: isWritePending, error: writeError } = useWriteContract();
@@ -441,6 +442,52 @@ export const useBlockchain = () => {
     });
   };
 
+  // ========== 新的RewardManager奖励领取函数 ==========
+
+  /**
+   * 领取指定游戏的所有奖励 (RewardManager)
+   */
+  const claimGameReward = (gameId: number, playerAddress: string) => {
+    writeContract({
+      ...rewardManagerContract,
+      functionName: 'claimReward',
+      args: [BigInt(gameId), playerAddress as `0x${string}`],
+    });
+  };
+
+  /**
+   * 一键领取所有奖励 (RewardManager)
+   */
+  const claimAllGameRewards = (playerAddress: string) => {
+    writeContract({
+      ...rewardManagerContract,
+      functionName: 'claimAllRewards',
+      args: [playerAddress as `0x${string}`],
+    });
+  };
+
+  /**
+   * 领取指定游戏的USD奖励 (RewardManager)
+   */
+  const claimUSDRewards = (gameId: number, playerAddress: string) => {
+    writeContract({
+      ...rewardManagerContract,
+      functionName: 'claimUSDRewards',
+      args: [BigInt(gameId), playerAddress as `0x${string}`],
+    });
+  };
+
+  /**
+   * 领取指定游戏的NCLab奖励 (RewardManager)
+   */
+  const claimNclabRewards = (gameId: number, playerAddress: string) => {
+    writeContract({
+      ...rewardManagerContract,
+      functionName: 'claimNclabRewards',
+      args: [BigInt(gameId), playerAddress as `0x${string}`],
+    });
+  };
+
   /**
    * 购买碎片
    */
@@ -480,6 +527,12 @@ export const useBlockchain = () => {
     claimAllRewards,
     claimRewardsPaginated,
     purchaseFragments,
+
+    // 新的RewardManager奖励领取方法
+    claimGameReward,
+    claimAllGameRewards,
+    claimUSDRewards,
+    claimNclabRewards,
 
     // 交易状态
     isWritePending,

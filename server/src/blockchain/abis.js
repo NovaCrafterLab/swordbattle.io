@@ -154,13 +154,29 @@ function loadERC20ABI() {
   ];
 }
 
+// 加载完整的RewardManager合约ABI
+function loadRewardManagerABI() {
+  try {
+    const abiPath = path.join(__dirname, 'abis', 'RewardManager.json');
+    const abiData = fs.readFileSync(abiPath, 'utf8');
+    const parsedData = JSON.parse(abiData);
+    // 如果ABI被包装在对象中，提取abi数组
+    return parsedData.abi || parsedData;
+  } catch (error) {
+    console.error('Failed to load RewardManager ABI:', error);
+    throw new Error('Unable to load RewardManager contract ABI');
+  }
+}
+
 // 加载并导出ABI
 const GAME_AGGREGATOR_ABI = loadGameAggregatorABI();
 const SWORD_BATTLE_ABI = loadSwordBattleABI();
 const ERC20_ABI = loadERC20ABI();
+const REWARD_MANAGER_ABI = loadRewardManagerABI();
 
 module.exports = {
   SWORD_BATTLE_ABI,
   GAME_AGGREGATOR_ABI,
-  ERC20_ABI
+  ERC20_ABI,
+  REWARD_MANAGER_ABI
 }; 

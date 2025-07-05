@@ -248,11 +248,17 @@ export class RaceGamesService {
           const playerInfo = await this.blockchainService.getPlayerInfo(game.gameId, playerAddress);
           
           if (playerInfo) {
-            // 使用新合约的getPlayerRewards方法获取奖励信息
-            const playerRewards = await this.blockchainService.getPlayerRewards(game.gameId, playerAddress);
-            const rewardAmount = playerRewards.totalReward; // 已经格式化为以太币单位
-            const hasClaimed = playerRewards.claimed;
-            const isWinner = Number(playerRewards.totalReward) > 0;
+            // 使用新合约的getPlayerRewardStatus方法获取奖励信息
+            const rewardStatus = await this.blockchainService.getPlayerRewardStatus(game.gameId, playerAddress);
+            
+            // 解析新的奖励结构
+            // [usdRewards, nclabRewards, usdClaimable, nclabClaimable, nclabClaimableTime, usdClaimed, nclabClaimed]
+            const [usdRewards, nclabRewards, usdClaimable, nclabClaimable, nclabClaimableTime, usdClaimed, nclabClaimed] = rewardStatus;
+            
+            const totalReward = Number(usdRewards) + Number(nclabRewards);
+            const rewardAmount = (totalReward / 1e18).toString(); // 转换为以太币单位
+            const hasClaimed = usdClaimed && nclabClaimed; // 全部领取才算领取
+            const isWinner = totalReward > 0;
 
             // 检查是否需要更新
             const needsUpdate = 
