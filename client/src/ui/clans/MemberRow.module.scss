@@ -2,13 +2,14 @@
 // sb-clans-cm-* styles; rely on sb design tokens
 
 .sb-clans-cm-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
   align-items: center;
   gap: var(--sb-space-3);
   background: #1f1f1f;
   border: 1px solid #333;
   border-radius: var(--sb-radius-md);
-  padding: 8px 12px;
+  padding: 6px 8px;
   margin-bottom: var(--sb-space-1);
 }
 .sb-clans-cm-name {
@@ -34,4 +35,9 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
+}
+
+@media (max-width: 480px) {
+  .sb-clans-cm-row { grid-template-columns: 1fr auto auto; }
+  .sb-clans-cm-role { display: none; }
 }

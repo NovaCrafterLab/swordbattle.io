@@ -101,18 +101,21 @@ const ClanDetail: React.FC = () => {
           </div>
         )}
 
+
         {/* member rows */}
-        {memberData.members.map((m) => (
-          <MemberRow
-            key={m.id}
-            member={m}
-            selfRole={selfRole}
-            isSelf={m.id === account.id}
-            onKick={kick.mutate}
-            onToggleAdmin={toggleAdmin.mutate}
-            onTransferOwner={transfer.mutate}
-          />
-        ))}
+        <div className={styles['sb-clans-cd-list']}>
+          {memberData.members.map((m) => (
+            <MemberRow
+              key={m.id}
+              member={m}
+              selfRole={selfRole}
+              isSelf={m.id === account.id}
+              onKick={kick.mutate}
+              onToggleAdmin={toggleAdmin.mutate}
+              onTransferOwner={transfer.mutate}
+            />
+          ))}
+        </div>
       </div>
     )
   }
