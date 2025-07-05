@@ -200,7 +200,7 @@ class BlockchainService {
     }
   }
 
-  // 获取合约实例 - 只使用GameAggregator
+  // 获取合约实例
   getGameAggregatorContract() {
     const contract = {
       address: this.config.contracts.gameAggregator,
@@ -215,6 +215,21 @@ class BlockchainService {
     });
     
     return contract;
+  }
+
+  // 获取SwordBattle合约实例 (用于签名验证)
+  getSwordBattleContract() {
+    return {
+      address: this.config.contracts.swordBattle,
+      abi: this.gameAggregatorAbi, // 复用ABI，因为签名验证逻辑相同
+    };
+  }
+
+  // 获取RewardManager合约实例 (为了兼容性，实际上使用GameAggregator)
+  getRewardManagerContract() {
+    // 在新的架构中，RewardManager功能已集成到GameAggregator中
+    // 这个方法主要是为了保持代码兼容性
+    return this.getGameAggregatorContract();
   }
 
   // 读取合约方法的封装
@@ -671,14 +686,56 @@ class BlockchainService {
     }
 
     try {
+      console.log(`🔚 开始结束游戏流程 - 游戏ID: ${gameId}`);
       Logger.server.info('Ending game on blockchain', { gameId });
-      
+
+      // 获取游戏结束前的状态
+      const preEndGameInfo = await this.getGameFullInfo(gameId);
+      console.log(`📋 游戏结束前状态:`, {
+        gameId,
+        status: preEndGameInfo[2].toString(),
+        totalPool: preEndGameInfo[3].toString(),
+        playerCount: preEndGameInfo[7].toString(),
+        activePlayers: preEndGameInfo[9].length
+      });
+
+      // 检查合约余额
+      console.log(`💰 检查合约余额...`);
+      await this.checkContractBalances(gameId);
+
+      console.log(`📝 准备发送endGame交易...`);
       const contract = this.getGameAggregatorContract();
       const txHash = await this.writeContract(contract, 'endGame', [BigInt(gameId)]);
-      
+
+      console.log(`✅ endGame交易已发送: ${txHash}`);
       Logger.server.info('Game end transaction sent', { txHash });
+
+      // 等待一小段时间让交易被处理
+      console.log(`⏳ 等待交易处理...`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // 获取游戏结束后的状态
+      try {
+        const postEndGameInfo = await this.getGameFullInfo(gameId);
+        console.log(`🏁 游戏结束后状态:`, {
+          gameId,
+          status: postEndGameInfo[2].toString(),
+          totalPool: postEndGameInfo[3].toString(),
+          endedAt: postEndGameInfo[5].toString(),
+          playerCount: postEndGameInfo[7].toString(),
+          activePlayers: postEndGameInfo[9].length
+        });
+      } catch (postError) {
+        console.log(`⚠️ 无法获取游戏结束后状态:`, postError.message);
+      }
+
       return txHash;
     } catch (error) {
+      console.error(`❌ endGame失败:`, {
+        gameId,
+        error: error.message,
+        stack: error.stack
+      });
       Logger.server.error('Failed to end game', { gameId, error: error.message });
       throw error;
     }
@@ -693,9 +750,34 @@ class BlockchainService {
     }
 
     try {
+      console.log(`📊 开始提交分数 - 玩家: ${playerAddress}`);
+      console.log(`📊 分数详情:`, {
+        gameId: gameId.toString(),
+        playerAddress,
+        kills: kills.toString(),
+        score: score.toString(),
+        nonce: nonce.toString(),
+        signatureLength: signature.length,
+        signaturePreview: signature.substring(0, 20) + '...'
+      });
+
       Logger.server.info('Submitting score', { score, kills, gameId, playerAddress });
-      
+
       const contract = this.getGameAggregatorContract();
+
+      // 提交前检查玩家当前状态
+      try {
+        const currentNonce = await this.getPlayerNonce(playerAddress);
+        console.log(`📋 当前nonce检查: 提交nonce=${nonce}, 链上nonce=${currentNonce}`);
+
+        if (BigInt(nonce) !== BigInt(currentNonce)) {
+          console.warn(`⚠️ Nonce不匹配! 提交=${nonce}, 期望=${currentNonce}`);
+        }
+      } catch (nonceError) {
+        console.warn(`⚠️ 无法检查nonce:`, nonceError.message);
+      }
+
+      console.log(`📤 发送submitScore交易...`);
       const txHash = await this.writeContract(contract, 'submitScore', [
         BigInt(gameId),
         playerAddress,
@@ -704,10 +786,27 @@ class BlockchainService {
         BigInt(nonce),
         signature
       ]);
-      
+
+      console.log(`✅ 分数提交交易已发送: ${txHash}`);
       Logger.server.info('Score submission transaction sent', { txHash });
+
+      // 等待一段时间后检查提交结果
+      setTimeout(async () => {
+        try {
+          await this.verifyScoreSubmission(gameId, playerAddress, score);
+        } catch (verifyError) {
+          console.warn(`⚠️ 分数提交验证失败:`, verifyError.message);
+        }
+      }, 3000);
+
       return txHash;
     } catch (error) {
+      console.error(`❌ 分数提交失败:`, {
+        gameId,
+        playerAddress,
+        error: error.message,
+        stack: error.stack
+      });
       Logger.server.error('Failed to submit score', { gameId, playerAddress, error: error.message });
       throw error;
     }
@@ -759,6 +858,196 @@ class BlockchainService {
   }
 
   /**
+   * 检查合约余额
+   */
+  async checkContractBalances(gameId) {
+    try {
+      const gameAggregatorContract = this.getGameAggregatorContract();
+
+      // 获取USD1代币合约地址
+      const usd1TokenAddress = await this.readContract(gameAggregatorContract, 'getUsdTokenAddress', []);
+
+      // 检查GameAggregator合约的USD1余额
+      const usd1Balance = await this.publicClient.readContract({
+        address: usd1TokenAddress,
+        abi: [
+          {
+            "inputs": [{"name": "account", "type": "address"}],
+            "name": "balanceOf",
+            "outputs": [{"name": "", "type": "uint256"}],
+            "stateMutability": "view",
+            "type": "function"
+          }
+        ],
+        functionName: 'balanceOf',
+        args: [gameAggregatorContract.address],
+      });
+
+      // 获取游戏信息以了解奖励池
+      const gameInfo = await this.readContract(gameAggregatorContract, 'getGameFullInfo', [BigInt(gameId)]);
+      const totalPool = gameInfo[3]; // totalPool是第4个字段
+
+      console.log(`💰 合约余额检查结果:`, {
+        gameId,
+        gameAggregatorAddress: gameAggregatorContract.address,
+        usd1TokenAddress,
+        contractUsd1Balance: usd1Balance.toString(),
+        contractUsd1BalanceETH: (Number(usd1Balance) / 1e18).toFixed(6),
+        gameTotalPool: totalPool.toString(),
+        gameTotalPoolETH: (Number(totalPool) / 1e18).toFixed(6),
+        hasSufficientBalance: usd1Balance >= totalPool
+      });
+
+      Logger.server.info('Contract balance check', {
+        gameId,
+        gameAggregatorAddress: gameAggregatorContract.address,
+        usd1TokenAddress,
+        contractUsd1Balance: usd1Balance.toString(),
+        contractUsd1BalanceETH: (Number(usd1Balance) / 1e18).toFixed(6),
+        gameTotalPool: totalPool.toString(),
+        gameTotalPoolETH: (Number(totalPool) / 1e18).toFixed(6),
+        hasSufficientBalance: usd1Balance >= totalPool
+      });
+
+      if (usd1Balance < totalPool) {
+        console.error(`❌ 合约余额不足!`, {
+          required: totalPool.toString(),
+          requiredETH: (Number(totalPool) / 1e18).toFixed(6),
+          available: usd1Balance.toString(),
+          availableETH: (Number(usd1Balance) / 1e18).toFixed(6),
+          deficit: (totalPool - usd1Balance).toString(),
+          deficitETH: (Number(totalPool - usd1Balance) / 1e18).toFixed(6)
+        });
+        Logger.server.warn('⚠️ GameAggregator contract has insufficient USD1 balance for rewards', {
+          required: totalPool.toString(),
+          available: usd1Balance.toString(),
+          deficit: (totalPool - usd1Balance).toString()
+        });
+      } else {
+        console.log(`✅ 合约余额充足，可以正常分发奖励`);
+      }
+
+    } catch (error) {
+      Logger.server.warn('Failed to check contract balances', { error: error.message });
+    }
+  }
+
+  /**
+   * 验证分数提交结果
+   */
+  async verifyScoreSubmission(gameId, playerAddress, expectedScore) {
+    try {
+      console.log(`🔍 验证分数提交结果 - 游戏: ${gameId}, 玩家: ${playerAddress}`);
+
+      const playerInfo = await this.getPlayerInfo(gameId, playerAddress);
+      console.log(`📊 玩家信息查询结果:`, {
+        gameId,
+        playerAddress,
+        submittedScore: playerInfo[1]?.toString() || 'N/A',
+        expectedScore: expectedScore.toString(),
+        kills: playerInfo[2]?.toString() || 'N/A',
+        hasSubmitted: playerInfo[3] || false,
+        scoreMatches: playerInfo[1] ? BigInt(playerInfo[1]) === BigInt(expectedScore) : false
+      });
+
+      if (playerInfo[3]) { // hasSubmitted
+        console.log(`✅ 分数提交验证成功 - 玩家 ${playerAddress} 分数已记录`);
+
+        // 查询奖励信息
+        await this.checkPlayerRewards(gameId, playerAddress);
+      } else {
+        console.warn(`⚠️ 分数提交验证失败 - 玩家 ${playerAddress} 分数未记录`);
+      }
+    } catch (error) {
+      console.error(`❌ 分数提交验证出错:`, error.message);
+    }
+  }
+
+  /**
+   * 获取玩家信息
+   */
+  async getPlayerInfo(gameId, playerAddress) {
+    try {
+      const contract = this.getGameAggregatorContract();
+      const playerInfo = await this.readContract(contract, 'getPlayerInfo', [BigInt(gameId), playerAddress]);
+      return playerInfo;
+    } catch (error) {
+      Logger.server.error('Failed to get player info', { gameId, playerAddress, error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * 检查玩家奖励
+   */
+  async checkPlayerRewards(gameId, playerAddress) {
+    try {
+      console.log(`🎁 检查玩家奖励 - 游戏: ${gameId}, 玩家: ${playerAddress}`);
+
+      const contract = this.getGameAggregatorContract();
+      const rewards = await this.readContract(contract, 'getPlayerRewards', [BigInt(gameId), playerAddress]);
+
+      // getPlayerRewards返回: [killReward, lotteryReward, guaranteedReward, fragmentReward, claimableTime, canClaim]
+      const killReward = rewards[0];
+      const lotteryReward = rewards[1];
+      const guaranteedReward = rewards[2];
+      const fragmentReward = rewards[3];
+      const claimableTime = rewards[4];
+      const canClaim = rewards[5];
+
+      const totalUsdReward = killReward + lotteryReward + guaranteedReward;
+
+      console.log(`💰 玩家 ${playerAddress} 奖励详情:`, {
+        gameId,
+        killReward: killReward.toString(),
+        killRewardETH: (Number(killReward) / 1e18).toFixed(6),
+        lotteryReward: lotteryReward.toString(),
+        lotteryRewardETH: (Number(lotteryReward) / 1e18).toFixed(6),
+        guaranteedReward: guaranteedReward.toString(),
+        guaranteedRewardETH: (Number(guaranteedReward) / 1e18).toFixed(6),
+        fragmentReward: fragmentReward.toString(),
+        fragmentRewardETH: (Number(fragmentReward) / 1e18).toFixed(6),
+        totalUsdReward: totalUsdReward.toString(),
+        totalUsdRewardETH: (Number(totalUsdReward) / 1e18).toFixed(6),
+        claimableTime: claimableTime.toString(),
+        canClaim,
+        hasRewards: totalUsdReward > 0 || fragmentReward > 0
+      });
+
+      return {
+        killReward,
+        lotteryReward,
+        guaranteedReward,
+        fragmentReward,
+        totalUsdReward,
+        claimableTime,
+        canClaim
+      };
+    } catch (error) {
+      console.error(`❌ 查询玩家奖励失败:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取游戏完整信息
+   */
+  async getGameFullInfo(gameId) {
+    if (!this.isInitialized) {
+      throw new Error('Blockchain service not initialized');
+    }
+
+    try {
+      const contract = this.getGameAggregatorContract();
+      const gameInfo = await this.readContract(contract, 'getGameFullInfo', [BigInt(gameId)]);
+      return gameInfo;
+    } catch (error) {
+      Logger.server.error('Failed to get game full info', { gameId, error: error.message });
+      throw error;
+    }
+  }
+
+  /**
    * 分发游戏奖励 (使用 GameAggregator 合约)
    */
   async distributeGameRewards(gameId) {
@@ -767,14 +1056,39 @@ class BlockchainService {
     }
 
     try {
-      Logger.server.info('Distributing game rewards', { gameId });
-      
-      const contract = this.getGameAggregatorContract();
-      // GameAggregator的奖励分发逻辑在endGame中已经处理，这里可以是空操作或者调用其他方法
-      Logger.server.info('Game rewards already distributed via GameAggregator.endGame', { gameId });
-      return 'rewards_distributed_in_endgame';
+      Logger.server.info('Checking game rewards distribution status', { gameId });
+
+      // 获取游戏信息检查奖励分发状态
+      const gameInfo = await this.getGameFullInfo(gameId);
+      const gameStatus = gameInfo[2]; // status字段
+      const totalPool = gameInfo[3]; // totalPool字段
+      const endedAt = gameInfo[5]; // endedAt字段
+      const playerCount = gameInfo[7]; // playerCount字段
+
+      console.log(`📊 游戏 ${gameId} 奖励分发状态检查:`, {
+        status: gameStatus.toString(),
+        totalPool: totalPool.toString(),
+        totalPoolETH: (Number(totalPool) / 1e18).toFixed(6),
+        endedAt: endedAt.toString(),
+        playerCount: playerCount.toString(),
+        isEnded: endedAt > 0,
+        timestamp: new Date().toISOString()
+      });
+
+      // GameAggregator的奖励分发逻辑在endGame中已经处理
+      if (endedAt > 0) {
+        Logger.server.info('Game rewards already distributed via GameAggregator.endGame', {
+          gameId,
+          endedAt: endedAt.toString(),
+          totalPool: totalPool.toString()
+        });
+        return `rewards_distributed_automatically_at_${endedAt}`;
+      } else {
+        Logger.server.warn('Game has not ended yet, rewards not distributed', { gameId });
+        return 'game_not_ended_yet';
+      }
     } catch (error) {
-      Logger.server.error('Failed to distribute rewards', { gameId, error: error.message });
+      Logger.server.error('Failed to check rewards distribution', { gameId, error: error.message });
       throw error;
     }
   }
