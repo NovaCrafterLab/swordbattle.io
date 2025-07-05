@@ -506,7 +506,12 @@ class BlockchainService {
     const contract = this.getGameAggregatorContract();
     try {
       const gameInfo = await this.readContract(contract, 'getGameFullInfo', [BigInt(gameId)]);
-      return gameInfo[9] || []; // activePlayers是第10个字段 (索引9)
+      
+      // GameAggregator returns a structured object, not an array
+      // Use the activePlayers property directly
+      const activePlayers = gameInfo.activePlayers || [];
+      
+      return activePlayers;
     } catch (error) {
       Logger.server.warn(`Failed to get players from GameAggregator for game ${gameId}`, { error: error.message });
       return [];

@@ -799,7 +799,7 @@ class Game {
 
       // 检查玩家是否在链上游戏中
       const players = await this.blockchainService.getGamePlayers(this.blockchainGameId);
-      
+
       // 确保players是数组
       const playerList = Array.isArray(players) ? players : [];
       console.log(`📋 Found ${playerList.length} players in game ${this.blockchainGameId}:`);
