@@ -11,7 +11,6 @@ services:
     env_file:
       - ./env/api.env.production
     build:
-      context: ./api
       args:
         NODE_ENV: production
     restart: always
@@ -30,7 +29,6 @@ services:
     env_file:
       - ./env/client.env.production
     build:
-      context: ./client
       target: runtime
       args:
         NODE_ENV: production
