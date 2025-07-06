@@ -14,8 +14,8 @@ const fs = require('fs');
 const path = require('path');
 
 // 配置文件路径
-const CONTRACT_CONFIG_FILE = path.join(__dirname, '..', 'contract-config.json');
-const ENV_DIR = path.join(__dirname, '..', 'env');
+const CONTRACT_CONFIG_FILE = path.join(__dirname, 'contract-config.json');
+const ENV_DIR = path.join(__dirname, 'env');
 
 // 环境文件映射
 const ENV_FILES = {
@@ -25,13 +25,70 @@ const ENV_FILES = {
 };
 
 // 合约名称映射（从 config JSON 到环境变量名）
-// 现在只使用 GameAggregator 合约
 const CONTRACT_MAPPINGS = {
-  // 主要合约 - 只保留 GameAggregator
+  // 主要合约
   gameAggregator: {
     server: 'GAME_AGGREGATOR_CONTRACT',
     client: 'REACT_APP_GAME_AGGREGATOR_CONTRACT',
     api: 'GAME_AGGREGATOR_CONTRACT'
+  },
+  swordBattle: {
+    server: 'SWORD_BATTLE_CONTRACT',
+    client: 'REACT_APP_SWORD_BATTLE_CONTRACT', 
+    api: 'SWORD_BATTLE_CONTRACT'
+  },
+  nftAggregator: {
+    server: 'NFT_AGGREGATOR_CONTRACT',
+    client: 'REACT_APP_NFT_AGGREGATOR_CONTRACT',
+    api: 'NFT_AGGREGATOR_CONTRACT'
+  },
+  economyAggregator: {
+    server: 'ECONOMY_AGGREGATOR_CONTRACT',
+    client: 'REACT_APP_ECONOMY_AGGREGATOR_CONTRACT',
+    api: 'ECONOMY_AGGREGATOR_CONTRACT'
+  },
+  // 代币合约
+  'tokens.usd1': {
+    server: 'USD1_TOKEN_CONTRACT',
+    client: 'REACT_APP_USD1_TOKEN_CONTRACT',
+    api: 'USD1_TOKEN_CONTRACT'
+  },
+  'tokens.nclab': {
+    server: 'NCLAB_TOKEN_CONTRACT',
+    client: 'REACT_APP_NCLAB_TOKEN_CONTRACT', 
+    api: 'NCLAB_TOKEN_CONTRACT'
+  },
+  // NFT合约
+  'nfts.shovel': {
+    server: 'SHOVEL_NFT_CONTRACT',
+    client: 'REACT_APP_SHOVEL_NFT_CONTRACT',
+    api: 'SHOVEL_NFT_CONTRACT'
+  },
+  'nfts.forge': {
+    server: 'FORGE_NFT_CONTRACT',
+    client: 'REACT_APP_FORGE_NFT_CONTRACT',
+    api: 'FORGE_NFT_CONTRACT'
+  },
+  // 服务合约
+  'services.gameRewardManager': {
+    server: 'GAME_REWARD_MANAGER_CONTRACT',
+    client: 'REACT_APP_GAME_REWARD_MANAGER_CONTRACT',
+    api: 'GAME_REWARD_MANAGER_CONTRACT'
+  },
+  'services.fragmentManager': {
+    server: 'FRAGMENT_MANAGER_CONTRACT',
+    client: 'REACT_APP_FRAGMENT_MANAGER_CONTRACT',
+    api: 'FRAGMENT_MANAGER_CONTRACT'
+  },
+  'services.rewardManager': {
+    server: 'REWARD_MANAGER_CONTRACT',
+    client: 'REACT_APP_REWARD_MANAGER_CONTRACT',
+    api: 'REWARD_MANAGER_CONTRACT'
+  },
+  'services.shovelTraitManager': {
+    server: 'SHOVEL_TRAIT_MANAGER_CONTRACT',
+    client: 'REACT_APP_SHOVEL_TRAIT_MANAGER_CONTRACT',
+    api: 'SHOVEL_TRAIT_MANAGER_CONTRACT'
   }
 };
 
@@ -155,18 +212,37 @@ class ContractUpdater {
     console.log('📋 Current Contract Configuration:');
     console.log('=====================================');
     
-    // 主要合约 - 只显示 GameAggregator
+    // 主要合约
     console.log('\\n🎮 Main Contracts:');
-    if (this.config.contracts && this.config.contracts.gameAggregator) {
-      const contract = this.config.contracts.gameAggregator;
-      console.log(`  gameAggregator:`);
+    for (const [name, contract] of Object.entries(this.config.contracts)) {
+      console.log(`  ${name}:`);
       console.log(`    Testnet: ${contract.testnet}`);
       console.log(`    Mainnet: ${contract.mainnet}`);
     }
 
-    // 注释：其他合约类型已移除，现在只使用 GameAggregator
-    console.log('\\n⚠️  Note: Only GameAggregator contract is currently supported.');
-    console.log('   Other contract types have been removed as they are no longer used.');
+    // 代币合约
+    console.log('\\n💰 Token Contracts:');
+    for (const [name, token] of Object.entries(this.config.tokens)) {
+      console.log(`  ${name}:`);
+      console.log(`    Testnet: ${token.testnet}`);
+      console.log(`    Mainnet: ${token.mainnet}`);
+    }
+
+    // NFT合约
+    console.log('\\n🖼️ NFT Contracts:');
+    for (const [name, nft] of Object.entries(this.config.nfts)) {
+      console.log(`  ${name}:`);
+      console.log(`    Testnet: ${nft.testnet}`);
+      console.log(`    Mainnet: ${nft.mainnet}`);
+    }
+
+    // 服务合约
+    console.log('\\n🔧 Service Contracts:');
+    for (const [name, service] of Object.entries(this.config.services)) {
+      console.log(`  ${name}:`);
+      console.log(`    Testnet: ${service.testnet}`);
+      console.log(`    Mainnet: ${service.mainnet}`);
+    }
   }
 }
 
@@ -232,7 +308,9 @@ function main() {
   console.log('  node update-contracts.js --contract=gameAggregator --network=mainnet --address=0x123...');
   console.log('');
   console.log('Available contracts:');
-  console.log('  - gameAggregator (only supported contract)');
+  for (const contractName of Object.keys(CONTRACT_MAPPINGS)) {
+    console.log(`  - ${contractName}`);
+  }
 }
 
 if (require.main === module) {

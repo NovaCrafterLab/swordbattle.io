@@ -9,8 +9,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const ROOT_ABI_DIR = path.join(__dirname, '..', 'abis');
-const CLIENT_ABI_DIR = path.join(__dirname, '..', 'client/src/abis');
+const ROOT_ABI_DIR = path.join(__dirname, 'abis');
+const CLIENT_ABI_DIR = path.join(__dirname, 'client/src/abis');
 
 console.log('🔄 Syncing ABI files...');
 
