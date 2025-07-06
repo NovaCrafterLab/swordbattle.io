@@ -94,11 +94,9 @@ export function validateBlockchainConfig(config: BlockchainConfig): boolean {
 
   // 输出当前使用的合约地址配置
   console.log('✅ Blockchain configuration validated');
+  console.log(`当前环境: ${isDev ? '开发环境 (测试网)' : '生产环境 (主网)'}`);
   console.log(`   环境: ${config.environment.networkName}`);
   console.log(`   GAME_AGGREGATOR合约: ${config.contracts.gameAggregator}`);
-  console.log(`   SWORD_BATTLE合约: ${config.contracts.swordBattle}`);
   console.log(`   USD1_TOKEN合约: ${config.contracts.usd1Token}`);
-  console.log(`   REWARD_MANAGER合约: ${config.contracts.rewardManager}`);
-
   return true;
 } 

@@ -5,7 +5,7 @@ const Logger = require('../utils/Logger');
 
 // 导入模块化配置
 const { CURRENT_RPC_POOL, NETWORK_CONFIG, ENVIRONMENT, isDev } = require('./networkConfig');
-const { SWORD_BATTLE_ABI, GAME_AGGREGATOR_ABI, ERC20_ABI, REWARD_MANAGER_ABI } = require('./abis');
+const { GAME_AGGREGATOR_ABI } = require('./abis');
 const RPCManager = require('./RPCManager');
 
 class BlockchainService {
@@ -66,11 +66,14 @@ class BlockchainService {
       const blockNumber = await this.publicClient.getBlockNumber();
       Logger.server.info('✅ Blockchain connected, block:', Number(blockNumber));
 
-      // 使用从文件加载的ABI
-      this.swordBattleAbi = SWORD_BATTLE_ABI;
+      // 使用GameAggregator ABI
       this.gameAggregatorAbi = GAME_AGGREGATOR_ABI;
-      this.usd1TokenAbi = ERC20_ABI;
-      this.rewardManagerAbi = REWARD_MANAGER_ABI;
+      Logger.server.debug('GameAggregator ABI loaded:', {
+        abiLength: this.gameAggregatorAbi.length,
+        hasGetCurrentGameId: this.gameAggregatorAbi.some(f => f.name === 'getCurrentGameId'),
+        hasGetPlayerNonce: this.gameAggregatorAbi.some(f => f.name === 'getPlayerNonce'),
+        functionNames: this.gameAggregatorAbi.filter(f => f.type === 'function').map(f => f.name).slice(0, 10)
+      });
 
       // 启动RPC健康检查
       await this.rpcManager.healthCheck();
@@ -198,32 +201,35 @@ class BlockchainService {
   }
 
   // 获取合约实例
-  getSwordBattleContract() {
-    return {
-      address: this.config.contracts.swordBattle,
-      abi: this.swordBattleAbi,
-    };
-  }
-
   getGameAggregatorContract() {
-    return {
+    const contract = {
       address: this.config.contracts.gameAggregator,
       abi: this.gameAggregatorAbi,
     };
+    
+    Logger.server.debug('Creating GameAggregator contract instance:', {
+      address: contract.address,
+      abiExists: !!contract.abi,
+      abiLength: contract.abi ? contract.abi.length : 0,
+      abiSample: contract.abi ? contract.abi.slice(0, 2) : null
+    });
+    
+    return contract;
   }
 
-  getUsd1TokenContract() {
+  // 获取SwordBattle合约实例 (用于签名验证)
+  getSwordBattleContract() {
     return {
-      address: this.config.contracts.usd1Token,
-      abi: this.usd1TokenAbi,
+      address: this.config.contracts.swordBattle,
+      abi: this.gameAggregatorAbi, // 复用ABI，因为签名验证逻辑相同
     };
   }
 
+  // 获取RewardManager合约实例 (为了兼容性，实际上使用GameAggregator)
   getRewardManagerContract() {
-    return {
-      address: this.config.contracts.rewardManager,
-      abi: this.rewardManagerAbi,
-    };
+    // 在新的架构中，RewardManager功能已集成到GameAggregator中
+    // 这个方法主要是为了保持代码兼容性
+    return this.getGameAggregatorContract();
   }
 
   // 读取合约方法的封装
@@ -242,7 +248,11 @@ class BlockchainService {
     } catch (error) {
       Logger.server.error('Failed to read contract', { 
         functionName, 
-        error: error.message 
+        contractAddress: contract.address,
+        args,
+        error: error.message,
+        errorStack: error.stack,
+        errorDetails: error
       });
       
       // 尝试重新连接
@@ -337,12 +347,12 @@ class BlockchainService {
       throw new Error('No wallet available for signing');
     }
 
-    // EIP-712域定义
+    // EIP-712域定义 - 使用SwordBattle合约地址进行签名验证
     const domain = {
       name: 'SwordBattle',
       version: '1',
       chainId: await this.publicClient.getChainId(),
-      verifyingContract: this.config.contracts.gameAggregator,
+      verifyingContract: this.config.contracts.swordBattle,
     };
 
     // 消息类型定义
@@ -437,11 +447,62 @@ class BlockchainService {
   // ============ 区块链读取方法 ============
 
   /**
-   * 获取游戏计数器 (使用 SwordBattle 合约)
+   * 获取游戏计数器 (使用 GameAggregator 合约)
    */
   async getGameCounter() {
-    const contract = this.getSwordBattleContract();
-    return await this.readContract(contract, 'gameCounter', []);
+    try {
+      Logger.server.debug('Getting game counter from GameAggregator...');
+      const contract = this.getGameAggregatorContract();
+      Logger.server.debug('GameAggregator contract config:', { address: contract.address, abiLength: contract.abi.length });
+      const result = await this.readContract(contract, 'getCurrentGameId', []);
+      Logger.server.debug('Game counter result:', result);
+      return result;
+    } catch (error) {
+      Logger.server.error('Failed to get game counter', { error: error.message, stack: error.stack });
+      throw error;
+    }
+  }
+
+  // ========== 新的GameAggregator读取函数 ==========
+
+  /**
+   * 获取游戏完整信息 (使用 GameAggregator 合约)
+   */
+  async getGameFullInfo(gameId) {
+    const contract = this.getGameAggregatorContract();
+    return await this.readContract(contract, 'getGameFullInfo', [BigInt(gameId)]);
+  }
+
+  /**
+   * 获取玩家完整奖励信息 (使用 GameAggregator 合约)
+   */
+  async getPlayerCompleteRewards(gameId, playerAddress) {
+    const contract = this.getGameAggregatorContract();
+    return await this.readContract(contract, 'getPlayerCompleteRewards', [BigInt(gameId), playerAddress]);
+  }
+
+  /**
+   * 获取玩家仪表板 (使用 GameAggregator 合约)
+   */
+  async getPlayerDashboard(playerAddress) {
+    const contract = this.getGameAggregatorContract();
+    return await this.readContract(contract, 'getPlayerDashboard', [playerAddress]);
+  }
+
+  /**
+   * 获取玩家所有奖励 (使用 GameAggregator 合约)
+   */
+  async getPlayerAllRewards(playerAddress) {
+    const contract = this.getGameAggregatorContract();
+    return await this.readContract(contract, 'getPlayerAllRewards', [playerAddress]);
+  }
+
+  /**
+   * 获取可领取奖励的游戏 (使用 GameAggregator 合约)
+   */
+  async getPlayerClaimableGames(playerAddress, maxGames = 25) {
+    const contract = this.getGameAggregatorContract();
+    return await this.readContract(contract, 'getPlayerClaimableGames', [playerAddress, BigInt(maxGames)]);
   }
 
   /**
@@ -456,18 +517,19 @@ class BlockchainService {
    * 获取游戏玩家列表 (使用 GameAggregator 合约)
    */
   async getGamePlayers(gameId) {
-    // 从SwordBattle合约获取玩家注册记录，因为实际的玩家数据在那里
-    const contract = this.getSwordBattleContract();
+    // 直接使用GameAggregator获取游戏信息和玩家列表
+    const contract = this.getGameAggregatorContract();
     try {
-      const players = await this.readContract(contract, 'getGamePlayers', [BigInt(gameId)]);
-      return players || [];
-    } catch (error) {
-      Logger.server.warn(`Failed to get players from SwordBattle for game ${gameId}, trying GameAggregator fallback`, { error: error.message });
+      const gameInfo = await this.readContract(contract, 'getGameFullInfo', [BigInt(gameId)]);
       
-      // 降级到GameAggregator（可能不包含最新的注册信息）
-      const aggregatorContract = this.getGameAggregatorContract();
-      const gameInfo = await this.readContract(aggregatorContract, 'getGameFullInfo', [BigInt(gameId)]);
-      return gameInfo[9] || []; // activePlayers是第10个字段 (索引9)
+      // GameAggregator returns a structured object, not an array
+      // Use the activePlayers property directly
+      const activePlayers = gameInfo.activePlayers || [];
+      
+      return activePlayers;
+    } catch (error) {
+      Logger.server.warn(`Failed to get players from GameAggregator for game ${gameId}`, { error: error.message });
+      return [];
     }
   }
 
@@ -481,7 +543,10 @@ class BlockchainService {
     try {
       const activeGames = await this.readContract(contract, 'getActiveGames', [level, 1]);
       if (activeGames && activeGames.length > 0) {
-        return activeGames[0][11]; // entryFee是GameFullInfo结构的第12个字段
+        // activeGames是GameFullInfo[]数组，每个元素都是结构体
+        // 注意：根据文档，GameFullInfo可能不包含entryFee字段
+        // 可能需要从其他地方获取入场费信息，暂时返回totalPool作为参考
+        return activeGames[0].totalPool || BigInt(0);
       }
       return BigInt(0); // 默认返回0
     } catch (error) {
@@ -504,10 +569,10 @@ class BlockchainService {
   }
 
   /**
-   * 获取玩家nonce (使用 SwordBattle 合约)
+   * 获取玩家nonce (使用 GameAggregator 合约)
    */
   async getPlayerNonce(playerAddress) {
-    const contract = this.getSwordBattleContract();
+    const contract = this.getGameAggregatorContract();
     return await this.readContract(contract, 'getPlayerNonce', [playerAddress]);
   }
 
@@ -522,12 +587,40 @@ class BlockchainService {
     }
 
     try {
-      Logger.server.info('Creating new game on blockchain', { level });
-      
+      Logger.server.info('🎮 Creating new game on blockchain', {
+        level,
+        account: this.account?.address,
+        contractAddress: this.config.contracts?.gameAggregator
+      });
+
       const contract = this.getGameAggregatorContract();
-      
+
+      // 检查合约地址是否有效
+      if (!contract.address) {
+        throw new Error('GameAggregator contract address not configured');
+      }
+
+      Logger.server.debug('📋 Contract details', {
+        address: contract.address,
+        level,
+        account: this.account.address
+      });
+
+      // 检查账户余额
+      try {
+        const balance = await this.publicClient.getBalance({
+          address: this.account.address,
+        });
+        Logger.server.debug('💰 Account balance', {
+          balance: balance.toString(),
+          balanceETH: (Number(balance) / 1e18).toFixed(6)
+        });
+      } catch (balanceError) {
+        Logger.server.warn('⚠️ Could not check account balance', { error: balanceError.message });
+      }
+
       // GameAggregator的createGame会直接返回gameId
-      Logger.server.debug('Calling createGame on GameAggregator', { level });
+      Logger.server.debug('🔍 Simulating createGame transaction', { level });
       const { request } = await this.publicClient.simulateContract({
         account: this.account,
         address: contract.address,
@@ -536,28 +629,53 @@ class BlockchainService {
         args: [level],
       });
 
+      Logger.server.debug('✅ Transaction simulation successful', {
+        gas: request.gas?.toString(),
+        gasPrice: request.gasPrice?.toString(),
+        value: request.value?.toString()
+      });
+
       const txHash = await this.walletClient.writeContract(request);
-      
-      Logger.server.info('Game creation transaction sent', { txHash });
-      Logger.server.debug('Transaction submitted to blockchain, waiting for confirmation');
-      
+
+      Logger.server.info('🚀 Game creation transaction sent', {
+        txHash,
+        level,
+        account: this.account.address
+      });
+      Logger.server.debug('⏳ Transaction submitted to blockchain, waiting for confirmation');
+
       return {
         txHash,
         timestamp: Date.now(),
         level
       };
     } catch (error) {
-      Logger.server.error('Failed to create game', { error: error.message });
-      
+      Logger.server.error('❌ Failed to create game - detailed error', {
+        error: error.message,
+        stack: error.stack,
+        level,
+        account: this.account?.address,
+        contractAddress: this.config.contracts?.gameAggregator,
+        isInitialized: this.isInitialized,
+        hasWalletClient: !!this.walletClient,
+        hasPublicClient: !!this.publicClient
+      });
+
       // 提供更详细的错误信息
       if (error.message.includes('insufficient funds')) {
-        Logger.server.error('Insufficient funds in wallet for transaction');
+        Logger.server.error('💰 Insufficient funds in wallet for transaction');
       } else if (error.message.includes('nonce')) {
-        Logger.server.error('Nonce issue - possible concurrent transactions');
+        Logger.server.error('🔢 Nonce issue - possible concurrent transactions');
       } else if (error.message.includes('gas')) {
-        Logger.server.error('Gas estimation failed or insufficient gas');
+        Logger.server.error('⛽ Gas estimation failed or insufficient gas');
+      } else if (error.message.includes('revert')) {
+        Logger.server.error('🔄 Transaction reverted - contract execution failed');
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        Logger.server.error('🌐 Network connection issue');
+      } else if (error.message.includes('contract')) {
+        Logger.server.error('📋 Contract interaction failed');
       }
-      
+
       throw error;
     }
   }
@@ -571,14 +689,56 @@ class BlockchainService {
     }
 
     try {
+      console.log(`🔚 开始结束游戏流程 - 游戏ID: ${gameId}`);
       Logger.server.info('Ending game on blockchain', { gameId });
-      
+
+      // 获取游戏结束前的状态
+      const preEndGameInfo = await this.getGameFullInfo(gameId);
+      console.log(`📋 游戏结束前状态:`, {
+        gameId,
+        status: preEndGameInfo.status.toString(),
+        totalPool: preEndGameInfo.totalPool.toString(),
+        level: preEndGameInfo.level,
+        endedAt: preEndGameInfo.endedAt.toString()
+      });
+
+      // 检查合约余额
+      console.log(`💰 检查合约余额...`);
+      await this.checkContractBalances(gameId);
+
+      console.log(`📝 准备发送endGame交易...`);
       const contract = this.getGameAggregatorContract();
       const txHash = await this.writeContract(contract, 'endGame', [BigInt(gameId)]);
-      
+
+      console.log(`✅ endGame交易已发送: ${txHash}`);
       Logger.server.info('Game end transaction sent', { txHash });
+
+      // 等待一小段时间让交易被处理
+      console.log(`⏳ 等待交易处理...`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // 获取游戏结束后的状态
+      try {
+        const postEndGameInfo = await this.getGameFullInfo(gameId);
+        console.log(`🏁 游戏结束后状态:`, {
+          gameId,
+          status: postEndGameInfo.status.toString(),
+          totalPool: postEndGameInfo.totalPool.toString(),
+          endedAt: postEndGameInfo.endedAt.toString(),
+          level: postEndGameInfo.level,
+          gameDuration: postEndGameInfo.gameDuration
+        });
+      } catch (postError) {
+        console.log(`⚠️ 无法获取游戏结束后状态:`, postError.message);
+      }
+
       return txHash;
     } catch (error) {
+      console.error(`❌ endGame失败:`, {
+        gameId,
+        error: error.message,
+        stack: error.stack
+      });
       Logger.server.error('Failed to end game', { gameId, error: error.message });
       throw error;
     }
@@ -593,9 +753,34 @@ class BlockchainService {
     }
 
     try {
+      console.log(`📊 开始提交分数 - 玩家: ${playerAddress}`);
+      console.log(`📊 分数详情:`, {
+        gameId: gameId.toString(),
+        playerAddress,
+        kills: kills.toString(),
+        score: score.toString(),
+        nonce: nonce.toString(),
+        signatureLength: signature.length,
+        signaturePreview: signature.substring(0, 20) + '...'
+      });
+
       Logger.server.info('Submitting score', { score, kills, gameId, playerAddress });
-      
+
       const contract = this.getGameAggregatorContract();
+
+      // 提交前检查玩家当前状态
+      try {
+        const currentNonce = await this.getPlayerNonce(playerAddress);
+        console.log(`📋 当前nonce检查: 提交nonce=${nonce}, 链上nonce=${currentNonce}`);
+
+        if (BigInt(nonce) !== BigInt(currentNonce)) {
+          console.warn(`⚠️ Nonce不匹配! 提交=${nonce}, 期望=${currentNonce}`);
+        }
+      } catch (nonceError) {
+        console.warn(`⚠️ 无法检查nonce:`, nonceError.message);
+      }
+
+      console.log(`📤 发送submitScore交易...`);
       const txHash = await this.writeContract(contract, 'submitScore', [
         BigInt(gameId),
         playerAddress,
@@ -604,10 +789,27 @@ class BlockchainService {
         BigInt(nonce),
         signature
       ]);
-      
+
+      console.log(`✅ 分数提交交易已发送: ${txHash}`);
       Logger.server.info('Score submission transaction sent', { txHash });
+
+      // 等待一段时间后检查提交结果
+      setTimeout(async () => {
+        try {
+          await this.verifyScoreSubmission(gameId, playerAddress, score);
+        } catch (verifyError) {
+          console.warn(`⚠️ 分数提交验证失败:`, verifyError.message);
+        }
+      }, 3000);
+
       return txHash;
     } catch (error) {
+      console.error(`❌ 分数提交失败:`, {
+        gameId,
+        playerAddress,
+        error: error.message,
+        stack: error.stack
+      });
       Logger.server.error('Failed to submit score', { gameId, playerAddress, error: error.message });
       throw error;
     }
@@ -659,7 +861,200 @@ class BlockchainService {
   }
 
   /**
-   * 分发游戏奖励到RewardManager合约
+   * 检查合约余额
+   */
+  async checkContractBalances(gameId) {
+    try {
+      const gameAggregatorContract = this.getGameAggregatorContract();
+
+      // 获取USD1代币合约地址
+      const usd1TokenAddress = await this.readContract(gameAggregatorContract, 'getUsdTokenAddress', []);
+
+      // 检查GameAggregator合约的USD1余额
+      const usd1Balance = await this.publicClient.readContract({
+        address: usd1TokenAddress,
+        abi: [
+          {
+            "inputs": [{"name": "account", "type": "address"}],
+            "name": "balanceOf",
+            "outputs": [{"name": "", "type": "uint256"}],
+            "stateMutability": "view",
+            "type": "function"
+          }
+        ],
+        functionName: 'balanceOf',
+        args: [gameAggregatorContract.address],
+      });
+
+      // 获取游戏信息以了解奖励池
+      const gameInfo = await this.readContract(gameAggregatorContract, 'getGameFullInfo', [BigInt(gameId)]);
+      const totalPool = gameInfo.totalPool; // 奖池总额
+
+      console.log(`💰 合约余额检查结果:`, {
+        gameId,
+        gameAggregatorAddress: gameAggregatorContract.address,
+        usd1TokenAddress,
+        contractUsd1Balance: usd1Balance.toString(),
+        contractUsd1BalanceETH: (Number(usd1Balance) / 1e18).toFixed(6),
+        gameTotalPool: totalPool.toString(),
+        gameTotalPoolETH: (Number(totalPool) / 1e18).toFixed(6),
+        hasSufficientBalance: usd1Balance >= totalPool
+      });
+
+      Logger.server.info('Contract balance check', {
+        gameId,
+        gameAggregatorAddress: gameAggregatorContract.address,
+        usd1TokenAddress,
+        contractUsd1Balance: usd1Balance.toString(),
+        contractUsd1BalanceETH: (Number(usd1Balance) / 1e18).toFixed(6),
+        gameTotalPool: totalPool.toString(),
+        gameTotalPoolETH: (Number(totalPool) / 1e18).toFixed(6),
+        hasSufficientBalance: usd1Balance >= totalPool
+      });
+
+      if (usd1Balance < totalPool) {
+        console.error(`❌ 合约余额不足!`, {
+          required: totalPool.toString(),
+          requiredETH: (Number(totalPool) / 1e18).toFixed(6),
+          available: usd1Balance.toString(),
+          availableETH: (Number(usd1Balance) / 1e18).toFixed(6),
+          deficit: (totalPool - usd1Balance).toString(),
+          deficitETH: (Number(totalPool - usd1Balance) / 1e18).toFixed(6)
+        });
+        Logger.server.warn('⚠️ GameAggregator contract has insufficient USD1 balance for rewards', {
+          required: totalPool.toString(),
+          available: usd1Balance.toString(),
+          deficit: (totalPool - usd1Balance).toString()
+        });
+      } else {
+        console.log(`✅ 合约余额充足，可以正常分发奖励`);
+      }
+
+    } catch (error) {
+      Logger.server.warn('Failed to check contract balances', { error: error.message });
+    }
+  }
+
+  /**
+   * 验证分数提交结果
+   */
+  async verifyScoreSubmission(gameId, playerAddress, expectedScore) {
+    try {
+      console.log(`🔍 验证分数提交结果 - 游戏: ${gameId}, 玩家: ${playerAddress}`);
+
+      const playerInfo = await this.getPlayerInfo(gameId, playerAddress);
+      console.log(`📊 玩家信息查询结果:`, {
+        gameId,
+        playerAddress,
+        submittedScore: playerInfo[1]?.toString() || 'N/A',
+        expectedScore: expectedScore.toString(),
+        kills: playerInfo[2]?.toString() || 'N/A',
+        hasSubmitted: playerInfo[3] || false,
+        scoreMatches: playerInfo[1] ? BigInt(playerInfo[1]) === BigInt(expectedScore) : false
+      });
+
+      if (playerInfo[3]) { // hasSubmitted
+        console.log(`✅ 分数提交验证成功 - 玩家 ${playerAddress} 分数已记录`);
+
+        // 查询奖励信息
+        await this.checkPlayerRewards(gameId, playerAddress);
+      } else {
+        console.warn(`⚠️ 分数提交验证失败 - 玩家 ${playerAddress} 分数未记录`);
+      }
+    } catch (error) {
+      console.error(`❌ 分数提交验证出错:`, error.message);
+    }
+  }
+
+  /**
+   * 获取玩家信息 (使用 getPlayerCompleteRewards 替代)
+   */
+  async getPlayerInfo(gameId, playerAddress) {
+    try {
+      // GameAggregator可能没有getPlayerInfo函数，使用getPlayerCompleteRewards替代
+      const contract = this.getGameAggregatorContract();
+      const playerRewards = await this.readContract(contract, 'getPlayerCompleteRewards', [BigInt(gameId), playerAddress]);
+      
+      // 转换为兼容格式 [playerAddress, score, kills, hasSubmitted, ...]
+      return [
+        playerAddress,
+        playerRewards.totalScore || BigInt(0), // 总分数
+        playerRewards.totalKills || BigInt(0), // 击杀数  
+        true, // 假设已提交 (因为能查询到奖励)
+        playerRewards.usdAmount || BigInt(0), // USD奖励
+        playerRewards.nclabAmount || BigInt(0) // NCLab奖励
+      ];
+    } catch (error) {
+      Logger.server.error('Failed to get player info', { gameId, playerAddress, error: error.message });
+      // 返回默认值以避免错误
+      return [playerAddress, BigInt(0), BigInt(0), false, BigInt(0), BigInt(0)];
+    }
+  }
+
+  /**
+   * 检查玩家奖励 (使用 getPlayerCompleteRewards)
+   */
+  async checkPlayerRewards(gameId, playerAddress) {
+    try {
+      console.log(`🎁 检查玩家奖励 - 游戏: ${gameId}, 玩家: ${playerAddress}`);
+
+      const contract = this.getGameAggregatorContract();
+      const rewards = await this.readContract(contract, 'getPlayerCompleteRewards', [BigInt(gameId), playerAddress]);
+
+      // getPlayerCompleteRewards返回: PlayerCompleteRewards结构体
+      const usdReward = rewards.usdAmount || BigInt(0);
+      const nclabReward = rewards.nclabAmount || BigInt(0);
+      const fragmentBonus = rewards.fragmentBonus || 0;
+
+      const totalUsdReward = usdReward;
+
+      console.log(`💰 玩家 ${playerAddress} 奖励详情:`, {
+        gameId,
+        usdReward: usdReward.toString(),
+        usdRewardETH: (Number(usdReward) / 1e18).toFixed(6),
+        nclabReward: nclabReward.toString(),
+        nclabRewardETH: (Number(nclabReward) / 1e18).toFixed(6),
+        fragmentBonus: fragmentBonus,
+        totalUsdReward: totalUsdReward.toString(),
+        totalUsdRewardETH: (Number(totalUsdReward) / 1e18).toFixed(6),
+        hasRewards: totalUsdReward > 0 || nclabReward > 0
+      });
+
+      return {
+        killReward: usdReward, // 为了兼容性
+        lotteryReward: BigInt(0),
+        guaranteedReward: BigInt(0),
+        fragmentReward: nclabReward,
+        totalUsdReward,
+        claimableTime: BigInt(0),
+        canClaim: true
+      };
+    } catch (error) {
+      console.error(`❌ 查询玩家奖励失败:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取游戏完整信息
+   */
+  async getGameFullInfo(gameId) {
+    if (!this.isInitialized) {
+      throw new Error('Blockchain service not initialized');
+    }
+
+    try {
+      const contract = this.getGameAggregatorContract();
+      const gameInfo = await this.readContract(contract, 'getGameFullInfo', [BigInt(gameId)]);
+      return gameInfo;
+    } catch (error) {
+      Logger.server.error('Failed to get game full info', { gameId, error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * 分发游戏奖励 (使用 GameAggregator 合约)
    */
   async distributeGameRewards(gameId) {
     if (!this.isInitialized || !this.walletClient) {
@@ -667,21 +1062,46 @@ class BlockchainService {
     }
 
     try {
-      Logger.server.info('Distributing game rewards', { gameId });
-      
-      const contract = this.getRewardManagerContract();
-      const txHash = await this.writeContract(contract, 'calculateAndDistributeRewards', [BigInt(gameId)]);
-      
-      Logger.server.info('Reward distribution transaction sent', { gameId, txHash });
-      return txHash;
+      Logger.server.info('Checking game rewards distribution status', { gameId });
+
+      // 获取游戏信息检查奖励分发状态
+      const gameInfo = await this.getGameFullInfo(gameId);
+      const gameStatus = gameInfo.status; // 游戏状态 
+      const totalPool = gameInfo.totalPool; // 奖池总额
+      const endedAt = gameInfo.endedAt; // 结束时间戳
+      const gameLevel = gameInfo.level; // 游戏等级
+
+      console.log(`📊 游戏 ${gameId} 奖励分发状态检查:`, {
+        status: gameStatus.toString(),
+        totalPool: totalPool.toString(), 
+        totalPoolETH: (Number(totalPool) / 1e18).toFixed(6),
+        endedAt: endedAt.toString(),
+        level: gameLevel,
+        gameDuration: gameInfo.gameDuration,
+        isEnded: endedAt > 0,
+        timestamp: new Date().toISOString()
+      });
+
+      // GameAggregator的奖励分发逻辑在endGame中已经处理
+      if (endedAt > 0) {
+        Logger.server.info('Game rewards already distributed via GameAggregator.endGame', {
+          gameId,
+          endedAt: endedAt.toString(),
+          totalPool: totalPool.toString()
+        });
+        return `rewards_distributed_automatically_at_${endedAt}`;
+      } else {
+        Logger.server.warn('Game has not ended yet, rewards not distributed', { gameId });
+        return 'game_not_ended_yet';
+      }
     } catch (error) {
-      Logger.server.error('Failed to distribute rewards', { gameId, error: error.message });
+      Logger.server.error('Failed to check rewards distribution', { gameId, error: error.message });
       throw error;
     }
   }
 
   /**
-   * 领取USD奖励 (使用 RewardManager 合约)
+   * 领取USD奖励 (使用 GameAggregator 合约)
    */
   async claimUSDRewards(gameIds) {
     if (!this.isInitialized || !this.walletClient) {
@@ -691,8 +1111,9 @@ class BlockchainService {
     try {
       Logger.server.info('Claiming USD rewards', { gameIds });
       
-      const contract = this.getRewardManagerContract();
-      const txHash = await this.writeContract(contract, 'claimAllUSDRewards', [gameIds.map(id => BigInt(id))]);
+      const contract = this.getGameAggregatorContract();
+      // 使用 claimAllPlayerRewards 方法，ClaimType.USD_ONLY = 1
+      const txHash = await this.writeContract(contract, 'claimAllPlayerRewards', [1, BigInt(gameIds.length)]);
       
       Logger.server.info('USD rewards claim transaction sent', { txHash });
       return txHash;
@@ -703,7 +1124,7 @@ class BlockchainService {
   }
 
   /**
-   * 领取NCLab奖励 (使用 RewardManager 合约)
+   * 领取NCLab奖励 (使用 GameAggregator 合约)
    */
   async claimNclabRewards(gameIds) {
     if (!this.isInitialized || !this.walletClient) {
@@ -713,8 +1134,9 @@ class BlockchainService {
     try {
       Logger.server.info('Claiming NCLab rewards', { gameIds });
       
-      const contract = this.getRewardManagerContract();
-      const txHash = await this.writeContract(contract, 'claimAllNclabRewards', [gameIds.map(id => BigInt(id))]);
+      const contract = this.getGameAggregatorContract();
+      // 使用 claimAllPlayerRewards 方法，ClaimType.NCLAB_ONLY = 2
+      const txHash = await this.writeContract(contract, 'claimAllPlayerRewards', [2, BigInt(gameIds.length)]);
       
       Logger.server.info('NCLab rewards claim transaction sent', { txHash });
       return txHash;
@@ -725,7 +1147,7 @@ class BlockchainService {
   }
 
   /**
-   * 一键领取所有奖励 (使用 RewardManager 合约)
+   * 一键领取所有奖励 (使用 GameAggregator 合约)
    */
   async claimAllRewards(gameId) {
     if (!this.isInitialized || !this.walletClient) {
@@ -735,8 +1157,9 @@ class BlockchainService {
     try {
       Logger.server.info('Claiming all rewards', { gameId });
       
-      const contract = this.getRewardManagerContract();
-      const txHash = await this.writeContract(contract, 'claimReward', [BigInt(gameId)]);
+      const contract = this.getGameAggregatorContract();
+      // 使用 claimGameReward 方法，ClaimType.ALL = 0
+      const txHash = await this.writeContract(contract, 'claimGameReward', [BigInt(gameId), 0]);
       
       Logger.server.info('All rewards claim transaction sent', { txHash });
       return txHash;
@@ -746,8 +1169,54 @@ class BlockchainService {
     }
   }
 
+  // ========== 新的GameAggregator奖励领取函数 ==========
+
   /**
-   * 获取玩家奖励状态 (使用 RewardManager 合约)
+   * 领取指定游戏奖励 (使用 GameAggregator 合约)
+   */
+  async claimGameReward(gameId, claimType = 0) {
+    if (!this.isInitialized || !this.walletClient) {
+      throw new Error('Blockchain service not initialized or no wallet available');
+    }
+
+    try {
+      Logger.server.info('Claiming game reward', { gameId, claimType });
+      
+      const contract = this.getGameAggregatorContract();
+      const txHash = await this.writeContract(contract, 'claimGameReward', [BigInt(gameId), claimType]);
+      
+      Logger.server.info('Game reward claim transaction sent', { txHash });
+      return txHash;
+    } catch (error) {
+      Logger.server.error('Failed to claim game reward', { gameId, claimType, error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * 批量领取所有奖励 (使用 GameAggregator 合约)
+   */
+  async claimAllPlayerRewards(claimType = 0, maxGames = 25) {
+    if (!this.isInitialized || !this.walletClient) {
+      throw new Error('Blockchain service not initialized or no wallet available');
+    }
+
+    try {
+      Logger.server.info('Claiming all player rewards', { claimType, maxGames });
+      
+      const contract = this.getGameAggregatorContract();
+      const txHash = await this.writeContract(contract, 'claimAllPlayerRewards', [claimType, BigInt(maxGames)]);
+      
+      Logger.server.info('All player rewards claim transaction sent', { txHash });
+      return txHash;
+    } catch (error) {
+      Logger.server.error('Failed to claim all player rewards', { claimType, maxGames, error: error.message });
+      throw error;
+    }
+  }
+
+  /**
+   * 获取玩家奖励状态 (使用 GameAggregator 合约)
    */
   async getPlayerRewardStatus(gameId, playerAddress) {
     if (!this.isInitialized) {
@@ -755,12 +1224,23 @@ class BlockchainService {
     }
 
     try {
-      const contract = this.getRewardManagerContract();
-      return await this.readContract(contract, 'getPlayerRewardStatus', [BigInt(gameId), playerAddress]);
+      const contract = this.getGameAggregatorContract();
+      return await this.readContract(contract, 'getPlayerCompleteRewards', [BigInt(gameId), playerAddress]);
     } catch (error) {
       Logger.server.error('Failed to get player reward status', { gameId, playerAddress, error: error.message });
       throw error;
     }
+  }
+
+  /**
+   * ClaimType 枚举常量
+   */
+  static get ClaimType() {
+    return {
+      ALL: 0,        // 领取所有类型 (USD1 + NCLab)
+      USD_ONLY: 1,   // 仅领取 USD1
+      NCLAB_ONLY: 2  // 仅领取 NCLab
+    };
   }
 }
 

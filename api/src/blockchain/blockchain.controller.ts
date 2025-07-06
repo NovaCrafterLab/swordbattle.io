@@ -64,32 +64,18 @@ export class BlockchainController {
     }
   }
 
-  // 获取游戏分数
+  // 游戏分数现在通过GameAggregator的其他接口获取
   @Get('games/:gameId/scores')
   async getGameScores(@Param('gameId') gameId: string) {
-    try {
-      const scores = await this.blockchainService.getGameScores(parseInt(gameId));
-      return { success: true, data: scores };
-    } catch (error) {
-      throw new HttpException(
-        { success: false, error: error.message },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+    // 返回空数组，因为现在分数通过其他方式获取
+    return { success: true, data: [] };
   }
 
-  // 获取游戏排名
+  // 游戏排名现在通过GameAggregator的其他接口获取
   @Get('games/:gameId/rankings')
   async getGameRankings(@Param('gameId') gameId: string) {
-    try {
-      const rankings = await this.blockchainService.getGameRankings(parseInt(gameId));
-      return { success: true, data: rankings };
-    } catch (error) {
-      throw new HttpException(
-        { success: false, error: error.message },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+    // 返回空数组，因为现在排名通过其他方式获取
+    return { success: true, data: [] };
   }
 
   // 获取玩家信息

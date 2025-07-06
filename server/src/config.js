@@ -37,7 +37,50 @@ module.exports = {
   apiEndpoint: process.env.API_ENDPOINT || 'http://localhost:8080',
 
   // ReCAPTCHA secret key for verifying ReCAPTCHA responses
-  recaptchaSecretKey: process.env.RECAPTCHA_SECRET_KEY || '',
+  recaptchaSecretKey: process.env.RECAPTCHA_SECRET_KEY,
+
+  // Environment information
+  environment: {
+    ENV,
+    isDev,
+    isRelease,
+    nodeEnv: ENV,
+  },
+
+  // Server type configuration
+  serverType: process.env.SERVER_TYPE || 'NORMAL',
+  isRaceServer: process.env.SERVER_TYPE === 'RACE',
+  enableCycleRestart:process.env.ENABLE_CYCLE_RESTART === 'true' || process.env.SERVER_TYPE === 'RACE',
+
+  // Blockchain configuration
+  blockchain: {
+    enabled: process.env.BLOCKCHAIN_ENABLED === 'true',
+    rpcUrl: process.env.BLOCKCHAIN_RPC_URL, // 可选，会使用内置RPC池
+    contracts: {
+      // GameAggregator 合约用于游戏操作 - 更新为最新地址
+      gameAggregator: isDev
+        ? (process.env.GAME_AGGREGATOR_CONTRACT_TESTNET || process.env.GAME_AGGREGATOR_CONTRACT || '0xd442E28E906aF252D6ecf6207bD8AE9CC4337bce')
+        : (process.env.GAME_AGGREGATOR_CONTRACT_MAINNET || process.env.GAME_AGGREGATOR_CONTRACT || '0xd442E28E906aF252D6ecf6207bD8AE9CC4337bce'),
+      // SwordBattle 原合约用于基础数据查询 - 更新为最新地址
+      swordBattle: isDev
+        ? (process.env.SWORD_BATTLE_CONTRACT_TESTNET || process.env.SWORD_BATTLE_CONTRACT || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD')
+        : (process.env.SWORD_BATTLE_CONTRACT_MAINNET || process.env.SWORD_BATTLE_CONTRACT || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD'),
+      usd1Token: isDev
+        ? (process.env.USD1_TOKEN_CONTRACT_TESTNET || process.env.USD1_TOKEN_CONTRACT || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16')
+        : (process.env.USD1_TOKEN_CONTRACT_MAINNET || process.env.USD1_TOKEN_CONTRACT),
+      rewardManager: isDev
+        ? (process.env.REWARD_MANAGER_CONTRACT_TESTNET || process.env.REWARD_MANAGER_CONTRACT)
+        : (process.env.REWARD_MANAGER_CONTRACT_MAINNET || process.env.REWARD_MANAGER_CONTRACT),
+    },
+    trustedSigner: process.env.TRUSTED_SIGNER_PRIVATE_KEY,
+    gameLevel: parseInt(process.env.GAME_LEVEL || '0'), // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH
+    environment: {
+      isDev,
+      isRelease,
+      chainId: isDev ? 97 : 56, // BSC测试网:97, BSC主网:56
+      networkName: isDev ? 'BSC Testnet' : 'BSC Mainnet',
+    },
+  },
 
   // Game configuration settings
   tickRate: 20,

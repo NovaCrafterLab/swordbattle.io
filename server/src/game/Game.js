@@ -695,7 +695,31 @@ class Game {
       await this.waitForGameCreated(initialCounter);
 
     } catch (error) {
-      Logger.server.error(`❌ Game creation failed (${currentAttempt}/${maxRetries}):`, error.message);
+      // 记录详细的错误信息
+      Logger.server.error(`❌ Game creation failed (${currentAttempt}/${maxRetries}):`, {
+        error: error.message,
+        stack: error.stack,
+        gameLevel,
+        blockchainService: !!this.blockchainService,
+        isInitialized: this.blockchainService?.isInitialized,
+        walletClient: !!this.blockchainService?.walletClient,
+        account: this.blockchainService?.account?.address,
+        contractAddress: this.blockchainService?.config?.contracts?.gameAggregator
+      });
+
+      // 如果错误包含特定信息，提供更详细的诊断
+      if (error.message.includes('insufficient funds')) {
+        Logger.server.error('💰 Insufficient funds in wallet for transaction');
+      } else if (error.message.includes('nonce')) {
+        Logger.server.error('🔢 Nonce issue - possible concurrent transactions');
+      } else if (error.message.includes('gas')) {
+        Logger.server.error('⛽ Gas estimation failed or insufficient gas');
+      } else if (error.message.includes('revert')) {
+        Logger.server.error('🔄 Transaction reverted - contract execution failed');
+      } else if (error.message.includes('network')) {
+        Logger.server.error('🌐 Network connection issue');
+      }
+
       this.gamePhase = 'error';
       this.isGameCreationInProgress = false;
 
@@ -882,19 +906,46 @@ class Game {
       }
 
       // 调用合约结束游戏
+      console.log(`🔚 正在调用合约结束游戏 ${this.blockchainGameId}...`);
       const endTxHash = await this.blockchainService.endGame(this.blockchainGameId);
+      console.log(`✅ 游戏结束交易已发送: ${endTxHash}`);
       Logger.server.info('Game end transaction sent', {
         gameId: this.blockchainGameId,
         txHash: endTxHash
       });
 
-      // 等待游戏结束交易确认后，分发奖励到RewardManager
+      // 等待游戏结束交易确认后，检查奖励分发状态
       try {
-        console.log(`🎁 开始分发游戏 ${this.blockchainGameId} 的奖励...`);
-        const rewardTxHash = await this.blockchainService.distributeGameRewards(this.blockchainGameId);
-        console.log(`✅ 奖励分发交易已发送: ${rewardTxHash}`);
+        console.log(`🎁 开始检查游戏 ${this.blockchainGameId} 的奖励分发状态...`);
+        const rewardResult = await this.blockchainService.distributeGameRewards(this.blockchainGameId);
+        console.log(`📊 奖励分发结果: ${rewardResult}`);
+
+        // 获取游戏最终状态
+        const finalGameInfo = await this.blockchainService.getGameFullInfo(this.blockchainGameId);
+        console.log(`🏁 游戏最终状态:`, {
+          gameId: this.blockchainGameId,
+          status: finalGameInfo.status, // 游戏状态
+          totalPool: finalGameInfo.totalPool.toString(), // 奖池总额
+          endedAt: finalGameInfo.endedAt.toString(), // 结束时间戳
+          level: finalGameInfo.level, // 游戏等级
+          gameDuration: finalGameInfo.gameDuration // 游戏持续时间
+        });
+
+        // 查询所有玩家的奖励分发情况
+        console.log(`🎁 查询所有玩家的奖励分发情况...`);
+        // 注意：GameFullInfo结构体可能不包含activePlayers，需要单独查询
+        const activePlayers = await this.blockchainService.getGamePlayers(this.blockchainGameId);
+        for (const playerAddress of activePlayers) {
+          try {
+            await this.blockchainService.checkPlayerRewards(this.blockchainGameId, playerAddress);
+          } catch (playerRewardError) {
+            console.warn(`⚠️ 查询玩家 ${playerAddress} 奖励失败:`, playerRewardError.message);
+          }
+        }
+
       } catch (rewardError) {
-        console.error(`❌ 奖励分发失败:`, rewardError.message);
+        console.error(`❌ 奖励分发检查失败:`, rewardError.message);
+        console.error(`❌ 错误详情:`, rewardError);
         // 不让奖励分发失败阻止游戏结束流程
       }
 
@@ -967,7 +1018,17 @@ class Game {
         console.log(`✍️ Signature obtained: ${signature.substring(0, 20)}...`);
 
         // 调用合约提交分数
-        console.log(`📊 Submitting score to blockchain...`);
+        console.log(`📊 正在向区块链提交分数...`);
+        console.log(`📊 提交参数确认:`, {
+          gameId: this.blockchainGameId,
+          playerName: scoreData.playerName,
+          playerAddress: scoreData.walletAddress,
+          kills: scoreData.kills,
+          finalScore: scoreData.finalScore,
+          nonce: nonce.toString(),
+          signatureLength: signature.length
+        });
+
         const txHash = await this.blockchainService.submitScore(
           this.blockchainGameId,
           scoreData.walletAddress,
@@ -977,9 +1038,20 @@ class Game {
           signature
         );
 
-        console.log(`✅ Score submitted for ${scoreData.playerName}: ${scoreData.finalScore} kills: ${scoreData.kills} (tx: ${txHash})`);
+        console.log(`✅ 分数提交成功 - 玩家: ${scoreData.playerName} (${scoreData.walletAddress})`);
+        console.log(`📊 提交详情: 分数=${scoreData.finalScore}, 击杀=${scoreData.kills}, 交易=${txHash}`);
         this.playerScoreSubmitted.add(playerId);
         successfulSubmissions++;
+
+        // 异步查询奖励信息
+        setTimeout(async () => {
+          try {
+            console.log(`🎁 查询玩家 ${scoreData.playerName} 的奖励...`);
+            await this.blockchainService.checkPlayerRewards(this.blockchainGameId, scoreData.walletAddress);
+          } catch (rewardError) {
+            console.warn(`⚠️ 查询奖励失败:`, rewardError.message);
+          }
+        }, 5000);
 
         // 准备数据库保存数据（暂时假设奖励为0，排名为0，后续可以改进）
         gameDataForDatabase.push({
@@ -1104,21 +1176,25 @@ class Game {
       try {
         console.log(`🔍 查询玩家 ${gameData.playerAddress} 的奖励...`);
 
-        // 从区块链查询真实奖励数据（使用RewardManager合约）
-        const playerRewardStatus = await this.blockchainService.readContract(
-          this.blockchainService.getRewardManagerContract(),
-          'getPlayerRewardStatus',
-          [BigInt(gameId), gameData.playerAddress]
+        // 从区块链查询真实奖励数据（使用GameAggregator合约）
+        const playerRewardStatus = await this.blockchainService.getPlayerCompleteRewards(
+          gameId,
+          gameData.playerAddress
         );
 
-        // getPlayerRewardStatus返回: [usdRewards, nclabRewards, usdClaimable, nclabClaimable, nclabClaimableTime, usdClaimed, nclabClaimed]
-        const usdRewards = playerRewardStatus[0];        // USD1奖励总额
-        const nclabRewards = playerRewardStatus[1];      // NCLab奖励总额
-        const usdClaimable = playerRewardStatus[2];      // USD奖励是否可领取
-        const nclabClaimable = playerRewardStatus[3];    // NCLab奖励是否可领取
-        const nclabClaimableTime = playerRewardStatus[4]; // NCLab奖励可领取时间
-        const usdClaimed = playerRewardStatus[5];        // USD奖励是否已领取
-        const nclabClaimed = playerRewardStatus[6];      // NCLab奖励是否已领取
+        // getPlayerCompleteRewards返回: PlayerCompleteRewards结构体
+        // { usdAmount, nclabAmount, fragmentBonus, ...其他字段 }
+        const usdRewards = playerRewardStatus.usdAmount || BigInt(0);     // USD1奖励总额
+        const nclabRewards = playerRewardStatus.nclabAmount || BigInt(0); // NCLab奖励总额
+        const fragmentBonus = playerRewardStatus.fragmentBonus || 0;      // 额外碎片数
+
+        // 注意：getPlayerCompleteRewards可能不包含可领取状态信息
+        // 这些信息可能需要从其他接口获取，暂时设为默认值
+        const usdClaimable = true;      // 默认可领取
+        const nclabClaimable = true;    // 默认可领取
+        const nclabClaimableTime = 0;   // 默认立即可领取
+        const usdClaimed = false;       // 默认未领取
+        const nclabClaimed = false;     // 默认未领取
 
         // 计算总USD奖励金额（以ETH为单位）
         const usdRewardEth = Number(usdRewards) / 1e18;
@@ -1134,10 +1210,12 @@ class Game {
         // 判断是否有可领取的奖励
         const hasClaimableRewards = usdClaimable || nclabClaimable;
 
-        console.log(`💰 玩家 ${gameData.playerAddress} 区块链奖励:`);
-        console.log(`   USD奖励: ${usdRewardEth} USD1 (可领取: ${usdClaimable}, 已领取: ${usdClaimed})`);
-        console.log(`   NCLab奖励: ${nclabRewardEth} NCLab (可领取: ${nclabClaimable}, 已领取: ${nclabClaimed})`);
-        console.log(`   总奖励: ${totalRewardEth}, 全部已领取: ${hasClaimedAll}`);
+        console.log(`💰 玩家 ${gameData.playerAddress} 区块链奖励详情:`);
+        console.log(`   💎 USD奖励: ${usdRewardEth.toFixed(6)} USD1 (可领取: ${usdClaimable}, 已领取: ${usdClaimed})`);
+        console.log(`   🧩 NCLab奖励: ${nclabRewardEth.toFixed(6)} NCLab (可领取: ${nclabClaimable}, 已领取: ${nclabClaimed})`);
+        console.log(`   📊 总奖励: ${totalRewardEth.toFixed(6)}, 全部已领取: ${hasClaimedAll}`);
+        console.log(`   ⏰ NCLab可领取时间: ${new Date(Number(nclabClaimableTime) * 1000).toISOString()}`);
+        console.log(`   🏆 是否获胜: ${isWinner}`);
 
         // 更新奖励数据
         const updatedData = {

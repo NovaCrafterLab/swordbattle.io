@@ -244,16 +244,19 @@ export class RaceGamesService {
 
       for (const game of playerGames) {
         try {
-          // 从区块链获取真实的奖励信息
-          const playerInfo = await this.blockchainService.getPlayerInfo(game.gameId, playerAddress);
+          // 使用新的GameAggregator获取玩家完整奖励信息
+          const playerCompleteRewards = await this.blockchainService.getPlayerCompleteRewards(game.gameId, playerAddress);
           
-          if (playerInfo) {
-            // 使用新合约的getPlayerRewardStatus方法获取奖励信息
-            const rewardStatus = await this.blockchainService.getPlayerRewardStatus(game.gameId, playerAddress);
-            
-            // 解析新的奖励结构
-            // [usdRewards, nclabRewards, usdClaimable, nclabClaimable, nclabClaimableTime, usdClaimed, nclabClaimed]
-            const [usdRewards, nclabRewards, usdClaimable, nclabClaimable, nclabClaimableTime, usdClaimed, nclabClaimed] = rewardStatus;
+          if (playerCompleteRewards) {
+            // 解析PlayerCompleteRewards结构
+            const {
+              usdRewards,
+              nclabRewards,
+              usdClaimable,
+              nclabClaimable,
+              usdClaimed,
+              nclabClaimed
+            } = playerCompleteRewards;
             
             const totalReward = Number(usdRewards) + Number(nclabRewards);
             const rewardAmount = (totalReward / 1e18).toString(); // 转换为以太币单位
