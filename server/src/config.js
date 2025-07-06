@@ -1,36 +1,14 @@
-// Load environment variables from unified env files
-const path = require('path');
-const fs = require('fs');
+// Load environment variables from a .env file
+require('dotenv').config();
 
 // 环境判断逻辑与前端保持一致
 const ENV = process.env.NODE_ENV || 'development';
 const isDev = ENV === 'development';
 const isRelease = ENV === 'production';
 
-// 环境文件加载优先级（从高到低）
-const envFiles = [
-  // 项目根目录的统一环境配置文件（优先）
-  path.resolve(__dirname, '..', '..', 'env', `server.env.${ENV}`),
-  path.resolve(__dirname, '..', '..', 'env', 'server.env'),
-  // 服务器目录下的传统.env文件（备用）
-  path.resolve(__dirname, '..', '.env'),
-].filter(Boolean);
+console.log("state:", process.env.NODE_ENV);
+console.log('workspace:', process.cwd());
 
-console.log('🔍 Loading server environment configuration...');
-envFiles.forEach((envFile, index) => {
-  if (fs.existsSync(envFile)) {
-    console.log(`   ${index + 1}. Loading: ${envFile} ✅`);
-    require('dotenv-expand')(
-      require('dotenv').config({
-        path: envFile,
-      }),
-    );
-  } else {
-    console.log(`   ${index + 1}. Skipping: ${envFile} ❌`);
-  }
-});
-
-console.log('✅ Environment configuration loaded\n');
 
 // Export configuration object for the application
 module.exports = {
@@ -59,50 +37,7 @@ module.exports = {
   apiEndpoint: process.env.API_ENDPOINT || 'http://localhost:8080',
 
   // ReCAPTCHA secret key for verifying ReCAPTCHA responses
-  recaptchaSecretKey: process.env.RECAPTCHA_SECRET_KEY,
-
-  // Environment information
-  environment: {
-    ENV,
-    isDev,
-    isRelease,
-    nodeEnv: ENV,
-  },
-
-  // Server type configuration
-  serverType: process.env.SERVER_TYPE || 'NORMAL',
-  isRaceServer: process.env.SERVER_TYPE === 'RACE',
-  enableCycleRestart:process.env.ENABLE_CYCLE_RESTART === 'true' || process.env.SERVER_TYPE === 'RACE',
-
-  // Blockchain configuration
-  blockchain: {
-    enabled: process.env.BLOCKCHAIN_ENABLED === 'true',
-    rpcUrl: process.env.BLOCKCHAIN_RPC_URL, // 可选，会使用内置RPC池
-    contracts: {
-      // GameAggregator 合约用于游戏操作
-      gameAggregator: isDev
-        ? (process.env.GAME_AGGREGATOR_CONTRACT_TESTNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x99616B1f031aF994a4b2cc940683255cB76Dd596')
-        : (process.env.GAME_AGGREGATOR_CONTRACT_MAINNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x99616B1f031aF994a4b2cc940683255cB76Dd596'),
-      // SwordBattle 原合约用于基础数据查询
-      swordBattle: isDev
-        ? (process.env.SWORD_BATTLE_CONTRACT_TESTNET || process.env.SWORD_BATTLE_CONTRACT || '0x788aA9aAb214B3ac525c23bd257e93Ff0f10D9E0')
-        : (process.env.SWORD_BATTLE_CONTRACT_MAINNET || process.env.SWORD_BATTLE_CONTRACT || '0x788aA9aAb214B3ac525c23bd257e93Ff0f10D9E0'),
-      usd1Token: isDev
-        ? (process.env.USD1_TOKEN_CONTRACT_TESTNET || process.env.USD1_TOKEN_CONTRACT || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16')
-        : (process.env.USD1_TOKEN_CONTRACT_MAINNET || process.env.USD1_TOKEN_CONTRACT),
-      rewardManager: isDev
-        ? (process.env.REWARD_MANAGER_CONTRACT_TESTNET || process.env.REWARD_MANAGER_CONTRACT)
-        : (process.env.REWARD_MANAGER_CONTRACT_MAINNET || process.env.REWARD_MANAGER_CONTRACT),
-    },
-    trustedSigner: process.env.TRUSTED_SIGNER_PRIVATE_KEY,
-    gameLevel: parseInt(process.env.GAME_LEVEL || '0'), // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH
-    environment: {
-      isDev,
-      isRelease,
-      chainId: isDev ? 97 : 56, // BSC测试网:97, BSC主网:56
-      networkName: isDev ? 'BSC Testnet' : 'BSC Mainnet',
-    },
-  },
+  recaptchaSecretKey: process.env.RECAPTCHA_SECRET_KEY || '',
 
   // Game configuration settings
   tickRate: 20,
@@ -144,4 +79,51 @@ module.exports = {
     worldHeight: 30000,
     worldWidth: 30000,
   },
+
+  /**************************************
+   * Web3
+   **************************************/
+  // Blockchain configuration
+  blockchain: {
+    enabled: process.env.BLOCKCHAIN_ENABLED === 'true',
+    rpcUrl: process.env.BLOCKCHAIN_RPC_URL, // 可选，会使用内置RPC池
+    contracts: {
+      // GameAggregator 合约用于游戏操作
+      gameAggregator: isDev
+        ? (process.env.GAME_AGGREGATOR_CONTRACT_TESTNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x99616B1f031aF994a4b2cc940683255cB76Dd596')
+        : (process.env.GAME_AGGREGATOR_CONTRACT_MAINNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x99616B1f031aF994a4b2cc940683255cB76Dd596'),
+      // SwordBattle 原合约用于基础数据查询
+      swordBattle: isDev
+        ? (process.env.SWORD_BATTLE_CONTRACT_TESTNET || process.env.SWORD_BATTLE_CONTRACT || '0x788aA9aAb214B3ac525c23bd257e93Ff0f10D9E0')
+        : (process.env.SWORD_BATTLE_CONTRACT_MAINNET || process.env.SWORD_BATTLE_CONTRACT || '0x788aA9aAb214B3ac525c23bd257e93Ff0f10D9E0'),
+      usd1Token: isDev
+        ? (process.env.USD1_TOKEN_CONTRACT_TESTNET || process.env.USD1_TOKEN_CONTRACT || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16')
+        : (process.env.USD1_TOKEN_CONTRACT_MAINNET || process.env.USD1_TOKEN_CONTRACT),
+      rewardManager: isDev
+        ? (process.env.REWARD_MANAGER_CONTRACT_TESTNET || process.env.REWARD_MANAGER_CONTRACT)
+        : (process.env.REWARD_MANAGER_CONTRACT_MAINNET || process.env.REWARD_MANAGER_CONTRACT),
+    },
+    trustedSigner: process.env.TRUSTED_SIGNER_PRIVATE_KEY,
+    gameLevel: parseInt(process.env.GAME_LEVEL || '0'), // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH
+    environment: {
+      isDev,
+      isRelease,
+      chainId: isDev ? 97 : 56, // BSC测试网:97, BSC主网:56
+      networkName: isDev ? 'BSC Testnet' : 'BSC Mainnet',
+    },
+  },
+
+  // Environment information
+  environment: {
+    ENV,
+    isDev,
+    isRelease,
+    nodeEnv: ENV,
+  },
+
+  // Server type configuration
+  serverType: process.env.SERVER_TYPE || 'NORMAL',
+  isRaceServer: process.env.SERVER_TYPE === 'RACE',
+  enableCycleRestart: process.env.ENABLE_CYCLE_RESTART === 'true' || process.env.SERVER_TYPE === 'RACE',
+
 };

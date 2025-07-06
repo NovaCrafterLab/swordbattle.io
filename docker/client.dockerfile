@@ -37,15 +37,8 @@ COPY package.json yarn.lock .yarnrc.yml ./
 COPY --from=deps-dev /app/node_modules ./node_modules
 
 # ---------- build-time public args ----------
-ARG PUBLIC_URL
-ARG REACT_APP_API
-ARG REACT_APP_ENDPOINT_TEST
-ARG REACT_APP_ENDPOINT_RACE
-
-ENV PUBLIC_URL=${PUBLIC_URL} \
-    REACT_APP_API=${REACT_APP_API} \
-    REACT_APP_ENDPOINT_TEST=${REACT_APP_ENDPOINT_TEST} \
-    REACT_APP_ENDPOINT_RACE=${REACT_APP_ENDPOINT_RACE}
+ARG BUILD_ENV=development
+ENV BUILD_ENV=${BUILD_ENV}
 
 # add: workspace manifest (FIX)
 COPY client/package.json  ./client/package.json
@@ -54,7 +47,10 @@ COPY client/tsconfig.json ./client/tsconfig.json
 # relatively static configs
 COPY client/config   ./client/config
 COPY client/scripts  ./client/scripts
-COPY client/.env*    ./client/
+
+# env
+COPY env/client.env.${BUILD_ENV} ./client/.env.production.local
+
 # frequently changing source & assets
 COPY client/public   ./client/public
 COPY client/src      ./client/src

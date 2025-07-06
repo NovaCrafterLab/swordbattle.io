@@ -1,6 +1,5 @@
 # ./docker-compose.dev.yml
 services:
-  # 覆盖 env_file → 指向 development
   db:
     env_file:
       - ./env/api.env.development
@@ -10,23 +9,39 @@ services:
   api:
     env_file:
       - ./env/api.env.development
+    build:
+      args:
+        NODE_ENV: "development"
     environment:
-      FAST_REFRESH: 'true'
+      NODE_ENV: "development"
+      FAST_REFRESH: "true"
 
   server:
     env_file:
       - ./env/server.env.development
+    build:
+      args:
+        NODE_ENV: "development"
     environment:
-      DEBUG: 'true'
+      NODE_ENV: "development"
+      DEBUG: "true"
 
   server-race:
     env_file:
       - ./env/development.server.race.env
+    build:
+      args:
+        NODE_ENV: "development"
     environment:
-      DEBUG: 'true'
+      NODE_ENV: "development"
+      DEBUG: "true"
 
   client:
     env_file:
       - ./env/client.env.development
+    build:
+      args:
+        BUILD_ENV: ${NODE_ENV:-development}
     environment:
-      REACT_APP_ENDPOINT_DEV: 'http://localhost:8000'
+      NODE_ENV: "development"
+      DEBUG: "true"
