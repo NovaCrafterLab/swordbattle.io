@@ -100,6 +100,25 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
     }
   }, [retryTrigger, address, isConnected]);
 
+  // 监听交易确认状态，自动刷新数据
+  useEffect(() => {
+    if (blockchain.isConfirmed && (claimingGameId || claimingAll)) {
+      // 交易确认后，刷新玩家数据
+      console.log('🎉 交易确认，刷新奖励数据...');
+      setClaimingGameId(null);
+      setClaimingAll(false);
+      
+      // 立即刷新数据，然后再次延迟刷新确保状态同步
+      playerData.refreshPlayerData();
+      
+      // 延迟2秒后再次刷新，确保区块链状态完全更新
+      setTimeout(() => {
+        playerData.refreshPlayerData();
+        console.log('🔄 二次刷新奖励数据完成');
+      }, 2000);
+    }
+  }, [blockchain.isConfirmed, claimingGameId, claimingAll]);
+
   /**
    * 领取单个游戏奖励 (所有类型)
    */

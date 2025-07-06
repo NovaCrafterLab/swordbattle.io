@@ -265,34 +265,118 @@ export class BlockchainService implements OnModuleInit {
       const result = await this.publicClient.readContract({
         address: this.config.contracts.gameAggregator as `0x${string}`,
         abi: GAME_AGGREGATOR_ABI,
-        functionName: 'getPlayerRewards',
+        functionName: 'getPlayerCompleteRewards',
         args: [BigInt(gameId), playerAddress as `0x${string}`],
       });
 
-      // getPlayerRewards返回: [killReward, lotteryReward, guaranteedReward, fragmentReward, claimableTime, canClaim]
-      const killReward = result[0] as bigint;
-      const lotteryReward = result[1] as bigint;
-      const guaranteedReward = result[2] as bigint;
-      const fragmentReward = result[3] as bigint;
-      const claimableTime = result[4] as bigint;
-      const canClaim = result[5] as boolean;
+      // 检查返回结果是否有效 - 支持对象和数组两种格式
+      if (!result) {
+        this.logger.warn(`Invalid result from getPlayerCompleteRewards for game ${gameId}, player ${playerAddress}: result is null/undefined`);
+        // 返回默认值而不是抛出错误
+        return {
+          killReward: '0',
+          lotteryReward: '0',
+          guaranteedReward: '0',
+          fragmentReward: '0',
+          totalReward: '0',
+          claimableTime: 0,
+          canClaim: false,
+          claimed: false,
+          usdAmount: '0',
+          nclabAmount: '0',
+          usdClaimable: false,
+          nclabClaimable: false,
+          usdClaimed: false,
+          nclabClaimed: false,
+        };
+      }
 
-      // 计算总USD1奖励（不包括碎片奖励）
-      const totalReward = killReward + lotteryReward + guaranteedReward;
+      let usdAmount: bigint, nclabAmount: bigint, fragmentBonus: bigint;
+      let usdClaimable: boolean, nclabClaimable: boolean, nclabClaimableTime: bigint;
+      let usdClaimed: boolean, nclabClaimed: boolean;
+
+      // 处理对象格式的返回值（新格式）
+      if (typeof result === 'object' && !Array.isArray(result)) {
+        usdAmount = result.usdRewards ? BigInt(result.usdRewards) : BigInt(0);
+        nclabAmount = result.nclabRewards ? BigInt(result.nclabRewards) : BigInt(0);
+        fragmentBonus = result.fragmentBalance ? BigInt(result.fragmentBalance) : BigInt(0);
+        usdClaimable = Boolean(result.usdClaimable);
+        nclabClaimable = Boolean(result.nclabClaimable);
+        nclabClaimableTime = result.nclabClaimableTime ? BigInt(result.nclabClaimableTime) : BigInt(0);
+        usdClaimed = Boolean(result.usdClaimed);
+        nclabClaimed = Boolean(result.nclabClaimed);
+      }
+      // 处理数组格式的返回值（旧格式）
+      else if (Array.isArray(result) && result.length >= 8) {
+        usdAmount = result[0] ? BigInt(result[0]) : BigInt(0);
+        nclabAmount = result[1] ? BigInt(result[1]) : BigInt(0);
+        fragmentBonus = result[2] ? BigInt(result[2]) : BigInt(0);
+        usdClaimable = Boolean(result[3]);
+        nclabClaimable = Boolean(result[4]);
+        nclabClaimableTime = result[5] ? BigInt(result[5]) : BigInt(0);
+        usdClaimed = Boolean(result[6]);
+        nclabClaimed = Boolean(result[7]);
+      }
+      // 无效格式
+      else {
+        this.logger.warn(`Invalid result format from getPlayerCompleteRewards for game ${gameId}, player ${playerAddress}: expected object or array with 8+ elements`);
+        return {
+          killReward: '0',
+          lotteryReward: '0',
+          guaranteedReward: '0',
+          fragmentReward: '0',
+          totalReward: '0',
+          claimableTime: 0,
+          canClaim: false,
+          claimed: false,
+          usdAmount: '0',
+          nclabAmount: '0',
+          usdClaimable: false,
+          nclabClaimable: false,
+          usdClaimed: false,
+          nclabClaimed: false,
+        };
+      }
+
+      // 计算总USD1奖励
+      const totalReward = usdAmount;
 
       return {
-        killReward: formatEther(killReward),
-        lotteryReward: formatEther(lotteryReward),
-        guaranteedReward: formatEther(guaranteedReward),
-        fragmentReward: formatEther(fragmentReward),
+        killReward: formatEther(usdAmount), // 兼容旧接口
+        lotteryReward: formatEther(BigInt(0)), // 兼容旧接口
+        guaranteedReward: formatEther(BigInt(0)), // 兼容旧接口
+        fragmentReward: formatEther(fragmentBonus),
         totalReward: formatEther(totalReward),
-        claimableTime: Number(claimableTime),
-        canClaim,
-        claimed: !canClaim, // 如果不能领取，说明已经领取了
+        claimableTime: Number(nclabClaimableTime),
+        canClaim: usdClaimable,
+        claimed: usdClaimed, // 使用真实的已领取状态
+        // 新增字段
+        usdAmount: formatEther(usdAmount),
+        nclabAmount: formatEther(nclabAmount),
+        usdClaimable,
+        nclabClaimable,
+        usdClaimed,
+        nclabClaimed,
       };
     } catch (error) {
       this.logger.error(`Failed to get player rewards for ${playerAddress} in game ${gameId}:`, error);
-      throw error;
+      // 返回默认值而不是抛出错误，避免影响整个API响应
+      return {
+        killReward: '0',
+        lotteryReward: '0',
+        guaranteedReward: '0',
+        fragmentReward: '0',
+        totalReward: '0',
+        claimableTime: 0,
+        canClaim: false,
+        claimed: false,
+        usdAmount: '0',
+        nclabAmount: '0',
+        usdClaimable: false,
+        nclabClaimable: false,
+        usdClaimed: false,
+        nclabClaimed: false,
+      };
     }
   }
 
@@ -317,34 +401,55 @@ export class BlockchainService implements OnModuleInit {
     }
   }
 
-  // 获取玩家基本信息
+  // 获取玩家基本信息（仅返回奖励相关数据）
   async getPlayerInfo(gameId: number, playerAddress: string) {
     if (!this.isAvailable()) {
       throw new Error('Blockchain service not available');
     }
 
     try {
-      const result = await this.publicClient.readContract({
-        address: this.config.contracts.gameAggregator as `0x${string}`,
-        abi: GAME_AGGREGATOR_ABI,
-        functionName: 'getPlayerInfo',
-        args: [BigInt(gameId), playerAddress as `0x${string}`],
-      });
-
-      // getPlayerInfo返回: [playerAddr, kills, score, submitted, fragmentReward]
-      if (Array.isArray(result)) {
-        return {
-          playerAddr: result[0],
-          kills: Number(result[1]),
-          score: Number(result[2]),
-          submitted: result[3],
-          fragmentReward: result[4],
-        };
-      }
-      return null;
+      // 新合约没有getPlayerInfo函数，从奖励数据推断基本信息
+      const rewardData = await this.getPlayerRewards(gameId, playerAddress);
+      
+      return {
+        playerAddr: playerAddress,
+        kills: 0, // 从奖励数据无法获取击杀数
+        score: 0, // 从奖励数据无法获取分数
+        submitted: rewardData.usdAmount !== '0' || rewardData.nclabAmount !== '0', // 有奖励说明已提交
+        fragmentReward: rewardData.fragmentReward,
+        // 添加奖励相关字段作为补充
+        reward: rewardData.totalReward,
+        claimed: rewardData.claimed,
+        // 添加新的字段以支持前端
+        usdAmount: rewardData.usdAmount,
+        nclabAmount: rewardData.nclabAmount,
+        usdClaimable: rewardData.usdClaimable,
+        nclabClaimable: rewardData.nclabClaimable,
+        usdClaimed: rewardData.usdClaimed,
+        nclabClaimed: rewardData.nclabClaimed,
+        totalReward: rewardData.totalReward,
+        claimableTime: rewardData.claimableTime,
+      };
     } catch (error) {
       this.logger.error(`Failed to get player info for ${playerAddress} in game ${gameId}:`, error);
-      throw error;
+      // 返回默认值而不是抛出错误
+      return {
+        playerAddr: playerAddress,
+        kills: 0,
+        score: 0,
+        submitted: false,
+        fragmentReward: '0',
+        reward: '0',
+        claimed: false,
+        usdAmount: '0',
+        nclabAmount: '0',
+        usdClaimable: false,
+        nclabClaimable: false,
+        usdClaimed: false,
+        nclabClaimed: false,
+        totalReward: '0',
+        claimableTime: 0,
+      };
     }
   }
 
@@ -379,7 +484,7 @@ export class BlockchainService implements OnModuleInit {
       const counter = await this.publicClient.readContract({
         address: this.config.contracts.gameAggregator as `0x${string}`,
         abi: GAME_AGGREGATOR_ABI,
-        functionName: 'gameCounter',
+        functionName: 'getCurrentGameId',
       });
 
       return Number(counter);

@@ -315,7 +315,17 @@ export const usePlayerData = () => {
   const getGameRewardFromBlockchain = useCallback(
     async (
       gameId: number
-    ): Promise<{ reward: bigint; hasClaimed: boolean }> => {
+    ): Promise<{ 
+      reward: bigint; 
+      hasClaimed: boolean;
+      usdReward?: bigint;
+      nclabReward?: bigint;
+      usdClaimed?: boolean;
+      nclabClaimed?: boolean;
+      usdClaimable?: boolean;
+      nclabClaimable?: boolean;
+      nclabClaimableTime?: number;
+    }> => {
       if (!address) return { reward: BigInt(0), hasClaimed: false }
 
       try {
@@ -334,12 +344,29 @@ export const usePlayerData = () => {
 
         // 解析API返回的数据
         const playerInfo = result.data
-        const rewardAmount = BigInt(
-          Math.floor(parseFloat(playerInfo.reward) * 1e18)
-        )
-        const claimStatus = Boolean(playerInfo.claimed)
+        
+        // 使用新的API字段
+        const usdAmount = BigInt(Math.floor(parseFloat(playerInfo.usdAmount || playerInfo.totalReward || '0') * 1e18))
+        const nclabAmount = BigInt(Math.floor(parseFloat(playerInfo.nclabAmount || '0') * 1e18))
+        const totalReward = usdAmount + nclabAmount
+        
+        // 获取准确的领取状态
+        const usdClaimed = Boolean(playerInfo.usdClaimed)
+        const nclabClaimed = Boolean(playerInfo.nclabClaimed)
+        const hasClaimed = usdClaimed || nclabClaimed || Boolean(playerInfo.claimed)
 
-        return { reward: rewardAmount, hasClaimed: claimStatus }
+        return { 
+          reward: totalReward, 
+          hasClaimed,
+          // 扩展返回信息以支持分离的USD/NCLab状态
+          usdReward: usdAmount,
+          nclabReward: nclabAmount,
+          usdClaimed,
+          nclabClaimed,
+          usdClaimable: Boolean(playerInfo.usdClaimable),
+          nclabClaimable: Boolean(playerInfo.nclabClaimable),
+          nclabClaimableTime: Number(playerInfo.claimableTime || 0)
+        }
       } catch (err) {
         console.error(`Failed to get reward info for game ${gameId}:`, err)
         return { reward: BigInt(0), hasClaimed: false }
@@ -458,6 +485,14 @@ export const usePlayerData = () => {
           ...game,
           reward: finalReward,
           hasClaimed: finalHasClaimed,
+          // 添加新的奖励状态字段
+          usdReward: rewardInfo.usdReward || BigInt(0),
+          nclabReward: rewardInfo.nclabReward || BigInt(0),
+          usdClaimed: rewardInfo.usdClaimed || false,
+          nclabClaimed: rewardInfo.nclabClaimed || false,
+          usdClaimable: rewardInfo.usdClaimable || false,
+          nclabClaimable: rewardInfo.nclabClaimable || false,
+          nclabClaimableTime: rewardInfo.nclabClaimableTime || 0,
           isWinner: finalReward > BigInt(0) || game.isWinner,
         }
       })
