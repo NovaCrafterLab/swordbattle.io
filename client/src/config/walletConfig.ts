@@ -7,7 +7,7 @@ import { ERC20_ABI } from '../abis/ERC20';
 import { config } from '../config';
 
 // 环境变量检查
-const ENV = process.env.BUILD_ENV ?? 'development';
+const ENV = process.env.REACT_APP_BUILD_ENV ?? 'development';
 export const isDev = config.isDev;
 export const isRelease = ENV === 'release';
 console.log('Environment:', ENV);
@@ -16,17 +16,13 @@ console.log('Environment:', ENV);
 export const CONTRACTS = isDev
   ? {
     // BSC测试网合约地址 - 使用新的GameAggregator地址
-    GAME_AGGREGATOR: process.env.REACT_APP_GAME_AGGREGATOR_CONTRACT_TESTNET || '0xd442E28E906aF252D6ecf6207bD8AE9CC4337bce',
-    SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_TESTNET || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD',
+    GAME_AGGREGATOR: process.env.REACT_APP_GAME_AGGREGATOR_CONTRACT_TESTNET || '0x6810494B605ac1A6259788Db999202f5578dA4E1',
     USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_TESTNET || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16',
-    REWARD_MANAGER: process.env.REACT_APP_REWARD_MANAGER_CONTRACT_TESTNET || '0x8732A5ceE8372DFa95Db266086A7FF297245b05c',
   }
   : {
     // BSC主网合约地址 - 使用新的GameAggregator地址
-    GAME_AGGREGATOR: process.env.REACT_APP_GAME_AGGREGATOR_CONTRACT_MAINNET || '0xd442E28E906aF252D6ecf6207bD8AE9CC4337bce',
-    SWORD_BATTLE: process.env.REACT_APP_SWORD_BATTLE_CONTRACT_MAINNET || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD',
+    GAME_AGGREGATOR: process.env.REACT_APP_GAME_AGGREGATOR_CONTRACT_MAINNET || '0x6810494B605ac1A6259788Db999202f5578dA4E1',
     USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_MAINNET || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16',
-    REWARD_MANAGER: process.env.REACT_APP_REWARD_MANAGER_CONTRACT_MAINNET || '0x8732A5ceE8372DFa95Db266086A7FF297245b05c',
   } as const;
 
 // ABI导出 - GameAggregator和ERC20

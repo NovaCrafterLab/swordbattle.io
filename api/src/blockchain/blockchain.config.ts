@@ -28,8 +28,8 @@ export const defaultBlockchainConfig: BlockchainConfig = {
   contracts: {
     // API 现在使用新的 GameAggregator 合约进行所有查询
     gameAggregator: isDev 
-      ? (process.env.GAME_AGGREGATOR_CONTRACT_TESTNET || process.env.GAME_AGGREGATOR_CONTRACT || '0xd442E28E906aF252D6ecf6207bD8AE9CC4337bce')
-      : (process.env.GAME_AGGREGATOR_CONTRACT_MAINNET || process.env.GAME_AGGREGATOR_CONTRACT || '0xd442E28E906aF252D6ecf6207bD8AE9CC4337bce'),
+      ? (process.env.GAME_AGGREGATOR_CONTRACT_TESTNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x6810494B605ac1A6259788Db999202f5578dA4E1')
+      : (process.env.GAME_AGGREGATOR_CONTRACT_MAINNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x6810494B605ac1A6259788Db999202f5578dA4E1'),
     // 保留 SwordBattle 合约地址用于某些旧功能
     swordBattle: isDev 
       ? (process.env.SWORD_BATTLE_CONTRACT_TESTNET || process.env.SWORD_BATTLE_CONTRACT || '0x2201a02600d55758F14bbC100c35580785BAD622')
