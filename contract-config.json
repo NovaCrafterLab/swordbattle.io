@@ -1,10 +1,10 @@
 {
   "version": "1.0.0",
-  "lastUpdated": "2025-01-05T14:10:00Z",
+  "lastUpdated": "2025-07-06T07:01:52.627Z",
   "note": "Centralized contract address configuration for all services",
   "contracts": {
     "gameAggregator": {
-      "testnet": "0x0E1124B236e454EA325c33aBBb561D38b255Da6c",
+      "testnet": "0x6810494B605ac1A6259788Db999202f5578dA4E1",
       "mainnet": "0x0E1124B236e454EA325c33aBBb561D38b255Da6c",
       "description": "Main GameAggregator contract - handles game creation, player registration, and rewards"
     },
@@ -73,7 +73,7 @@
   "environments": {
     "development": "testnet",
     "test": "testnet",
-    "staging": "testnet", 
+    "staging": "testnet",
     "production": "mainnet"
   }
 }
