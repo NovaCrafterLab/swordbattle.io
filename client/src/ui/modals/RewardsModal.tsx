@@ -302,12 +302,6 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
               <span className="stat-value claimable">{formatEther(claimableAmount)} USD1</span>
             </div>
             <div className="stat-item">
-              <label>Fragment Balance</label>
-              <span className="stat-value" style={{ color: '#9333ea' }}>
-                {playerDashboard?.fragmentBalance ? formatEther(BigInt(playerDashboard.fragmentBalance)) : '0'} ⚡
-              </span>
-            </div>
-            <div className="stat-item">
               <label>Games Played</label>
               <span className="stat-value">{totalGames}</span>
             </div>
