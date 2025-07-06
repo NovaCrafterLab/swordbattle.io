@@ -63,7 +63,7 @@ class Game {
     if (this.pendingMassKill) {
       for (const player of this.players) {
         if (!player.removed && !player.isBot) {
-          player.remove('Race Finished', Types.DisconnectReason.Server);
+          player.remove('Game Ended - Server Restarting', Types.DisconnectReason.Server);
         }
       }
       this.pendingMassKill = false;
@@ -1051,49 +1051,17 @@ class Game {
   }
 
   /**
-   * 向所有客户端广播游戏结束消息
+   * 向所有客户端广播游戏结束消息并踢出玩家
    */
   broadcastGameEnd(reason, scores) {
-    // 检查服务器引用是否存在
-    if (!this.server?.clients) {
-      console.warn('Server reference not available for broadcasting game end');
-      return;
-    }
-
-    // 构建游戏结束数据
-    const gameEndData = {
-      reason,
-      gameId: this.blockchainGameId,
-      endTime: this.gameEndTime,
-      duration: this.gameEndTime - this.gameStartTime,
-      // 可以添加排行榜、获胜者等信息
-    };
-
-    let notifiedCount = 0;
-    let errorCount = 0;
-
-    // 向所有连接的客户端发送游戏结束消息
-    for (const client of this.server.clients.values()) {
-      try {
-        // 移除所有玩家，触发死亡界面
-        if (client.player && !client.player.removed) {
-          client.player.remove('Game Ended', Types.DisconnectReason.Server);
-        }
-        // 设置为观战模式
-        client.spectator.isSpectating = true;
-        client.fullSync = true;
-        
-        // 这里可以根据你的网络协议发送游戏结束消息
-        // 例如：client.send(Protocol.GAME_END, gameEndData);
-        
-        notifiedCount++;
-      } catch (err) {
-        console.warn(`Failed to notify client of game end: ${err.message}`);
-        errorCount++;
-      }
-    }
+    console.log(`📢 Game ${this.blockchainGameId} ending (${reason}) - kicking all players to main menu`);
     
-    console.log(`📢 Game ${this.blockchainGameId} ended (${reason}) - notified ${notifiedCount} clients, ${errorCount} errors`);
+    // 使用pendingMassKill机制，在下一次tick时踢出所有玩家
+    // 这与周期重启使用相同的机制，确保玩家被正确踢出并回到主界面
+    this.pendingMassKill = true;
+    
+    const playerCount = this.players.size;
+    console.log(`🔄 Scheduled ${playerCount} players to be kicked in next game tick`);
   }
 
   /**
