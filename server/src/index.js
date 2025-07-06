@@ -85,29 +85,49 @@ async function bootstrap() {
   /* == Periodic restart hook == */
   if (config.enableCycleRestart) {
     initCycleRestart(async () => {
-      Logger.server.info('[CycleRestart] auto hot-restart');
+      Logger.server.info('[CycleRestart] Scheduled restart triggered - ending current game');
 
-      game.pendingMassKill = true;
+      // 使用统一的游戏结束流程
+      // 这将会：1) 踢出玩家 2) 等待区块链操作完成 3) 重启服务器开始新游戏
+      if (config.isRaceServer && config.blockchain.enabled && game.blockchainService) {
+        try {
+          await game.endBlockchainGame('cycle_restart');
+        } catch (error) {
+          Logger.server.error('Cycle restart failed to end blockchain game properly', {
+            error: error.message
+          });
+          
+          // 如果区块链游戏结束失败，降级到简单重启
+          Logger.server.warn('Falling back to simple restart without blockchain operations');
+          game.pendingMassKill = true;
+          await new Promise(r => setTimeout(r, 3000));
+          
+          game.clearGameTimeout();
+          Object.assign(game, { gamePhase: 'initializing', blockchainGameId: null });
+          game.registeredPlayers.clear();
+          game.finalScores.clear();
+          game.playerScoreSubmitted.clear();
 
-      await new Promise(r => setTimeout(r, 3000));
+          for (const client of server.clients.values()) {
+            client.player = null;
+            client.spectator.isSpectating = true;
+            client.fullSync = true;
+          }
 
-      game.clearGameTimeout();
-      Object.assign(game, { gamePhase: 'initializing', blockchainGameId: null });
-      game.registeredPlayers.clear();
-      game.finalScores.clear();
-      game.playerScoreSubmitted.clear();
-
-      for (const client of server.clients.values()) {
-        client.player = null;
-        client.spectator.isSpectating = true;
-        client.fullSync = true;
+          await game.initializeBlockchainGame();
+        }
+      } else {
+        // 非区块链模式的简单重启
+        Logger.server.info('Non-blockchain cycle restart');
+        game.pendingMassKill = true;
+        await new Promise(r => setTimeout(r, 3000));
+        
+        for (const client of server.clients.values()) {
+          client.player = null;
+          client.spectator.isSpectating = true;
+          client.fullSync = true;
+        }
       }
-
-      // for (const client of server.clients.values()) {
-      //   client.socket?.close();
-      // }
-
-      await game.initializeBlockchainGame();
     });
   }
 
