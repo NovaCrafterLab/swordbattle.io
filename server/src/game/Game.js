@@ -426,13 +426,16 @@ class Game {
   async verifyAndAddPlayer(client, data, name) {
     try {
       const walletAddress = data.walletAddress;
-      console.log(`🔍 Verifying player ${name} with wallet ${walletAddress}...`);
+      
+      // 在RACE模式下，使用钱包地址前部分作为玩家名
+      const racePlayerName = walletAddress.slice(0, 11); // 0x + 前9个字符 = 11个字符总长度
+      console.log(`🔍 Verifying player ${racePlayerName} with wallet ${walletAddress}...`);
 
       // 验证玩家是否已在链上注册
       const isRegistered = await this.verifyPlayerRegistration(walletAddress);
 
       if (!isRegistered) {
-        console.log(`❌ Player ${name} rejected: Not registered for current game`);
+        console.log(`❌ Player ${racePlayerName} rejected: Not registered for current game`);
         // 发送错误消息给客户端
         client.socket.send(JSON.stringify({
           type: 'error',
@@ -445,22 +448,24 @@ class Game {
       // 检查玩家是否已经在游戏中
       for (const player of this.players) {
         if (player.client?.walletAddress?.toLowerCase() === walletAddress.toLowerCase()) {
-          console.log(`❌ Player ${name} rejected: Already in game with this wallet`);
+          console.log(`❌ Player ${racePlayerName} rejected: Already in game with this wallet`);
           client.socket.close();
           return;
         }
       }
 
-      // 验证通过，创建玩家
-      console.log(`✅ Player ${name} verified and joining game`);
-      const player = this.createAndAddPlayer(client, data, name);
+      // 验证通过，创建玩家 - 使用钱包地址作为名字
+      console.log(`✅ Player ${racePlayerName} verified and joining game`);
+      const player = this.createAndAddPlayer(client, data, racePlayerName);
 
       // 保存钱包地址到客户端
       client.walletAddress = walletAddress;
 
       return player;
     } catch (error) {
-      console.error(`❌ Error verifying player ${name}:`, error);
+      const walletAddress = data.walletAddress;
+      const racePlayerName = walletAddress ? walletAddress.slice(0, 11) : 'Unknown';
+      console.error(`❌ Error verifying player ${racePlayerName}:`, error);
       client.socket.send(JSON.stringify({
         type: 'error',
         message: 'Failed to verify blockchain registration. Please try again.',
