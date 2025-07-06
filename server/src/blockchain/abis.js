@@ -5,7 +5,7 @@ const path = require('path');
 // 加载GameAggregator ABI
 function loadGameAggregatorABI() {
   try {
-    const abiPath = path.join(__dirname, '../../../abis/GameAggregator.json');
+    const abiPath = path.join(__dirname, './../../abis/GameAggregator.json');
     const abiData = fs.readFileSync(abiPath, 'utf8');
     const parsedData = JSON.parse(abiData);
     return parsedData.abi || parsedData;
