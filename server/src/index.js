@@ -56,6 +56,9 @@ app.listen('0.0.0.0', config.port, async (tok) => {
 
 // == Core Bootstrap Logic ==
 async function bootstrap() {
+  // Validate critical configuration
+  validateServerConfiguration();
+  
   await initializeBlockchainService();     // sets global.blockchainService
 
   const game = new Game();
@@ -516,5 +519,49 @@ async function initializeBlockchainService() {
   } catch (err) {
     Logger.server.error('Blockchain init failed', { error: err.message });
     return null;
+  }
+}
+
+// == Configuration Validation ==
+function validateServerConfiguration() {
+  const issues = [];
+  
+  // Check critical environment variables
+  if (!config.serverSecret || config.serverSecret === 'server-secret') {
+    issues.push('SERVER_SECRET not properly configured (using default value)');
+  }
+  
+  if (!config.apiEndpoint) {
+    issues.push('API_ENDPOINT not configured');
+  }
+  
+  if (config.isRaceServer && config.blockchain.enabled) {
+    if (!config.blockchain.trustedSigner) {
+      issues.push('BLOCKCHAIN_TRUSTED_SIGNER not configured for race server');
+    }
+    if (!config.blockchain.contracts?.gameAggregator) {
+      issues.push('GAME_AGGREGATOR_CONTRACT not configured for race server');
+    }
+  }
+  
+  // Log configuration status
+  console.log('🔧 Server Configuration Check:');
+  console.log(`   SERVER_SECRET: ${config.serverSecret ? 'SET' : 'NOT_SET'}`);
+  console.log(`   API_ENDPOINT: ${config.apiEndpoint || 'NOT_SET'}`);
+  console.log(`   RACE_SERVER: ${config.isRaceServer ? 'YES' : 'NO'}`);
+  console.log(`   BLOCKCHAIN_ENABLED: ${config.blockchain?.enabled ? 'YES' : 'NO'}`);
+  
+  if (issues.length > 0) {
+    console.warn('⚠️ Configuration Issues Found:');
+    issues.forEach(issue => console.warn(`   - ${issue}`));
+    
+    if (config.isRaceServer && config.blockchain.enabled) {
+      console.error('❌ Critical configuration issues detected for race server');
+      console.error('   Please fix these issues before starting the server');
+    } else {
+      console.warn('⚠️ Some configuration issues detected but server can continue');
+    }
+  } else {
+    console.log('✅ Configuration validation passed');
   }
 }

@@ -1117,7 +1117,7 @@ class Game {
   }
 
   /**
-   * 提交玩家分数到合约
+   * 提交玩家分数到合约（并发执行）
    */
   async submitPlayerScores(scores) {
     if (!scores || scores.size === 0) {
@@ -1125,103 +1125,129 @@ class Game {
       return;
     }
 
-    console.log('📤 Submitting player scores to contract...');
-
-    let totalPlayers = 0;
-    let playersWithWallet = 0;
-    let successfulSubmissions = 0;
-    let failedSubmissions = 0;
-
-    // 收集成功的分数数据用于批量保存到数据库
-    const gameDataForDatabase = [];
-
+    const startTime = Date.now();
+    console.log(`📤 Starting concurrent score submission for game ${this.blockchainGameId} - ${scores.size} players total`);
+    
+    // 首先显示所有玩家的分数概览
+    console.log('📊 Player scores overview:');
     for (const [playerId, scoreData] of scores) {
-      totalPlayers++;
+      console.log(`   ${scoreData.playerName} (${scoreData.walletAddress || 'NO_WALLET'}): ${scoreData.finalScore} pts, ${scoreData.kills} kills`);
+    }
 
+    // 过滤出有钱包地址的玩家
+    const playersWithWallet = Array.from(scores.entries()).filter(([playerId, scoreData]) => {
       if (!scoreData.walletAddress) {
         console.log(`⚠️ Skipping player ${scoreData.playerName} - no wallet address`);
-        continue;
+        return false;
       }
+      return true;
+    });
 
-      playersWithWallet++;
-      // Processing score submission
+    if (playersWithWallet.length === 0) {
+      console.log('⚠️ No players with wallet addresses to submit scores');
+      return;
+    }
 
-      try {
-        // 获取玩家nonce
-        const nonce = await this.blockchainService.getPlayerNonce(scoreData.walletAddress);
+    console.log(`🚀 Starting concurrent submission for ${playersWithWallet.length} players with wallets...`);
 
-        // 通过API服务器获取签名
-        const signature = await this.getScoreSignature(
-          this.blockchainGameId,
-          scoreData.walletAddress,
-          scoreData.kills,
-          scoreData.finalScore,
-          nonce
-        );
+    // 创建并发提交Promise数组
+    const submissionPromises = playersWithWallet.map(([playerId, scoreData]) => 
+      this.submitSinglePlayerScore(playerId, scoreData)
+    );
 
-        // 提交分数到区块链
+    // 使用Promise.allSettled等待所有提交完成
+    const results = await Promise.allSettled(submissionPromises);
 
-        const txHash = await this.blockchainService.submitScore(
-          this.blockchainGameId,
-          scoreData.walletAddress,
-          scoreData.kills,
-          scoreData.finalScore,
-          nonce,
-          signature
-        );
+    // 分析结果
+    const successful = [];
+    const failed = [];
+    const gameDataForDatabase = [];
 
-        console.log(`✅ Score submitted: ${scoreData.playerName} - ${scoreData.finalScore} pts, ${scoreData.kills} kills`);
+    results.forEach((result, index) => {
+      const [playerId, scoreData] = playersWithWallet[index];
+      
+      if (result.status === 'fulfilled') {
+        successful.push({ playerId, scoreData, result: result.value });
         this.playerScoreSubmitted.add(playerId);
-        successfulSubmissions++;
-
-        // 异步查询奖励信息
-        setTimeout(async () => {
-          try {
-            console.log(`🎁 查询玩家 ${scoreData.playerName} 的奖励...`);
-            await this.blockchainService.checkPlayerRewards(this.blockchainGameId, scoreData.walletAddress);
-          } catch (rewardError) {
-            console.warn(`⚠️ 查询奖励失败:`, rewardError.message);
-          }
-        }, 5000);
-
-        // 准备数据库保存数据（暂时假设奖励为0，排名为0，后续可以改进）
+        
+        // 准备数据库保存数据
         gameDataForDatabase.push({
           gameId: Number(this.blockchainGameId),
           playerAddress: scoreData.walletAddress,
           score: scoreData.finalScore,
-          kills: scoreData.kills, // 添加击杀数据
+          kills: scoreData.kills,
           rewardAmount: '0', // 临时值，后续可以从区块链查询实际奖励
-          usdRewardAmount: '0', // USD奖励金额
-          nclabRewardAmount: '0', // NCLab奖励金额
+          usdRewardAmount: '0',
+          nclabRewardAmount: '0',
           hasClaimed: false,
-          usdClaimed: false, // USD奖励是否已领取
-          nclabClaimed: false, // NCLab奖励是否已领取
-          usdClaimable: false, // USD奖励是否可领取
-          nclabClaimable: false, // NCLab奖励是否可领取
-          nclabClaimableTime: 0, // NCLab奖励可领取时间
-          rank: 0, // 临时值，后续可以计算实际排名
-          isWinner: false, // 临时值，后续可以根据排名确定
+          usdClaimed: false,
+          nclabClaimed: false,
+          usdClaimable: false,
+          nclabClaimable: false,
+          nclabClaimableTime: 0,
+          rank: 0,
+          isWinner: false,
           gameEnded: true,
           gameEndedAt: new Date(),
         });
-
-      } catch (error) {
-        console.error(`❌ Failed to submit score for ${scoreData.playerName}:`, error);
-        console.error(`❌ Error details: ${error.message}`);
-        failedSubmissions++;
+      } else {
+        failed.push({
+          playerId,
+          scoreData,
+          error: result.reason
+        });
       }
+    });
+
+    const endTime = Date.now();
+    const totalTime = (endTime - startTime) / 1000;
+
+    // 显示并发执行结果
+    console.log(`📊 Concurrent score submission completed in ${totalTime.toFixed(2)}s:`);
+    console.log(`   Total players: ${scores.size}`);
+    console.log(`   Players with wallet: ${playersWithWallet.length}`);
+    console.log(`   Successful submissions: ${successful.length}`);
+    console.log(`   Failed submissions: ${failed.length}`);
+    
+    if (successful.length > 0) {
+      console.log(`✅ Successfully submitted scores:`);
+      successful.forEach((success, index) => {
+        console.log(`   ${index + 1}. ${success.scoreData.playerName}: ${success.scoreData.finalScore} pts, ${success.scoreData.kills} kills`);
+      });
+    }
+    
+    if (failed.length > 0) {
+      console.log(`❌ Failed submissions:`);
+      failed.forEach((failure, index) => {
+        console.log(`   ${index + 1}. ${failure.scoreData.playerName} (${failure.scoreData.walletAddress})`);
+        console.log(`      Score: ${failure.scoreData.finalScore}, Kills: ${failure.scoreData.kills}`);
+        console.log(`      Error: ${failure.error.message}`);
+        
+        // 检查特定错误类型
+        if (failure.error.message.includes('403')) {
+          console.log(`      💡 Likely API authentication issue`);
+        } else if (failure.error.message.includes('nonce')) {
+          console.log(`      💡 Likely blockchain nonce issue`);
+        } else if (failure.error.message.includes('gas')) {
+          console.log(`      💡 Likely gas estimation issue`);
+        } else if (failure.error.message.includes('timeout')) {
+          console.log(`      💡 Request timeout - try increasing timeout limit`);
+        }
+      });
     }
 
-    console.log(`📊 Score submission summary:`);
-    console.log(`   Total players: ${totalPlayers}`);
-    console.log(`   Players with wallet: ${playersWithWallet}`);
-    console.log(`   Successful submissions: ${successfulSubmissions}`);
-    console.log(`   Failed submissions: ${failedSubmissions}`);
+    // 异步查询成功提交玩家的奖励信息
+    if (successful.length > 0) {
+      console.log(`🎁 Scheduling reward queries for ${successful.length} successful submissions...`);
+      setTimeout(() => {
+        this.queryPlayerRewardsAsync(successful);
+      }, 5000);
+    }
 
-    // 保存成功的游戏数据到数据库
+    // 保存成功的游戏数据到数据库（不影响区块链操作）
     if (gameDataForDatabase.length > 0) {
       try {
-        console.log(`💾 Saving ${gameDataForDatabase.length} game records to database...`);
+        console.log(`💾 Attempting to save ${gameDataForDatabase.length} game records to database...`);
         await this.saveGameDataToDatabase(gameDataForDatabase);
         console.log(`✅ Game data saved to database successfully`);
 
@@ -1229,9 +1255,23 @@ class Game {
         this.scheduleBlockchainRewardUpdate(gameDataForDatabase, this.blockchainGameId);
 
       } catch (dbError) {
-        console.error(`❌ Failed to save game data to database:`, dbError);
-        // 不抛出错误，让游戏继续结束
+        console.error(`❌ Database save failed but blockchain operations continue:`, dbError.message);
+        console.error(`   Error type: ${dbError.constructor.name}`);
+        
+        // 检查特定错误类型并提供建议
+        if (dbError.message.includes('403')) {
+          console.error(`   💡 Check SERVER_SECRET configuration: ${config.serverSecret ? 'SET' : 'NOT_SET'}`);
+          console.error(`   💡 Check API endpoint: ${config.apiEndpoint}`);
+        }
+        
+        // 尝试在本地记录未保存的数据供后续处理
+        console.log(`📝 Unsaved game data for manual recovery:`);
+        console.log(JSON.stringify(gameDataForDatabase, null, 2));
+        
+        // 不抛出错误，让区块链游戏结束流程继续
       }
+    } else {
+      console.log(`⚠️ No game data to save to database (${successfulSubmissions} successful blockchain submissions)`);
     }
   }
 
@@ -1266,6 +1306,89 @@ class Game {
     } catch (error) {
       console.error('❌ Error saving game data to database:', error);
       throw error;
+    }
+  }
+
+  /**
+   * 提交单个玩家分数（带超时控制）
+   */
+  async submitSinglePlayerScore(playerId, scoreData) {
+    const timeout = 60000; // 60秒超时
+    
+    return Promise.race([
+      this.performSingleScoreSubmission(playerId, scoreData),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error(`Submission timeout after ${timeout/1000}s`)), timeout)
+      )
+    ]);
+  }
+
+  /**
+   * 执行单个玩家的分数提交
+   */
+  async performSingleScoreSubmission(playerId, scoreData) {
+    try {
+      console.log(`🔄 [${scoreData.playerName}] Starting score submission...`);
+      
+      // 获取玩家nonce
+      console.log(`📋 [${scoreData.playerName}] Getting player nonce...`);
+      const nonce = await this.blockchainService.getPlayerNonce(scoreData.walletAddress);
+      console.log(`📋 [${scoreData.playerName}] Nonce: ${nonce}`);
+
+      // 通过API服务器获取签名
+      console.log(`✍️ [${scoreData.playerName}] Getting signature...`);
+      const signature = await this.getScoreSignature(
+        this.blockchainGameId,
+        scoreData.walletAddress,
+        scoreData.kills,
+        scoreData.finalScore,
+        nonce
+      );
+      console.log(`✍️ [${scoreData.playerName}] Signature obtained`);
+
+      // 提交分数到区块链
+      console.log(`📤 [${scoreData.playerName}] Submitting to blockchain...`);
+      const txHash = await this.blockchainService.submitScore(
+        this.blockchainGameId,
+        scoreData.walletAddress,
+        scoreData.kills,
+        scoreData.finalScore,
+        nonce,
+        signature
+      );
+
+      console.log(`✅ [${scoreData.playerName}] Score submitted successfully - TX: ${txHash}`);
+      return { success: true, txHash, playerName: scoreData.playerName };
+      
+    } catch (error) {
+      console.error(`❌ [${scoreData.playerName}] Submission failed: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 异步查询玩家奖励信息
+   */
+  async queryPlayerRewardsAsync(successfulSubmissions) {
+    console.log(`🎁 Starting async reward queries for ${successfulSubmissions.length} players...`);
+    
+    const rewardPromises = successfulSubmissions.map(async (submission) => {
+      try {
+        await this.blockchainService.checkPlayerRewards(
+          this.blockchainGameId, 
+          submission.scoreData.walletAddress
+        );
+        console.log(`🎁 [${submission.scoreData.playerName}] Reward query completed`);
+      } catch (error) {
+        console.warn(`⚠️ [${submission.scoreData.playerName}] Reward query failed: ${error.message}`);
+      }
+    });
+
+    try {
+      await Promise.allSettled(rewardPromises);
+      console.log(`🎁 Async reward queries completed for all players`);
+    } catch (error) {
+      console.error(`❌ Error during async reward queries: ${error.message}`);
     }
   }
 
