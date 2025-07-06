@@ -49,8 +49,6 @@ export const getUSD1TokenContract = (): ContractConfig => ({
   abi: ABIS.ERC20,
 });
 
-// 其他合约现在都通过GameAggregator访问，不再需要单独的配置
-
 // BSC主网RPC池配置
 export const BSC_MAINNET_RPC_POOL = [
   'https://rpc.ankr.com/bsc/861a4f3afee73437812056e2efd748f76db6220c614f0e34a9c7b2f66c9e97d5',

@@ -12,16 +12,6 @@
       "testnet": "0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD",
       "mainnet": "0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD",
       "description": "Legacy SwordBattle contract - used for signature verification"
-    },
-    "nftAggregator": {
-      "testnet": "0x2a028159B9F838B913609b50B8EB3280747f8e41",
-      "mainnet": "0x2a028159B9F838B913609b50B8EB3280747f8e41",
-      "description": "NFT management contract"
-    },
-    "economyAggregator": {
-      "testnet": "0xC5Fd051DBAF85199D6f6b53a7B5D539f934e6129",
-      "mainnet": "0xC5Fd051DBAF85199D6f6b53a7B5D539f934e6129",
-      "description": "Economy and token management contract"
     }
   },
   "tokens": {
@@ -29,45 +19,6 @@
       "testnet": "0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16",
       "mainnet": "0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16",
       "description": "USD1 stable token for rewards"
-    },
-    "nclab": {
-      "testnet": "0x73b8c8c5c81f257832e86A7329123035477C12fA",
-      "mainnet": "0x73b8c8c5c81f257832e86A7329123035477C12fA",
-      "description": "NCLab governance token"
-    }
-  },
-  "nfts": {
-    "shovel": {
-      "testnet": "0x32cdE73F1A2F6BC4933D760aDdA673e6aA9Ad9b8",
-      "mainnet": "0x32cdE73F1A2F6BC4933D760aDdA673e6aA9Ad9b8",
-      "description": "Shovel NFT collection"
-    },
-    "forge": {
-      "testnet": "0x01DdFC46F9DB383EcFf2d98c20dC1AE8f49EAe8B",
-      "mainnet": "0x01DdFC46F9DB383EcFf2d98c20dC1AE8f49EAe8B",
-      "description": "Forge NFT collection"
-    }
-  },
-  "services": {
-    "gameRewardManager": {
-      "testnet": "0xbDCA6B9cb9C7766EF6FD86C3414fB3EdD82566D0",
-      "mainnet": "0xbDCA6B9cb9C7766EF6FD86C3414fB3EdD82566D0",
-      "description": "Game-specific reward distribution"
-    },
-    "fragmentManager": {
-      "testnet": "0xeae3B25f13F669aCF7aF67C11E78a648e1A71c99",
-      "mainnet": "0xeae3B25f13F669aCF7aF67C11E78a648e1A71c99",
-      "description": "Fragment token management"
-    },
-    "rewardManager": {
-      "testnet": "0x8732A5ceE8372DFa95Db266086A7FF297245b05c",
-      "mainnet": "0x8732A5ceE8372DFa95Db266086A7FF297245b05c",
-      "description": "Global reward management"
-    },
-    "shovelTraitManager": {
-      "testnet": "0x227de7B0980f1E49f9D11e58A66f9D81D35645dB",
-      "mainnet": "0x227de7B0980f1E49f9D11e58A66f9D81D35645dB",
-      "description": "Shovel trait and metadata management"
     }
   },
   "environments": {

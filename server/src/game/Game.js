@@ -47,6 +47,9 @@ class Game {
     // 游戏最大持续时间 (30分钟)
     this.maxGameDuration = 30 * 60 * 1000;
     this.pendingMassKill = false;
+    
+    // 服务器引用，用于访问客户端连接
+    this.server = null;
   }
 
   initialize() {
@@ -787,26 +790,23 @@ class Game {
     }
 
     try {
-      console.log(`🔍 Verifying player ${playerAddress} for game ${this.blockchainGameId}:`);
+      // 验证玩家注册状态
 
       // 检查玩家是否在链上游戏中
       const players = await this.blockchainService.getGamePlayers(this.blockchainGameId);
 
       // 确保players是数组
       const playerList = Array.isArray(players) ? players : [];
-      console.log(`📋 Found ${playerList.length} players in game ${this.blockchainGameId}:`);
-      console.log(`   Players: ${playerList.map(p => p.toLowerCase()).join(', ')}`);
-      console.log(`   Looking for: ${playerAddress.toLowerCase()}`);
+      // 检查游戏玩家列表
 
       const isRegistered = playerList.map(p => p.toLowerCase()).includes(playerAddress.toLowerCase());
 
       if (isRegistered) {
         this.registeredPlayers.add(playerAddress.toLowerCase());
-        console.log(`✅ Player ${playerAddress} verified as registered`);
+        console.log(`✅ Player ${playerAddress} joined game`);
         return true;
       } else {
         console.log(`❌ Player ${playerAddress} not registered for game ${this.blockchainGameId}`);
-        console.log(`   Available players: [${playerList.map(p => p.toLowerCase()).join(', ')}]`);
         console.log(`   Searched for: ${playerAddress.toLowerCase()}`);
         return false;
       }
@@ -861,7 +861,7 @@ class Game {
   }
 
   /**
-   * 结束区块链游戏
+   * 结束区块链游戏 - 等待所有区块链操作完成后重启服务器
    */
   async endBlockchainGame(reason = 'normal') {
     if (!config.isRaceServer || !config.blockchain.enabled || !this.blockchainService) {
@@ -891,73 +891,28 @@ class Game {
         duration: this.gameEndTime - this.gameStartTime
       });
 
+      // 📢 立即通知所有玩家游戏正在结束
+      console.log(`📢 Game ${this.blockchainGameId} ending (${reason}) - processing final scores and rewards...`);
+      
       // 收集所有玩家分数
       const scores = this.collectPlayerScores();
+      
+      // 向所有客户端发送游戏结束消息
+      this.broadcastGameEnd(reason, scores);
 
-      // 尝试为每个玩家的分数进行签名（通过API服务器）
-      // 但不要让分数提交失败阻止游戏结束
-      try {
-        await this.submitPlayerScores(scores);
-      } catch (scoreError) {
-        Logger.game.error('Failed to submit player scores, but continuing with game end', {
-          error: scoreError.message
-        });
-        // 继续执行游戏结束流程，不让分数提交失败阻止游戏结束
-      }
+      // 🔄 等待所有区块链操作完成
+      await this.processCompleteBlockchainGameEnd(this.blockchainGameId, scores, reason);
 
-      // 调用合约结束游戏
-      console.log(`🔚 正在调用合约结束游戏 ${this.blockchainGameId}...`);
-      const endTxHash = await this.blockchainService.endGame(this.blockchainGameId);
-      console.log(`✅ 游戏结束交易已发送: ${endTxHash}`);
-      Logger.server.info('Game end transaction sent', {
-        gameId: this.blockchainGameId,
-        txHash: endTxHash
-      });
-
-      // 等待游戏结束交易确认后，检查奖励分发状态
-      try {
-        console.log(`🎁 开始检查游戏 ${this.blockchainGameId} 的奖励分发状态...`);
-        const rewardResult = await this.blockchainService.distributeGameRewards(this.blockchainGameId);
-        console.log(`📊 奖励分发结果: ${rewardResult}`);
-
-        // 获取游戏最终状态
-        const finalGameInfo = await this.blockchainService.getGameFullInfo(this.blockchainGameId);
-        console.log(`🏁 游戏最终状态:`, {
-          gameId: this.blockchainGameId,
-          status: finalGameInfo.status, // 游戏状态
-          totalPool: finalGameInfo.totalPool.toString(), // 奖池总额
-          endedAt: finalGameInfo.endedAt.toString(), // 结束时间戳
-          level: finalGameInfo.level, // 游戏等级
-          gameDuration: finalGameInfo.gameDuration // 游戏持续时间
-        });
-
-        // 查询所有玩家的奖励分发情况
-        console.log(`🎁 查询所有玩家的奖励分发情况...`);
-        // 注意：GameFullInfo结构体可能不包含activePlayers，需要单独查询
-        const activePlayers = await this.blockchainService.getGamePlayers(this.blockchainGameId);
-        for (const playerAddress of activePlayers) {
-          try {
-            await this.blockchainService.checkPlayerRewards(this.blockchainGameId, playerAddress);
-          } catch (playerRewardError) {
-            console.warn(`⚠️ 查询玩家 ${playerAddress} 奖励失败:`, playerRewardError.message);
-          }
-        }
-
-      } catch (rewardError) {
-        console.error(`❌ 奖励分发检查失败:`, rewardError.message);
-        console.error(`❌ 错误详情:`, rewardError);
-        // 不让奖励分发失败阻止游戏结束流程
-      }
-
+      // 设置游戏为已结束状态
       this.gamePhase = 'ended';
-
+      
       // 清理当前游戏状态
       this.cleanupCurrentGame();
 
-      // 可选：重新开始新游戏
-      setTimeout(() => {
-        this.initializeBlockchainGame();
-      }, 10000); // 10秒后创建新游戏
+      console.log(`✅ Game ${this.blockchainGameId} completely finished. Server will restart to begin new game.`);
+      
+      // 📡 触发服务器重启
+      this.triggerServerRestart();
 
     } catch (error) {
       Logger.game.error('Failed to end blockchain game', {
@@ -967,7 +922,225 @@ class Game {
       });
       // 即使出错也要尝试设置状态，避免游戏卡在ending状态
       this.gamePhase = 'error';
+      
+      // 即使出错也要重启服务器
+      setTimeout(() => {
+        this.triggerServerRestart();
+      }, 5000);
     }
+  }
+
+  /**
+   * 完整处理区块链游戏结束操作 - 等待所有操作完成
+   * 确保所有提交分数和奖励分配都完成后才结束游戏
+   */
+  async processCompleteBlockchainGameEnd(gameId, scores, reason) {
+    console.log(`🔄 Starting complete blockchain processing for game ${gameId}`);
+    
+    let scoreSubmissionSuccess = false;
+    let gameEndSuccess = false;
+    let rewardDistributionSuccess = false;
+
+    try {
+      // 1. 提交分数到区块链
+      console.log(`📊 Step 1/3: Submitting player scores to blockchain...`);
+      try {
+        await this.submitPlayerScores(scores);
+        scoreSubmissionSuccess = true;
+        console.log(`✅ Score submission completed successfully`);
+        
+        // 等待分数提交交易确认
+        console.log(`⏳ Waiting 30s for score confirmations...`);
+        await new Promise(resolve => setTimeout(resolve, 30000));
+        console.log(`✅ Score confirmation wait completed`);
+        
+      } catch (scoreError) {
+        console.error(`❌ Failed to submit player scores:`, scoreError.message);
+        Logger.game.error('Failed to submit player scores', {
+          gameId,
+          error: scoreError.message
+        });
+        // 继续处理，但记录失败状态
+      }
+
+      // 2. 调用合约结束游戏
+      console.log(`🔚 Step 2/3: Ending game ${gameId} on blockchain...`);
+      try {
+        const endTxHash = await this.blockchainService.endGame(gameId);
+        gameEndSuccess = true;
+        console.log(`✅ Game ${gameId} ended successfully - TX: ${endTxHash}`);
+        
+        Logger.server.info('Game end transaction sent', {
+          gameId,
+          txHash: endTxHash
+        });
+
+        // 等待游戏结束交易确认
+        console.log(`⏳ Waiting 10s for game end confirmation...`);
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        
+      } catch (endGameError) {
+        console.error(`❌ Failed to end game on blockchain:`, endGameError.message);
+        Logger.game.error('Failed to end game on blockchain', {
+          gameId,
+          error: endGameError.message
+        });
+        throw endGameError; // 游戏结束失败是严重错误
+      }
+
+      // 3. 检查和分发奖励
+      console.log(`🎁 Step 3/3: Processing rewards for game ${gameId}...`);
+      try {
+        const rewardResult = await this.blockchainService.distributeGameRewards(gameId);
+        rewardDistributionSuccess = true;
+        console.log(`✅ Rewards processed successfully`);
+
+        // 获取游戏最终状态
+        const finalGameInfo = await this.blockchainService.getGameFullInfo(gameId);
+        console.log(`🏁 Final game state: Pool ${finalGameInfo.totalPool.toString()}, Duration ${finalGameInfo.gameDuration}s`);
+
+        // 查询所有玩家的奖励分发情况
+        const activePlayers = await this.blockchainService.getGamePlayers(gameId);
+        console.log(`🔍 Checking rewards for ${activePlayers.length} players...`);
+        
+        for (const playerAddress of activePlayers) {
+          try {
+            await this.blockchainService.checkPlayerRewards(gameId, playerAddress);
+          } catch (playerRewardError) {
+            console.warn(`⚠️ Failed to check rewards for player ${playerAddress}:`, playerRewardError.message);
+          }
+        }
+
+        Logger.game.info('Game rewards distributed', {
+          gameId,
+          result: rewardResult
+        });
+      } catch (rewardError) {
+        console.error(`❌ Failed to distribute game rewards:`, rewardError.message);
+        Logger.game.error('Failed to distribute game rewards', {
+          gameId,
+          error: rewardError.message
+        });
+        // 奖励分发失败不阻止游戏结束，但记录状态
+      }
+
+      // 最终状态汇总
+      console.log(`📋 Blockchain processing summary for game ${gameId}:`);
+      console.log(`   Score Submission: ${scoreSubmissionSuccess ? '✅ Success' : '❌ Failed'}`);
+      console.log(`   Game End: ${gameEndSuccess ? '✅ Success' : '❌ Failed'}`);
+      console.log(`   Reward Distribution: ${rewardDistributionSuccess ? '✅ Success' : '❌ Failed'}`);
+
+      if (gameEndSuccess) {
+        console.log(`✅ Complete blockchain processing finished for game ${gameId}`);
+      } else {
+        console.error(`❌ Critical blockchain operations failed for game ${gameId}`);
+      }
+
+    } catch (error) {
+      console.error(`❌ Complete blockchain processing failed for game ${gameId}:`, error.message);
+      Logger.game.error('Complete blockchain processing failed', {
+        gameId,
+        error: error.message,
+        stack: error.stack,
+        scoreSubmissionSuccess,
+        gameEndSuccess,
+        rewardDistributionSuccess
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 向所有客户端广播游戏结束消息
+   */
+  broadcastGameEnd(reason, scores) {
+    // 检查服务器引用是否存在
+    if (!this.server?.clients) {
+      console.warn('Server reference not available for broadcasting game end');
+      return;
+    }
+
+    // 构建游戏结束数据
+    const gameEndData = {
+      reason,
+      gameId: this.blockchainGameId,
+      endTime: this.gameEndTime,
+      duration: this.gameEndTime - this.gameStartTime,
+      // 可以添加排行榜、获胜者等信息
+    };
+
+    let notifiedCount = 0;
+    let errorCount = 0;
+
+    // 向所有连接的客户端发送游戏结束消息
+    for (const client of this.server.clients.values()) {
+      try {
+        // 移除所有玩家，触发死亡界面
+        if (client.player && !client.player.removed) {
+          client.player.remove('Game Ended', Types.DisconnectReason.Server);
+        }
+        // 设置为观战模式
+        client.spectator.isSpectating = true;
+        client.fullSync = true;
+        
+        // 这里可以根据你的网络协议发送游戏结束消息
+        // 例如：client.send(Protocol.GAME_END, gameEndData);
+        
+        notifiedCount++;
+      } catch (err) {
+        console.warn(`Failed to notify client of game end: ${err.message}`);
+        errorCount++;
+      }
+    }
+    
+    console.log(`📢 Game ${this.blockchainGameId} ended (${reason}) - notified ${notifiedCount} clients, ${errorCount} errors`);
+  }
+
+  /**
+   * 触发服务器重启以开始新游戏
+   */
+  triggerServerRestart() {
+    console.log(`🔄 Triggering server restart to begin new game...`);
+    
+    // 设置标志，准备重启
+    this.pendingMassKill = true;
+    
+    // 给客户端一些时间处理游戏结束状态
+    setTimeout(() => {
+      console.log(`🔄 Executing server restart...`);
+      
+      // 清理游戏状态
+      this.clearGameTimeout();
+      Object.assign(this, { 
+        gamePhase: 'initializing', 
+        blockchainGameId: null,
+        gameStartTime: null,
+        gameEndTime: null
+      });
+      this.registeredPlayers.clear();
+      this.finalScores.clear();
+      this.playerScoreSubmitted.clear();
+
+      // 重置所有客户端状态
+      if (this.server?.clients) {
+        for (const client of this.server.clients.values()) {
+          client.player = null;
+          client.spectator.isSpectating = true;
+          client.fullSync = true;
+        }
+      }
+
+      // 开始新的区块链游戏
+      console.log(`🎮 Server restarted, initializing new blockchain game...`);
+      this.initializeBlockchainGame().catch(error => {
+        console.error(`❌ Failed to initialize new blockchain game after restart:`, error.message);
+        // 如果新游戏创建失败，再次尝试重启
+        setTimeout(() => {
+          this.triggerServerRestart();
+        }, 10000);
+      });
+      
+    }, 3000); // 3秒延迟，给客户端足够时间
   }
 
   /**
@@ -998,16 +1171,13 @@ class Game {
       }
 
       playersWithWallet++;
-      console.log(`🔄 Processing score for ${scoreData.playerName} (${scoreData.walletAddress}): ${scoreData.finalScore}`);
+      // Processing score submission
 
       try {
         // 获取玩家nonce
-        console.log(`📋 Getting nonce for player ${scoreData.walletAddress}...`);
         const nonce = await this.blockchainService.getPlayerNonce(scoreData.walletAddress);
-        console.log(`📋 Player nonce: ${nonce}`);
 
         // 通过API服务器获取签名
-        console.log(`✍️ Getting signature from API server...`);
         const signature = await this.getScoreSignature(
           this.blockchainGameId,
           scoreData.walletAddress,
@@ -1015,19 +1185,8 @@ class Game {
           scoreData.finalScore,
           nonce
         );
-        console.log(`✍️ Signature obtained: ${signature.substring(0, 20)}...`);
 
-        // 调用合约提交分数
-        console.log(`📊 正在向区块链提交分数...`);
-        console.log(`📊 提交参数确认:`, {
-          gameId: this.blockchainGameId,
-          playerName: scoreData.playerName,
-          playerAddress: scoreData.walletAddress,
-          kills: scoreData.kills,
-          finalScore: scoreData.finalScore,
-          nonce: nonce.toString(),
-          signatureLength: signature.length
-        });
+        // 提交分数到区块链
 
         const txHash = await this.blockchainService.submitScore(
           this.blockchainGameId,
@@ -1038,8 +1197,7 @@ class Game {
           signature
         );
 
-        console.log(`✅ 分数提交成功 - 玩家: ${scoreData.playerName} (${scoreData.walletAddress})`);
-        console.log(`📊 提交详情: 分数=${scoreData.finalScore}, 击杀=${scoreData.kills}, 交易=${txHash}`);
+        console.log(`✅ Score submitted: ${scoreData.playerName} - ${scoreData.finalScore} pts, ${scoreData.kills} kills`);
         this.playerScoreSubmitted.add(playerId);
         successfulSubmissions++;
 
@@ -1143,17 +1301,16 @@ class Game {
    * 游戏结束60秒后查询区块链真实奖励并更新数据库
    */
   scheduleBlockchainRewardUpdate(gameDataArray, gameId) {
-    console.log(`⏰ 安排60秒后的区块链奖励更新任务 (游戏ID: ${gameId})...`);
+    // 安排奖励更新任务
 
     // 60秒后执行异步更新，使用保存的gameId而不是当前的this.blockchainGameId
     // 增加延迟时间给奖励分发交易更多确认时间
     setTimeout(async () => {
       try {
-        console.log(`🔄 开始执行区块链奖励更新任务 (游戏ID: ${gameId})`);
         await this.updateBlockchainRewards(gameDataArray, gameId);
-        console.log(`✅ 区块链奖励更新任务完成`);
+        console.log(`✅ Rewards updated for game ${gameId}`);
       } catch (error) {
-        console.error(`❌ 区块链奖励更新任务失败:`, error);
+        console.error(`❌ Reward update failed for game ${gameId}:`, error.message);
         // 可以考虑重试机制或者记录到错误日志中
       }
     }, 60000); // 60秒延迟
@@ -1168,13 +1325,13 @@ class Game {
       return;
     }
 
-    console.log(`🔗 开始查询游戏 ${gameId} 的区块链奖励数据...`);
+    // 查询区块链奖励数据
 
     const updatedGameData = [];
 
     for (const gameData of gameDataArray) {
       try {
-        console.log(`🔍 查询玩家 ${gameData.playerAddress} 的奖励...`);
+        // 查询玩家奖励
 
         // 从区块链查询真实奖励数据（使用GameAggregator合约）
         const playerRewardStatus = await this.blockchainService.getPlayerCompleteRewards(
@@ -1210,12 +1367,10 @@ class Game {
         // 判断是否有可领取的奖励
         const hasClaimableRewards = usdClaimable || nclabClaimable;
 
-        console.log(`💰 玩家 ${gameData.playerAddress} 区块链奖励详情:`);
-        console.log(`   💎 USD奖励: ${usdRewardEth.toFixed(6)} USD1 (可领取: ${usdClaimable}, 已领取: ${usdClaimed})`);
-        console.log(`   🧩 NCLab奖励: ${nclabRewardEth.toFixed(6)} NCLab (可领取: ${nclabClaimable}, 已领取: ${nclabClaimed})`);
-        console.log(`   📊 总奖励: ${totalRewardEth.toFixed(6)}, 全部已领取: ${hasClaimedAll}`);
-        console.log(`   ⏰ NCLab可领取时间: ${new Date(Number(nclabClaimableTime) * 1000).toISOString()}`);
-        console.log(`   🏆 是否获胜: ${isWinner}`);
+        // 只在有奖励时记录关键信息
+        if (isWinner) {
+          console.log(`💰 Player ${gameData.playerAddress}: ${usdRewardEth.toFixed(4)} USD1 + ${nclabRewardEth.toFixed(4)} NCLab`);
+        }
 
         // 更新奖励数据
         const updatedData = {
@@ -1245,9 +1400,8 @@ class Game {
     // 批量更新数据库中的奖励信息
     if (updatedGameData.length > 0) {
       try {
-        console.log(`💾 更新数据库中的奖励信息...`);
         await this.updateRewardsInDatabase(updatedGameData);
-        console.log(`✅ 数据库奖励信息更新完成`);
+        console.log(`✅ Database updated with rewards for ${updatedGameData.length} players`);
       } catch (dbError) {
         console.error(`❌ 更新数据库奖励信息失败:`, dbError);
       }
@@ -1280,7 +1434,7 @@ class Game {
         throw new Error(result.error || 'Failed to update reward data');
       }
 
-      console.log(`💾 数据库奖励更新响应:`, result);
+      // 数据库更新成功
       return result.data;
     } catch (error) {
       console.error('❌ 更新数据库奖励信息时出错:', error);

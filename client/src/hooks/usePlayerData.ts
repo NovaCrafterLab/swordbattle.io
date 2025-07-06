@@ -414,7 +414,6 @@ export const usePlayerData = () => {
       const databaseGames: PlayerGameData[] = result.data.games.map(
         (game: any) => {
           const rewardAmount = BigInt(Math.floor(parseFloat(game.reward || '0') * 1e18))
-          console.log(`🎮 Processing game ${game.gameId}: reward="${game.reward}" -> ${rewardAmount.toString()} wei`)
           return {
             gameId: game.gameId,
             score: game.score,
@@ -433,8 +432,6 @@ export const usePlayerData = () => {
         }
       )
 
-      console.log('📊 Database API returned', databaseGames.length, 'games')
-      console.log('💰 Total rewards from database:', databaseGames.reduce((sum, g) => sum + g.reward, BigInt(0)).toString())
 
       return databaseGames.sort((a, b) => b.gameId - a.gameId) // 按游戏ID降序排列
     } catch (err) {
@@ -573,13 +570,6 @@ export const usePlayerData = () => {
 
       // 使用混合查询获取玩家游戏历史（数据库 + 区块链）
       const gameHistory = await fetchPlayerGameHistory(false) // false = 使用混合查询
-      
-      console.log('🔄 Refreshing player data for:', address)
-      console.log('📊 Game history loaded:', gameHistory.length, 'games')
-      if (gameHistory.length > 0) {
-        console.log('🎮 Latest game:', gameHistory[0].gameId, 'reward:', gameHistory[0].reward.toString())
-      }
-
       // 计算统计数据
       const totalRewards = gameHistory.reduce(
         (sum, game) => sum + game.reward,

@@ -600,21 +600,14 @@ class BlockchainService {
         throw new Error('GameAggregator contract address not configured');
       }
 
-      Logger.server.debug('📋 Contract details', {
-        address: contract.address,
-        level,
-        account: this.account.address
-      });
+      // Contract ready for game creation
 
       // 检查账户余额
       try {
         const balance = await this.publicClient.getBalance({
           address: this.account.address,
         });
-        Logger.server.debug('💰 Account balance', {
-          balance: balance.toString(),
-          balanceETH: (Number(balance) / 1e18).toFixed(6)
-        });
+        // Account balance checked
       } catch (balanceError) {
         Logger.server.warn('⚠️ Could not check account balance', { error: balanceError.message });
       }
@@ -629,11 +622,7 @@ class BlockchainService {
         args: [level],
       });
 
-      Logger.server.debug('✅ Transaction simulation successful', {
-        gas: request.gas?.toString(),
-        gasPrice: request.gasPrice?.toString(),
-        value: request.value?.toString()
-      });
+      // Transaction simulation successful
 
       const txHash = await this.walletClient.writeContract(request);
 
@@ -642,7 +631,7 @@ class BlockchainService {
         level,
         account: this.account.address
       });
-      Logger.server.debug('⏳ Transaction submitted to blockchain, waiting for confirmation');
+      // Transaction submitted
 
       return {
         txHash,
@@ -703,18 +692,15 @@ class BlockchainService {
       });
 
       // 检查合约余额
-      console.log(`💰 检查合约余额...`);
       await this.checkContractBalances(gameId);
 
-      console.log(`📝 准备发送endGame交易...`);
       const contract = this.getGameAggregatorContract();
       const txHash = await this.writeContract(contract, 'endGame', [BigInt(gameId)]);
 
-      console.log(`✅ endGame交易已发送: ${txHash}`);
+      console.log(`✅ Game ${gameId} ended - TX: ${txHash}`);
       Logger.server.info('Game end transaction sent', { txHash });
 
-      // 等待一小段时间让交易被处理
-      console.log(`⏳ 等待交易处理...`);
+      // 等待交易处理
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       // 获取游戏结束后的状态
@@ -1008,17 +994,10 @@ class BlockchainService {
 
       const totalUsdReward = usdReward;
 
-      console.log(`💰 玩家 ${playerAddress} 奖励详情:`, {
-        gameId,
-        usdReward: usdReward.toString(),
-        usdRewardETH: (Number(usdReward) / 1e18).toFixed(6),
-        nclabReward: nclabReward.toString(),
-        nclabRewardETH: (Number(nclabReward) / 1e18).toFixed(6),
-        fragmentBonus: fragmentBonus,
-        totalUsdReward: totalUsdReward.toString(),
-        totalUsdRewardETH: (Number(totalUsdReward) / 1e18).toFixed(6),
-        hasRewards: totalUsdReward > 0 || nclabReward > 0
-      });
+      // 只在有奖励时记录
+      if (totalUsdReward > 0 || nclabReward > 0) {
+        console.log(`💰 Player ${playerAddress} rewards: ${(Number(totalUsdReward) / 1e18).toFixed(6)} USD1 + ${(Number(nclabReward) / 1e18).toFixed(6)} NCLab`);
+      }
 
       return {
         killReward: usdReward, // 为了兼容性

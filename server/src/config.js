@@ -57,7 +57,6 @@ module.exports = {
     enabled: process.env.BLOCKCHAIN_ENABLED === 'true',
     rpcUrl: process.env.BLOCKCHAIN_RPC_URL, // 可选，会使用内置RPC池
     contracts: {
-      // GameAggregator 合约用于游戏操作 - 更新为最新地址
       gameAggregator: isDev
         ? (process.env.GAME_AGGREGATOR_CONTRACT_TESTNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x6810494B605ac1A6259788Db999202f5578dA4E1')
         : (process.env.GAME_AGGREGATOR_CONTRACT_MAINNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x6810494B605ac1A6259788Db999202f5578dA4E1'),
@@ -68,9 +67,6 @@ module.exports = {
       usd1Token: isDev
         ? '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16'
         : '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16',
-      rewardManager: isDev
-        ? '0x8732A5ceE8372DFa95Db266086A7FF297245b05c'
-        : '0x8732A5ceE8372DFa95Db266086A7FF297245b05c',
     },
     trustedSigner: process.env.TRUSTED_SIGNER_PRIVATE_KEY,
     gameLevel: parseInt(process.env.GAME_LEVEL || '0'), 

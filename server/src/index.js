@@ -63,6 +63,9 @@ async function bootstrap() {
 
   // Attach blockchain service to game instance
   game.blockchainService = global.blockchainService;
+  
+  // Attach server reference to game instance for client broadcasting
+  game.server = server;
 
   game.initialize();
   server.initialize(app);
