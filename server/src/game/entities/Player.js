@@ -412,79 +412,11 @@ class Player extends Entity {
         hasClient: !!this.client
       });
 
-      // blockchain end
-      if (config.isRaceServer && config.blockchain.enabled && this.game.blockchainService) {
-        this.checkBlockchainGameEnd();
-      }
+      // 移除自动游戏结束检查 - 游戏只能通过手动结束、超时、周期重启或服务器关闭来结束
+      // 玩家死亡不再触发游戏结束
     }
   }
 
-  /**
-   * 检查是否需要结束区块链游戏
-   */
-  checkBlockchainGameEnd() {
-    // 检查游戏是否已经结束或正在结束
-    if (this.game.gamePhase === 'ending' || this.game.gamePhase === 'ended') {
-      Logger.game.debug('Game already in ending/ended phase, skipping end check', {
-        gamePhase: this.game.gamePhase,
-        gameId: this.game.blockchainGameId
-      });
-      return;
-    }
-
-    // 延迟检查，给其他玩家死亡事件时间处理
-    setTimeout(() => {
-      try {
-        // 再次检查游戏状态（因为有延迟）
-        if (this.game.gamePhase === 'ending' || this.game.gamePhase === 'ended') {
-          Logger.game.debug('Game changed to ending/ended phase during delay, skipping end check', {
-            gamePhase: this.game.gamePhase
-          });
-          return;
-        }
-
-        const alivePlayers = [...this.game.players].filter(player => !player.removed);
-        const registeredPlayers = this.game.registeredPlayers ? this.game.registeredPlayers.size : 0;
-
-        Logger.game.info('Checking game end condition', {
-          alivePlayers: alivePlayers.length,
-          registeredPlayers,
-          gameId: this.game.blockchainGameId
-        });
-
-        // 如果只剩下1个或0个玩家，结束游戏
-        if (alivePlayers.length <= 1) {
-          Logger.game.warn('Game ending: Only 1 or 0 players remaining', {
-            gameId: this.game.blockchainGameId,
-            alivePlayers: alivePlayers.length
-          });
-          this.game.endBlockchainGame('last_player_standing');
-        }
-        // 如果所有注册玩家都死了，也结束游戏
-        else if (registeredPlayers > 0) {
-          const aliveRegisteredPlayers = alivePlayers.filter(player =>
-            player.client?.walletAddress &&
-            this.game.registeredPlayers?.has(player.client.walletAddress.toLowerCase())
-          );
-
-          if (aliveRegisteredPlayers.length === 0) {
-            Logger.game.warn('Game ending: No registered players remaining', {
-              gameId: this.game.blockchainGameId,
-              registeredPlayers,
-              aliveRegisteredPlayers: aliveRegisteredPlayers.length
-            });
-            this.game.endBlockchainGame('no_registered_players');
-          }
-        }
-      } catch (error) {
-        Logger.game.error('Error checking blockchain game end', {
-          error: error.message,
-          playerId: this.id,
-          playerName: this.name
-        });
-      }
-    }, 1000); // 1秒延迟
-  }
 
   calculateDropAmount() {
     const coins = this.levels.coins;
