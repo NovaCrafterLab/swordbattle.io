@@ -44,9 +44,13 @@ ENV NODE_ENV=production \
 
 # copy production deps
 COPY --from=deps-prod --chown=swordbattle:swordbattle /app/node_modules ./node_modules
+
 # copy plain-JS source
 COPY server/package.json ./server/package.json
 COPY server/src          ./src
+
+# GameAggregator
+COPY server/abis/GameAggregator.json ./abis/GameAggregator.json
 
 USER swordbattle
 EXPOSE 8000
