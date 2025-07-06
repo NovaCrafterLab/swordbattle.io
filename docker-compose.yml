@@ -109,7 +109,7 @@ services:
       dockerfile: docker/client.dockerfile
       target: runtime
       args:
-        BUILD_ENV: ${NODE_ENV:-development}
+        BUILD_ENV: development
     env_file: [./env/client.env.development]
     depends_on: [server]
     ports:

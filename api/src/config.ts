@@ -1,11 +1,11 @@
 // 获取环境变量，优先使用系统/命令行设置，否则默认为development
-const ENV = process.env.NODE_ENV || 'development';
+const ENV = process.env.BUILD_ENV || 'development';
 const isDev = ENV === 'development';
 const isProduction = ENV === 'production';
 
 require('dotenv').config();
 
-console.log("state:", process.env.NODE_ENV);
+console.log("state:", process.env.BUILD_ENV);
 console.log('workspace:', process.cwd());
 
 interface ConfigProps {

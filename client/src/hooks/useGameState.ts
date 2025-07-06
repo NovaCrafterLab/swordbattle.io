@@ -128,17 +128,17 @@ export const useGameState = (serverUrl?: string) => {
       const info: ServerInfo = await response.json();
       setServerInfo(info);
       // 更新游戏状态
-      if (info.gameStatus) {
-        logger.info('🎮 Server returned gameStatus:', info.gameStatus);
-        setGameState(prev => ({
-          ...prev,
-          gameId: info.gameStatus.gameId,
-          phase: info.gameStatus.phase,
-          playerCount: info.gameStatus.activePlayersCount,
-          registeredCount: info.gameStatus.registeredPlayersCount,
-          lastUpdated: Date.now(),
-        }));
-      }
+      // if (info.gameStatus) {
+      //   logger.info('🎮 Server returned gameStatus:', info.gameStatus);
+      //   setGameState(prev => ({
+      //     ...prev,
+      //     gameId: info.gameStatus.gameId,
+      //     phase: info.gameStatus.phase,
+      //     playerCount: info.gameStatus.activePlayersCount,
+      //     registeredCount: info.gameStatus.registeredPlayersCount,
+      //     lastUpdated: Date.now(),
+      //   }));
+      // }
     } catch (err) {
       logger.error('Failed to fetch server info:', err);
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -181,14 +181,14 @@ export const useGameState = (serverUrl?: string) => {
       lastUpdated: Date.now(),
     };
 
-    logger.info('🎮 Game state updated:', {
-      gameCounter,
-      currentGameId,
-      gameId: newGameState.gameId,
-      phase: newGameState.phase,
-      isRaceServer: serverInfo?.isRaceServer,
-      blockchainEnabled: serverInfo?.blockchainEnabled,
-    });
+    // logger.info('🎮 Game state updated:', {
+    //   gameCounter,
+    //   currentGameId,
+    //   gameId: newGameState.gameId,
+    //   phase: newGameState.phase,
+    //   isRaceServer: serverInfo?.isRaceServer,
+    //   blockchainEnabled: serverInfo?.blockchainEnabled,
+    // });
 
     setGameState(newGameState);
   }, [gameCounter, entryFee, currentGameId, serverInfo, gamePlayers, isPlayerJoined]);

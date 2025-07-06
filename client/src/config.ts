@@ -18,7 +18,7 @@ interface Config {
 
 export const config: Config = {
   basename: process.env.REACT_APP_BASENAME || '',
-  isDev: process.env.NODE_ENV === 'development',
+  isDev: process.env.BUILD_ENV === 'development',
 
   serverDev:
     process.env.REACT_APP_ENDPOINT_DEV ||

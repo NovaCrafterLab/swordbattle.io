@@ -9,7 +9,9 @@ const { DateTime } = require('luxon');
 const TZ = process.env.CYCLE_TZ || 'UTC';
 const PERIOD_MIN = Number(process.env.CYCLE_PERIOD_MIN || 30);
 const PERIOD_MS = PERIOD_MIN * 60 * 1000;
-const EPOCH_ISO = process.env.CYCLE_EPOCH_ISO || '2025-01-01T00:00:00';
+const EPOCH_ISO =
+  process.env.CYCLE_EPOCH_ISO
+  || DateTime.now().setZone(TZ).toISO({ suppressMilliseconds: true });;
 
 /* Anchor in UTC ms */
 const ANCHOR_MS = DateTime.fromISO(EPOCH_ISO, { zone: TZ }).toUTC().toMillis();

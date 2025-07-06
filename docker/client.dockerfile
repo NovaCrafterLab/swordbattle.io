@@ -38,6 +38,7 @@ COPY --from=deps-dev /app/node_modules ./node_modules
 
 # ---------- build-time public args ----------
 ARG BUILD_ENV=development
+ENV NODE_ENV=${BUILD_ENV}
 ENV BUILD_ENV=${BUILD_ENV}
 
 # add: workspace manifest (FIX)

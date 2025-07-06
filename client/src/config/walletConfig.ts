@@ -7,7 +7,7 @@ import { ERC20_ABI } from '../abis/ERC20';
 import { config } from '../config';
 
 // 环境变量检查
-const ENV = process.env.REACT_APP_NODE_ENV ?? process.env.NODE_ENV ?? 'development';
+const ENV = process.env.BUILD_ENV ?? 'development';
 export const isDev = config.isDev;
 export const isRelease = ENV === 'release';
 console.log('Environment:', ENV);

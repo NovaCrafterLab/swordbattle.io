@@ -2,11 +2,11 @@
 require('dotenv').config();
 
 // 环境判断逻辑与前端保持一致
-const ENV = process.env.NODE_ENV || 'development';
+const ENV = process.env.BUILD_ENV || 'development';
 const isDev = ENV === 'development';
 const isRelease = ENV === 'production';
 
-console.log("state:", process.env.NODE_ENV);
+console.log("state:", process.env.BUILD_ENV);
 console.log('workspace:', process.cwd());
 
 
@@ -66,18 +66,18 @@ module.exports = {
         ? (process.env.SWORD_BATTLE_CONTRACT_TESTNET || process.env.SWORD_BATTLE_CONTRACT || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD')
         : (process.env.SWORD_BATTLE_CONTRACT_MAINNET || process.env.SWORD_BATTLE_CONTRACT || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD'),
       usd1Token: isDev
-        ? (process.env.USD1_TOKEN_CONTRACT_TESTNET || process.env.USD1_TOKEN_CONTRACT || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16')
-        : (process.env.USD1_TOKEN_CONTRACT_MAINNET || process.env.USD1_TOKEN_CONTRACT),
+        ? '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16'
+        : '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16',
       rewardManager: isDev
-        ? (process.env.REWARD_MANAGER_CONTRACT_TESTNET || process.env.REWARD_MANAGER_CONTRACT)
-        : (process.env.REWARD_MANAGER_CONTRACT_MAINNET || process.env.REWARD_MANAGER_CONTRACT),
+        ? '0x8732A5ceE8372DFa95Db266086A7FF297245b05c'
+        : '0x8732A5ceE8372DFa95Db266086A7FF297245b05c',
     },
     trustedSigner: process.env.TRUSTED_SIGNER_PRIVATE_KEY,
-    gameLevel: parseInt(process.env.GAME_LEVEL || '0'), // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH
+    gameLevel: parseInt(process.env.GAME_LEVEL || '0'), 
     environment: {
       isDev,
       isRelease,
-      chainId: isDev ? 97 : 56, // BSC测试网:97, BSC主网:56
+      chainId: isDev ? 97 : 56,
       networkName: isDev ? 'BSC Testnet' : 'BSC Mainnet',
     },
   },

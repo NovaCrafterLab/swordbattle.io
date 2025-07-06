@@ -1,6 +1,3 @@
-// 区块链配置
-// API服务器的区块链相关配置
-
 export interface BlockchainConfig {
   enabled: boolean;
   rpcUrl?: string;
@@ -20,7 +17,7 @@ export interface BlockchainConfig {
 }
 
 // 环境判断逻辑
-const ENV = process.env.NODE_ENV || 'development';
+const ENV = process.env.BUILD_ENV || 'development';
 const isDev = ENV === 'development';
 const isRelease = ENV === 'production';
 
@@ -38,11 +35,11 @@ export const defaultBlockchainConfig: BlockchainConfig = {
       ? (process.env.SWORD_BATTLE_CONTRACT_TESTNET || process.env.SWORD_BATTLE_CONTRACT || '0x2201a02600d55758F14bbC100c35580785BAD622')
       : (process.env.SWORD_BATTLE_CONTRACT_MAINNET || process.env.SWORD_BATTLE_CONTRACT || '0x2201a02600d55758F14bbC100c35580785BAD622'),
     usd1Token: isDev 
-      ? (process.env.USD1_TOKEN_CONTRACT_TESTNET || process.env.USD1_TOKEN_CONTRACT || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16')
-      : (process.env.USD1_TOKEN_CONTRACT_MAINNET || process.env.USD1_TOKEN_CONTRACT || ''),
+      ? '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16'
+      : '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16',
     rewardManager: isDev 
-      ? (process.env.REWARD_MANAGER_CONTRACT_TESTNET || process.env.REWARD_MANAGER_CONTRACT || '0x8732A5ceE8372DFa95Db266086A7FF297245b05c')
-      : (process.env.REWARD_MANAGER_CONTRACT_MAINNET || process.env.REWARD_MANAGER_CONTRACT || '0x8732A5ceE8372DFa95Db266086A7FF297245b05c'),
+      ? '0x8732A5ceE8372DFa95Db266086A7FF297245b05c'
+      : '0x8732A5ceE8372DFa95Db266086A7FF297245b05c',
   },
   trustedSigner: process.env.TRUSTED_SIGNER_PRIVATE_KEY,
   environment: {

@@ -41,7 +41,7 @@ services:
       - ./env/client.env.development
     build:
       args:
-        BUILD_ENV: ${NODE_ENV:-development}
+        BUILD_ENV: "development"
     environment:
       NODE_ENV: "development"
       DEBUG: "true"
