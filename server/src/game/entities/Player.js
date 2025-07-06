@@ -22,8 +22,6 @@ const { clamp, calculateGemsXP } = require('../../helpers');
 const { skins } = require('../../cosmetics.json');
 const Logger = require('../../utils/Logger');
 
-const { prof } = require('../../prof');
-
 
 class Player extends Entity {
   constructor(game, name) {
@@ -130,7 +128,7 @@ class Player extends Entity {
   }
 
   update(dt) {
-    prof('player-biome', () => this.applyBiomeEffects());
+    this.applyBiomeEffects();
     this.levels.applyBuffs();
     this.effects.forEach((effect) => effect.update(dt));
     this.health.update(dt);

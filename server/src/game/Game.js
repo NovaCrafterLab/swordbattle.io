@@ -13,8 +13,6 @@ const { getBannedIps } = require('../moderation');
 const { rectangleRectangle } = require('./collisions');
 const Logger = require('../utils/Logger');
 
-const { prof } = require('../prof');
-
 
 const sharedResp = new SAT.Response();
 
@@ -68,12 +66,10 @@ class Game {
       this.pendingMassKill = false;
     }
 
-    prof('entities.update', () => {
-      for (const entity of this.entities.values()) {
-        if (entity.type === Types.Entity.Sword) continue;
-        entity.update(dt);
-      }
-    });
+    for (const entity of this.entities.values()) {
+      if (entity.type === Types.Entity.Sword) continue;
+      entity.update(dt);
+    }
 
     // const needRebuild = ++this._qtTick === 4 || this.newEntities.size > 0;
     // if (needRebuild) {
@@ -82,18 +78,14 @@ class Game {
     // }
 
     this._qtTick += 1;
-    prof('quadtree.rebuild', () => {
-      this.updateQuadtree();
-    });
+    this.updateQuadtree();
     this.newEntities.clear();
 
-    prof('collisions', () => {
-      for (const entity of this.entities.values()) {
-        if (entity.removed) continue;
-        if (entity.isGlobal) this.globalEntities.entities.set(entity.id, entity);
-        this.processCollisions(entity, dt);
-      }
-    });
+    for (const entity of this.entities.values()) {
+      if (entity.removed) continue;
+      if (entity.isGlobal) this.globalEntities.entities.set(entity.id, entity);
+      this.processCollisions(entity, dt);
+    }
 
     this.map.update(dt);
   }
@@ -1195,11 +1187,11 @@ class Game {
         const usdRewards = playerRewardStatus.usdAmount || BigInt(0);     // USD1奖励总额
         const nclabRewards = playerRewardStatus.nclabAmount || BigInt(0); // NCLab奖励总额
         const fragmentBonus = playerRewardStatus.fragmentBonus || 0;      // 额外碎片数
-        
+
         // 注意：getPlayerCompleteRewards可能不包含可领取状态信息
         // 这些信息可能需要从其他接口获取，暂时设为默认值
         const usdClaimable = true;      // 默认可领取
-        const nclabClaimable = true;    // 默认可领取  
+        const nclabClaimable = true;    // 默认可领取
         const nclabClaimableTime = 0;   // 默认立即可领取
         const usdClaimed = false;       // 默认未领取
         const nclabClaimed = false;     // 默认未领取
@@ -1211,10 +1203,10 @@ class Game {
 
         // 判断是否为获胜者（有任何奖励）
         const isWinner = usdRewards > BigInt(0) || nclabRewards > BigInt(0);
-        
+
         // 判断是否已全部领取完毕
         const hasClaimedAll = usdClaimed && nclabClaimed;
-        
+
         // 判断是否有可领取的奖励
         const hasClaimableRewards = usdClaimable || nclabClaimable;
 
@@ -1421,7 +1413,7 @@ class Game {
   analyzeRewardClaimStrategy(rewardStatus) {
     const {
       usdRewards,
-      nclabRewards, 
+      nclabRewards,
       usdClaimable,
       nclabClaimable,
       usdClaimed,
@@ -1439,7 +1431,7 @@ class Game {
     if (strategy.shouldClaimUSD && strategy.shouldClaimNCLab) {
       strategy.canClaimAll = true;
       strategy.recommendedMethod = 'claimReward'; // 一键领取所有
-    } 
+    }
     // 如果只有USD奖励可领取
     else if (strategy.shouldClaimUSD && !strategy.shouldClaimNCLab) {
       strategy.recommendedMethod = 'claimAllUSDRewards'; // 只领取USD

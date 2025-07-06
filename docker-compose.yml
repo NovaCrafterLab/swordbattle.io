@@ -16,7 +16,7 @@ x-resources-512m: &res-512
   deploy:
     resources:
       limits:
-        cpus: "0.5"
+        cpus: "1.5"
         memory: 512M
       reservations:
         memory: 256M
@@ -25,7 +25,7 @@ x-resources-256m: &res-256
   deploy:
     resources:
       limits:
-        cpus: "0.3"
+        cpus: "0.5"
         memory: 256M
       reservations:
         memory: 128M
@@ -42,12 +42,12 @@ x-server-common: &server-common
     dockerfile: docker/server.dockerfile
     target: runtime
   env_file: [./env/server.env.development]
-  environment:
-    - SERVER_PORT
-    - API_ENDPOINT
-    - SERVER_SECRET
-    - DEBUG
-    - RECAPTCHA_SECRET_KEY
+  # environment:
+  #   - SERVER_PORT
+  #   - API_ENDPOINT
+  #   - SERVER_SECRET
+  #   - DEBUG
+  #   - RECAPTCHA_SECRET_KEY
   depends_on:
     api:
       condition: service_started
@@ -78,12 +78,12 @@ services:
       dockerfile: docker/api.dockerfile
       target: runtime
     env_file: [./env/api.env.development]
-    environment:
-      - API_PORT
-      - DB_URL
-      - APP_SECRET
-      - SERVER_SECRET
-      - USE_SSL
+    # environment:
+    #   - API_PORT
+    #   - DB_URL
+    #   - APP_SECRET
+    #   - SERVER_SECRET
+    #   - USE_SSL
     depends_on:
       db:
         condition: service_healthy
@@ -109,10 +109,7 @@ services:
       dockerfile: docker/client.dockerfile
       target: runtime
       args:
-        REACT_APP_API: ${REACT_APP_API}
-        REACT_APP_ENDPOINT_DEV: ${REACT_APP_ENDPOINT_DEV}
-        REACT_APP_ENDPOINT_TEST: ${REACT_APP_ENDPOINT_TEST}
-        REACT_APP_ENDPOINT_RACE: ${REACT_APP_ENDPOINT_RACE}
+        BUILD_ENV: ${NODE_ENV:-development}
     env_file: [./env/client.env.development]
     depends_on: [server]
     ports:
