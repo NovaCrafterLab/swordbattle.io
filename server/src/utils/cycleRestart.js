@@ -28,7 +28,14 @@ function getCycleInfo() {
   };
 }
 
-module.exports = { initCycleRestart, getCycleInfo };
+const CYCLE_DATA = Object.freeze({
+  TZ,
+  PERIOD_MIN,
+  PERIOD_MS,
+  EPOCH_ISO,
+});
+
+module.exports = { initCycleRestart, getCycleInfo, CYCLE_DATA };
 
 /* == Internals == */
 function scheduleNext(restartFn) {

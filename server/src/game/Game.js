@@ -11,6 +11,7 @@ const filter = require('leo-profanity');
 const Types = require('./Types');
 const { getBannedIps } = require('../moderation');
 const { rectangleRectangle } = require('./collisions');
+const { CYCLE_DATA } = require('../utils/cycleRestart');
 const Logger = require('../utils/Logger');
 
 
@@ -45,7 +46,7 @@ class Game {
     this.gameTimeout = null;
 
     // 游戏最大持续时间 (30分钟)
-    this.maxGameDuration = 30 * 60 * 1000;
+    this.maxGameDuration = CYCLE_DATA.PERIOD_MS;
     this.pendingMassKill = false;
     
     // 服务器引用，用于访问客户端连接
