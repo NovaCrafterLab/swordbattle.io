@@ -3,7 +3,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Mint, Transfer};
 
-declare_id!("JC8TvL6RdntRxEEzVjmAXzkAWD5HsCYREiSGXtU5c2tj");
+declare_id!("AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV");
 
 #[program]
 pub mod vault {
@@ -66,7 +66,7 @@ pub mod vault {
 
     pub fn finalize_game(
         ctx: Context<FinalizeGame>,
-        rewards: Vec<(Pubkey, u64)>,
+        rewards: Vec<RewardEntry>,
     ) -> Result<()> {
         let vault = &mut ctx.accounts.vault;
 
@@ -79,9 +79,7 @@ pub mod vault {
         // Store rewards in the reward map account
         let reward_map = &mut ctx.accounts.reward_map;
         reward_map.game_id = vault.game_id;
-        for (user_key, reward) in rewards.iter() {
-            reward_map.rewards.insert(*user_key, *reward);
-        }
+        reward_map.rewards = rewards.clone();
 
         emit!(GameFinalized {
             game_id: vault.game_id,
@@ -102,24 +100,37 @@ pub mod vault {
         require!(vault.withdraw_enabled, GameError::WithdrawNotEnabled);
         require!(!user_ticket.has_withdrawn, GameError::AlreadyWithdrawn);
 
-        let reward = reward_map.rewards.get(&ctx.accounts.user.key())
+        // Find reward for this user
+        let reward = reward_map.rewards.iter()
+            .find(|entry| entry.user == ctx.accounts.user.key())
             .ok_or(GameError::NoReward)?;
 
-        // Transfer token from vault to user
+        // Transfer token from vault to user using invoke_signed
+        let seeds = &[
+            b"vault",
+            &vault.game_id.to_le_bytes()[..],
+            &[ctx.bumps.vault_signer],
+        ];
+        let signer_seeds = &[&seeds[..]];
+
         let cpi_accounts = Transfer {
             from: ctx.accounts.vault_token.to_account_info(),
             to: ctx.accounts.user_token.to_account_info(),
             authority: ctx.accounts.vault_signer.to_account_info(),
         };
-        let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
-        token::transfer(cpi_ctx, *reward)?;
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            cpi_accounts,
+            signer_seeds,
+        );
+        token::transfer(cpi_ctx, reward.amount)?;
 
         user_ticket.has_withdrawn = true;
 
         emit!(RewardClaimed {
             game_id: vault.game_id,
             user: ctx.accounts.user.key(),
-            reward_amount: *reward,
+            reward_amount: reward.amount,
             user_ticket: user_ticket.key(),
         });
 
@@ -132,13 +143,24 @@ pub mod vault {
         require!(vault.authority == ctx.accounts.authority.key(), GameError::Unauthorized);
         require!(amount > 0, GameError::InvalidAmount);
 
-        // Transfer token from vault to admin
+        // Transfer token from vault to admin using invoke_signed
+        let seeds = &[
+            b"vault",
+            &vault.game_id.to_le_bytes()[..],
+            &[ctx.bumps.vault_signer],
+        ];
+        let signer_seeds = &[&seeds[..]];
+
         let cpi_accounts = Transfer {
             from: ctx.accounts.vault_token.to_account_info(),
             to: ctx.accounts.admin_token.to_account_info(),
             authority: ctx.accounts.vault_signer.to_account_info(),
         };
-        let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            cpi_accounts,
+            signer_seeds,
+        );
         token::transfer(cpi_ctx, amount)?;
 
         emit!(AdminWithdrawn {
@@ -171,6 +193,12 @@ pub mod vault {
     }
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]
+pub struct RewardEntry {
+    pub user: Pubkey,
+    pub amount: u64,
+}
+
 #[account]
 pub struct GameVault {
     pub game_id: u64,
@@ -192,7 +220,7 @@ pub struct UserTicket {
 #[account]
 pub struct RewardMap {
     pub game_id: u64,
-    pub rewards: std::collections::HashMap<Pubkey, u64>,
+    pub rewards: Vec<RewardEntry>,
 }
 
 #[event]
@@ -323,6 +351,7 @@ pub struct ClaimReward<'info> {
     #[account(mut)]
     pub user_token: Account<'info, TokenAccount>,
     /// CHECK: This is the vault signer PDA
+    #[account(seeds = [b"vault", vault.game_id.to_le_bytes().as_ref()], bump)]
     pub vault_signer: UncheckedAccount<'info>,
     pub user: Signer<'info>,
     pub token_program: Program<'info, Token>,
@@ -337,6 +366,7 @@ pub struct AdminWithdraw<'info> {
     #[account(mut)]
     pub admin_token: Account<'info, TokenAccount>,
     /// CHECK: This is the vault signer PDA
+    #[account(seeds = [b"vault", vault.game_id.to_le_bytes().as_ref()], bump)]
     pub vault_signer: UncheckedAccount<'info>,
     pub authority: Signer<'info>,
     pub token_program: Program<'info, Token>,
