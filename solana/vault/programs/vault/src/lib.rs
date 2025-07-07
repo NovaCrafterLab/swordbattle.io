@@ -20,6 +20,14 @@ pub mod vault {
         vault.finalized = false;
         vault.withdraw_enabled = false;
         vault.token_mint = ctx.accounts.token_mint.key();
+        
+        emit!(GameVaultInitialized {
+            game_id,
+            authority: ctx.accounts.authority.key(),
+            token_mint: ctx.accounts.token_mint.key(),
+            vault: vault.key(),
+        });
+        
         Ok(())
     }
 
@@ -45,6 +53,14 @@ pub mod vault {
         user_ticket.has_withdrawn = false;
         user_ticket.game_id = vault.game_id;
 
+        emit!(TicketPurchased {
+            game_id: vault.game_id,
+            user: ctx.accounts.user.key(),
+            amount,
+            total_deposit: vault.total_deposit,
+            user_ticket: user_ticket.key(),
+        });
+
         Ok(())
     }
 
@@ -66,6 +82,14 @@ pub mod vault {
         for (user_key, reward) in rewards.iter() {
             reward_map.rewards.insert(*user_key, *reward);
         }
+
+        emit!(GameFinalized {
+            game_id: vault.game_id,
+            authority: ctx.accounts.authority.key(),
+            total_deposit: vault.total_deposit,
+            reward_count: rewards.len() as u64,
+            reward_map: reward_map.key(),
+        });
 
         Ok(())
     }
@@ -91,6 +115,14 @@ pub mod vault {
         token::transfer(cpi_ctx, *reward)?;
 
         user_ticket.has_withdrawn = true;
+
+        emit!(RewardClaimed {
+            game_id: vault.game_id,
+            user: ctx.accounts.user.key(),
+            reward_amount: *reward,
+            user_ticket: user_ticket.key(),
+        });
+
         Ok(())
     }
 
@@ -109,6 +141,13 @@ pub mod vault {
         let cpi_ctx = CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts);
         token::transfer(cpi_ctx, amount)?;
 
+        emit!(AdminWithdrawn {
+            game_id: vault.game_id,
+            authority: ctx.accounts.authority.key(),
+            amount,
+            admin_token: ctx.accounts.admin_token.key(),
+        });
+
         Ok(())
     }
 
@@ -118,7 +157,16 @@ pub mod vault {
         require!(vault.authority == ctx.accounts.authority.key(), GameError::Unauthorized);
         require!(!vault.finalized, GameError::AlreadyFinalized);
         
+        let old_mint = vault.token_mint;
         vault.token_mint = new_mint;
+
+        emit!(TokenMintChanged {
+            game_id: vault.game_id,
+            authority: ctx.accounts.authority.key(),
+            old_mint,
+            new_mint,
+        });
+
         Ok(())
     }
 }
@@ -145,6 +193,56 @@ pub struct UserTicket {
 pub struct RewardMap {
     pub game_id: u64,
     pub rewards: std::collections::HashMap<Pubkey, u64>,
+}
+
+#[event]
+pub struct GameVaultInitialized {
+    pub game_id: u64,
+    pub authority: Pubkey,
+    pub token_mint: Pubkey,
+    pub vault: Pubkey,
+}
+
+#[event]
+pub struct TicketPurchased {
+    pub game_id: u64,
+    pub user: Pubkey,
+    pub amount: u64,
+    pub total_deposit: u64,
+    pub user_ticket: Pubkey,
+}
+
+#[event]
+pub struct GameFinalized {
+    pub game_id: u64,
+    pub authority: Pubkey,
+    pub total_deposit: u64,
+    pub reward_count: u64,
+    pub reward_map: Pubkey,
+}
+
+#[event]
+pub struct RewardClaimed {
+    pub game_id: u64,
+    pub user: Pubkey,
+    pub reward_amount: u64,
+    pub user_ticket: Pubkey,
+}
+
+#[event]
+pub struct AdminWithdrawn {
+    pub game_id: u64,
+    pub authority: Pubkey,
+    pub amount: u64,
+    pub admin_token: Pubkey,
+}
+
+#[event]
+pub struct TokenMintChanged {
+    pub game_id: u64,
+    pub authority: Pubkey,
+    pub old_mint: Pubkey,
+    pub new_mint: Pubkey,
 }
 
 #[error_code]
