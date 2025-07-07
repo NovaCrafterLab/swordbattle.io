@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useAccount, useConnect } from 'wagmi';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import Modal from './Modal';
 import { useGameState } from '../../hooks/useGameState';
 import { usePlayerData } from '../../hooks/usePlayerData';
 import { useBlockchain } from '../../hooks/useBlockchain';
-import { formatEther, parseEther } from 'viem';
 import './RaceGameModal.scss';
 
 interface RaceGameModalProps {
@@ -14,8 +15,9 @@ interface RaceGameModalProps {
 }
 
 const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoinGame }) => {
-  const { address, isConnected } = useAccount();
-  const { connect, connectors } = useConnect();
+  const { publicKey, connected: isConnected } = useWallet();
+  const { setVisible: openWalletModal } = useWalletModal();
+  const address = publicKey?.toString();
   const blockchain = useBlockchain();
   const gameState = useGameState(serverUrl);
   const playerData = usePlayerData();
@@ -34,7 +36,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
   const { data: defaultEntryFee } = blockchain.useEntryFee();
   const entryFeeAmount = (levelConfig?.entryFee && typeof levelConfig.entryFee === 'bigint') 
     ? levelConfig.entryFee 
-    : (typeof defaultEntryFee === 'bigint' ? defaultEntryFee : parseEther('10')); // 默认10 USD1
+    : (typeof defaultEntryFee === 'bigint' ? defaultEntryFee : BigInt(0.01 * LAMPORTS_PER_SOL)); // 默认0.01 SOL
 
   // 获取级别显示名称
   const getLevelDisplayName = (level: number) => {
@@ -77,10 +79,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
    */
   const handleConnectWallet = async () => {
     try {
-      const connector = connectors[0]; // 使用第一个连接器（通常是MetaMask）
-      if (connector) {
-        connect({ connector });
-      }
+      openWalletModal(true);
     } catch (error) {
       console.error('Failed to connect wallet:', error);
     }
@@ -214,7 +213,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
         >
           {isApproving || (blockchain.isWritePending && txStep === 'approving') 
             ? 'Approving...' 
-            : `Approve ${formatEther(entryFeeAmount)} USD1`}
+            : `Approve ${(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)} SOL`}
         </button>
       );
     }
@@ -305,11 +304,11 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
               </div>
               <div className="info-item">
                 <label>Entry Fee</label>
-                <span>{formatEther(entryFeeAmount)} USD1</span>
+                <span>{(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)} SOL</span>
               </div>
               <div className="info-item">
                 <label>Total Prize</label>
-                <span>{formatEther(gameState.gameState.totalPrize)} USD1</span>
+                <span>{(Number(gameState.gameState.totalPrize) / LAMPORTS_PER_SOL).toFixed(4)} SOL</span>
               </div>
               <div className="info-item">
                 <label>Players</label>
@@ -331,10 +330,10 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
             </div>
             <div className="balance-info">
               <span>
-                USD1 Balance: {
+                SOL Balance: {
                   playerData.isBalanceLoading 
                     ? '⏳ Loading...' 
-                    : formatEther(typeof playerData.usd1Balance === 'bigint' ? playerData.usd1Balance : BigInt(0))
+                    : (Number(typeof playerData.usd1Balance === 'bigint' ? playerData.usd1Balance : BigInt(0)) / LAMPORTS_PER_SOL).toFixed(4)
                 }
               </span>
               {gameState.isRaceServer && (
@@ -342,7 +341,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({ serverUrl, onClose, onJoi
                   Allowance: {
                     playerData.isAllowanceLoading 
                       ? '⏳ Loading...' 
-                      : formatEther(typeof playerData.allowance === 'bigint' ? playerData.allowance : BigInt(0))
+                      : (Number(typeof playerData.allowance === 'bigint' ? playerData.allowance : BigInt(0)) / LAMPORTS_PER_SOL).toFixed(4)
                   }
                 </span>
               )}

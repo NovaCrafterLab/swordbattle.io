@@ -222,7 +222,7 @@ export const useBlockchain = () => {
   });
 
   const useGamePlayers = (gameId: number) => ({
-    data: [],
+    data: [] as string[],
     isLoading: false,
     error: null,
     refetch: () => {}

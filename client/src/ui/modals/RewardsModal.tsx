@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useAccount } from 'wagmi';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import Modal from './Modal';
 import { usePlayerData } from '../../hooks/usePlayerData';
 import { useBlockchain, PlayerDashboard } from '../../hooks/useBlockchain';
-import { formatEther } from 'viem';
 import './RewardsModal.scss';
 
 interface RewardsModalProps {
@@ -30,13 +30,14 @@ interface GameReward {
 }
 
 const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
-  const { address, isConnected } = useAccount();
+  const { publicKey, connected: isConnected } = useWallet();
+  const address = publicKey?.toString();
   const blockchain = useBlockchain();
   const playerData = usePlayerData();
 
   // 获取玩家仪表板数据（包含碎片余额、奖励等所有信息）
   const { data: playerDashboardRaw } = blockchain.usePlayerDashboard(address || '');
-  const playerDashboard = playerDashboardRaw as PlayerDashboard | undefined;
+  const playerDashboard = playerDashboardRaw as PlayerDashboard | null;
 
   const [gameRewards, setGameRewards] = useState<GameReward[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -295,11 +296,11 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
           <div className="rewards-stats">
             <div className="stat-item">
               <label>Total Rewards</label>
-              <span className="stat-value">{formatEther(totalRewards)} USD1</span>
+              <span className="stat-value">{(Number(totalRewards) / LAMPORTS_PER_SOL).toFixed(4)} SOL</span>
             </div>
             <div className="stat-item">
               <label>Available to Claim</label>
-              <span className="stat-value claimable">{formatEther(claimableAmount)} USD1</span>
+              <span className="stat-value claimable">{(Number(claimableAmount) / LAMPORTS_PER_SOL).toFixed(4)} SOL</span>
             </div>
             <div className="stat-item">
               <label>Games Played</label>
@@ -421,11 +422,11 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
                         <span className="score">Score: {reward.score.toLocaleString()}</span>
                         <div className="reward-amounts">
                           <span className={`reward-amount ${reward.usdReward > BigInt(0) ? 'positive' : 'zero'}`}>
-                            💰 {formatEther(reward.usdReward)} USD1
+                            💰 {(Number(reward.usdReward) / LAMPORTS_PER_SOL).toFixed(4)} SOL
                           </span>
                           {reward.nclabReward > BigInt(0) && (
                             <span className={`reward-amount ${reward.nclabReward > BigInt(0) ? 'positive' : 'zero'}`}>
-                              ⚡ {formatEther(reward.nclabReward)} NCLab
+                              ⚡ {(Number(reward.nclabReward) / LAMPORTS_PER_SOL).toFixed(4)} SPL
                             </span>
                           )}
                         </div>

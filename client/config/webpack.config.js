@@ -332,6 +332,8 @@ module.exports = function (webpackEnv) {
         process: require.resolve('process'),
         util: require.resolve('util'),
         vm: require.resolve('vm-browserify'),
+        crypto: require.resolve('crypto-browserify'),
+        stream: require.resolve('stream-browserify'),
         fs: false,
         path: false,
         os: false,

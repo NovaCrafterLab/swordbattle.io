@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAccount } from 'wagmi';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useBlockchain } from './useBlockchain';
 import logger from '@/utils/logger';
 
@@ -41,7 +41,8 @@ export interface ServerInfo {
  * 游戏状态管理hook
  */
 export const useGameState = (serverUrl?: string) => {
-  const { address } = useAccount();
+  const { publicKey } = useWallet();
+  const address = publicKey?.toString();
   const blockchain = useBlockchain();
 
   const [gameState, setGameState] = useState<GameState>({
@@ -108,7 +109,7 @@ export const useGameState = (serverUrl?: string) => {
 
   // 检查玩家是否已加入
   const isPlayerJoined = address && gamePlayers && Array.isArray(gamePlayers) ?
-    gamePlayers.includes(address.toLowerCase() as `0x${string}`) : false;
+    gamePlayers.includes(address) : false;
 
   /**
    * 获取服务器信息

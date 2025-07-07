@@ -10,6 +10,7 @@ import {
   faX,
 } from '@fortawesome/free-solid-svg-icons';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 
 import clsx from 'clsx';
 import { useScale } from './Scale';
@@ -72,6 +73,7 @@ function App() {
   const dispatch = useDispatch();
   const account = useSelector(selectAccount);
   const { publicKey, connected: walletConnected } = useWallet();
+  const { setVisible: openWalletModal } = useWalletModal();
   const walletAddress = publicKey?.toString();
 
   const scale = useScale(false);
@@ -464,7 +466,7 @@ function App() {
                         account={account}
                         onLogin={onLogin}
                         onSignup={onSignup}
-                        onConnectWallet={openConnectModal}
+                        onConnectWallet={() => openWalletModal(true)}
                       />
                     </div>
 

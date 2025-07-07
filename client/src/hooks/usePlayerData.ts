@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useAccount } from 'wagmi'
-import { formatEther } from 'viem'
+import { useWallet } from '@solana/wallet-adapter-react'
 import { useBlockchain } from './useBlockchain'
-import { getGameAggregatorContract } from '@/config/walletConfig'
 import { endpoint as API_ROOT } from '@/api'
+import { LAMPORTS_PER_SOL } from '@solana/web3.js'
 
 // 新的GameAggregator接口类型定义
 export interface GameFullInfo {
@@ -87,7 +86,8 @@ const api = (p: string) => `${API_ROOT}${p.startsWith('/') ? '' : '/'}${p}`;
  * 玩家数据管理hook
  */
 export const usePlayerData = () => {
-  const { address } = useAccount()
+  const { publicKey } = useWallet()
+  const address = publicKey?.toString()
   const blockchain = useBlockchain()
 
   const [playerProfile, setPlayerProfile] = useState<PlayerProfile | null>(null)
@@ -673,10 +673,12 @@ export const usePlayerData = () => {
   )
 
   /**
-   * 格式化USD1金额
+   * 格式化SPL Token金额 (替代原来的USD1)
    */
   const formatUSD1Amount = useCallback((amount: bigint): string => {
-    return formatEther(amount)
+    // 将 lamports 转换为 SOL (1 SOL = 1,000,000,000 lamports)
+    // 注意：这里假设原来的 "USD1" 金额现在用 lamports 表示
+    return (Number(amount) / LAMPORTS_PER_SOL).toFixed(6)
   }, [])
 
   /**
@@ -685,10 +687,10 @@ export const usePlayerData = () => {
   const getPlayerLevel = useCallback((): number => {
     if (!playerProfile) return 1
 
-    const totalRewardsEth = Number(formatEther(playerProfile.totalRewards))
+    const totalRewardsSol = Number(playerProfile.totalRewards) / LAMPORTS_PER_SOL
 
-    // 简单的等级计算：每100 USD1为一级
-    return Math.floor(totalRewardsEth / 100) + 1
+    // 简单的等级计算：每100 SOL为一级
+    return Math.floor(totalRewardsSol / 100) + 1
   }, [playerProfile])
 
   /**
