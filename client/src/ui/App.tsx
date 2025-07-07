@@ -9,8 +9,7 @@ import {
   faGear,
   faX,
 } from '@fortawesome/free-solid-svg-icons';
-import { useAccount } from 'wagmi';
-import { useConnectModal } from '@rainbow-me/rainbowkit';
+import { useWallet } from '@solana/wallet-adapter-react';
 
 import clsx from 'clsx';
 import { useScale } from './Scale';
@@ -62,7 +61,7 @@ import ForumCard from './ForumCard';
 // import Game from '../game/scenes/Game';
 import titleImg from '../assets/img/final.png';
 import Leaderboard from './game/Leaderboard';
-import BSCWalletButton from './BSCWalletButton';
+import UnifiedWalletButton from './UnifiedWalletButton';
 
 let debugMode = false;
 try {
@@ -72,8 +71,8 @@ try {
 function App() {
   const dispatch = useDispatch();
   const account = useSelector(selectAccount);
-  const { address: walletAddress, isConnected: walletConnected } = useAccount();
-  const { openConnectModal } = useConnectModal();
+  const { publicKey, connected: walletConnected } = useWallet();
+  const walletAddress = publicKey?.toString();
 
   const scale = useScale(false);
   const [name, setName] = useState('');
@@ -605,7 +604,7 @@ function App() {
 
             <div className="auth-buttons" style={scale.styles}>
               <div className="auth-btn">
-                <BSCWalletButton />
+                <UnifiedWalletButton />
               </div>
               <div className="auth-btn">
                 <button

@@ -1,19 +1,28 @@
-// client/src/index.tsx
-import React from 'react';
+// client/src/index.tsx - Solana-Only Support
+import React, { useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
 import { RouterProvider } from 'react-router-dom';
-import { WagmiProvider } from 'wagmi';
-import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import '@rainbow-me/rainbowkit/styles.css';
+// Solana Wallet Adapter imports
+import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
+import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
+import { clusterApiUrl } from '@solana/web3.js';
+
+// Solana Wallet Adapter CSS
+import '@solana/wallet-adapter-react-ui/styles.css';
 
 import { refreshAccountAsync } from '@/redux/account/slice'
 import { ToastProvider, ToastContainer } from '@/ui/components/Toast'
 
 import { router } from './router';
-import { wagmiConfig } from './blockchain';
+import { 
+  network, 
+  endpoint, 
+  wallets,
+  BLOCKCHAIN_INFO
+} from './blockchain';
 import { initRecaptcha } from './utils/recaptcha';
 import { store } from './redux/store';
 import { config } from './config';
@@ -40,18 +49,36 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 3, staleTime: 5 * 60_000 } },
 });
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+// Solana Wallet Providers Component
+const SolanaWalletProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Use RPC endpoint with fallback
+  const rpcEndpoint = useMemo(() => {
+    return endpoint || clusterApiUrl(network);
+  }, []);
 
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider>
-          <Provider store={store}>
-            <ToastProvider>
-              <RouterProvider router={router} />
-              <ToastContainer />
-            </ToastProvider>
-          </Provider>
-        </RainbowKitProvider>
-      </QueryClientProvider>
-    </WagmiProvider>,
+  // 显示区块链信息
+  console.log(`🔗 Solana Blockchain Configuration:`, BLOCKCHAIN_INFO);
+
+  return (
+    <ConnectionProvider endpoint={rpcEndpoint}>
+      <WalletProvider wallets={wallets} autoConnect>
+        <WalletModalProvider>
+          <QueryClientProvider client={queryClient}>
+            {children}
+          </QueryClientProvider>
+        </WalletModalProvider>
+      </WalletProvider>
+    </ConnectionProvider>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+  <SolanaWalletProviders>
+    <Provider store={store}>
+      <ToastProvider>
+        <RouterProvider router={router} />
+        <ToastContainer />
+      </ToastProvider>
+    </Provider>
+  </SolanaWalletProviders>
 );

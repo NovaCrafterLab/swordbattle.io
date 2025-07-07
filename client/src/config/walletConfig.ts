@@ -1,9 +1,6 @@
-// RainbowKit/Wagmi/Viem 钱包相关配置
-// 适配 BSC 主网与测试网，预留 ABI 路径与类型声明
+// Solana钱包相关配置
+// 适配 Solana Devnet 与 Mainnet，预留程序ID与配置
 
-// ABI导入 - GameAggregator和ERC20
-import { GAME_AGGREGATOR_ABI } from '../abis/GameAggregator';
-import { ERC20_ABI } from '../abis/ERC20';
 import { config } from '../config';
 
 // 环境变量检查
@@ -12,118 +9,127 @@ export const isDev = config.isDev;
 export const isRelease = ENV === 'release';
 console.log('Environment:', ENV);
 
-// 合约地址配置 - 根据环境选择  
-export const CONTRACTS = isDev
-  ? {
-    // BSC测试网合约地址 - 使用新的GameAggregator地址
-    GAME_AGGREGATOR: process.env.REACT_APP_GAME_AGGREGATOR_CONTRACT_TESTNET || '0x6810494B605ac1A6259788Db999202f5578dA4E1',
-    USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_TESTNET || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16',
-  }
-  : {
-    // BSC主网合约地址 - 使用新的GameAggregator地址
-    GAME_AGGREGATOR: process.env.REACT_APP_GAME_AGGREGATOR_CONTRACT_MAINNET || '0x6810494B605ac1A6259788Db999202f5578dA4E1',
-    USD1_TOKEN: process.env.REACT_APP_USD1_TOKEN_CONTRACT_MAINNET || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16',
-  } as const;
-
-// ABI导出 - GameAggregator和ERC20
-export const ABIS = {
-  GAME_AGGREGATOR: GAME_AGGREGATOR_ABI as readonly any[],
-  ERC20: ERC20_ABI as readonly any[],
+// 有效的Solana地址作为占位符（base58编码）
+const PLACEHOLDER_ADDRESSES = {
+  // 使用系统程序ID作为安全的占位符地址
+  GAME_PROGRAM_DEVNET: '11111111111111111111111111111112', // System Program
+  REWARD_TOKEN_MINT_DEVNET: 'So11111111111111111111111111111111111111112', // SOL mint
+  GAME_PROGRAM_MAINNET: '11111111111111111111111111111112', // System Program
+  REWARD_TOKEN_MINT_MAINNET: 'So11111111111111111111111111111111111111112', // SOL mint
 } as const;
 
-// 合约配置类型
-export type ContractConfig = {
-  address: `0x${string}`;
-  abi: readonly any[];
-};
-
-// 导出合约配置
-export const getGameAggregatorContract = (): ContractConfig => ({
-  address: CONTRACTS.GAME_AGGREGATOR as `0x${string}`,
-  abi: ABIS.GAME_AGGREGATOR,
-});
-
-// USD1 Token合约配置
-export const getUSD1TokenContract = (): ContractConfig => ({
-  address: CONTRACTS.USD1_TOKEN as `0x${string}`,
-  abi: ABIS.ERC20,
-});
-
-// BSC主网RPC池配置
-export const BSC_MAINNET_RPC_POOL = [
-  'https://rpc.ankr.com/bsc/861a4f3afee73437812056e2efd748f76db6220c614f0e34a9c7b2f66c9e97d5',
-  'https://rpc.ankr.com/bsc/45608a7cdae0c7873dcbd9196953b7015f8d7127736df17480472224b128e67e',
-  'https://rpc.ankr.com/bsc/6912fa941610bbd399c033a47c0103ac0611db7e30b95c19b8087d5363670537',
-  'https://rpc.ankr.com/bsc/c5c5e3d8c1b1b285ba4778fb16c35fc211b3eb691cf9bd2a9b9a155eca0f4bc2',
-] as const;
-
-// BSC测试网RPC池配置
-export const BSC_TESTNET_RPC_POOL = [
-  'https://bsc-testnet-dataseed.bnbchain.org',
-  'https://bsc-testnet.bnbchain.org',
-  'https://bsc-testnet-rpc.publicnode.com',
-  'https://endpoints.omniatech.io/v1/bsc/testnet/public',
-  'https://data-seed-prebsc-1-s1.bnbchain.org:8545',
-  'https://data-seed-prebsc-2-s1.bnbchain.org:8545',
-  'https://data-seed-prebsc-1-s2.bnbchain.org:8545',
-  'https://data-seed-prebsc-2-s2.bnbchain.org:8545',
-  'https://data-seed-prebsc-1-s3.bnbchain.org:8545',
-  'https://data-seed-prebsc-2-s3.bnbchain.org:8545',
-] as const;
-
-// 根据环境选择RPC池
-export const CURRENT_RPC_POOL = isDev ? BSC_TESTNET_RPC_POOL : BSC_MAINNET_RPC_POOL;
-
-// 网络配置 - 根据环境选择
-export const NETWORK_CONFIG = isDev
+// Solana程序ID配置 - 根据环境选择
+export const SOLANA_PROGRAMS = isDev
   ? {
-    chainId: 97,
-    name: 'BSC Testnet',
-    rpcUrls: BSC_TESTNET_RPC_POOL,
-    primaryRpcUrl: BSC_TESTNET_RPC_POOL[0],
-    explorerUrl: 'https://testnet.bscscan.com/',
-    nativeCurrency: {
-      name: 'tBNB',
-      symbol: 'tBNB',
-      decimals: 18,
-    },
+    // Devnet程序地址 - TODO: 替换为实际部署的程序ID
+    GAME_PROGRAM: process.env.REACT_APP_GAME_PROGRAM_ID_DEVNET || PLACEHOLDER_ADDRESSES.GAME_PROGRAM_DEVNET,
+    REWARD_TOKEN_MINT: process.env.REACT_APP_REWARD_TOKEN_MINT_DEVNET || PLACEHOLDER_ADDRESSES.REWARD_TOKEN_MINT_DEVNET,
   }
   : {
-    chainId: 56,
-    name: 'BSC Mainnet',
-    rpcUrls: BSC_MAINNET_RPC_POOL,
-    primaryRpcUrl: BSC_MAINNET_RPC_POOL[0],
-    explorerUrl: 'https://bscscan.com/',
-    nativeCurrency: {
-      name: 'BNB',
-      symbol: 'BNB',
-      decimals: 18,
-    },
+    // Mainnet-beta程序地址 - TODO: 替换为实际部署的程序ID
+    GAME_PROGRAM: process.env.REACT_APP_GAME_PROGRAM_ID_MAINNET || PLACEHOLDER_ADDRESSES.GAME_PROGRAM_MAINNET,
+    REWARD_TOKEN_MINT: process.env.REACT_APP_REWARD_TOKEN_MINT_MAINNET || PLACEHOLDER_ADDRESSES.REWARD_TOKEN_MINT_MAINNET,
   } as const;
 
-// 导出环境信息
-export const ENVIRONMENT = {
+// 程序配置类型
+export type ProgramConfig = {
+  programId: string;
+  cluster: string;
+};
+
+// 导出程序配置 
+export const getGameProgramConfig = (): ProgramConfig => ({
+  programId: SOLANA_PROGRAMS.GAME_PROGRAM,
+  cluster: isDev ? 'devnet' : 'mainnet-beta',
+});
+
+// SPL Token配置
+export const getRewardTokenConfig = (): ProgramConfig => ({
+  programId: SOLANA_PROGRAMS.REWARD_TOKEN_MINT,
+  cluster: isDev ? 'devnet' : 'mainnet-beta',
+});
+
+// Helius RPC API Keys Pool (49个密钥用于负载均衡)
+const RPC_API_KEYS_RAW = process.env.REACT_APP_RPC_API_KEYS_POOL || '';
+const RPC_API_KEYS = RPC_API_KEYS_RAW.split(',').filter(key => key.trim().length > 0);
+
+// Solana Devnet RPC池配置 (使用Helius API密钥)
+export const SOLANA_DEVNET_RPC_POOL = RPC_API_KEYS.length > 0 
+  ? RPC_API_KEYS.map(key => `https://devnet.helius-rpc.com/?api-key=${key}`)
+  : [
+    'https://api.devnet.solana.com',
+    'https://devnet.helius-rpc.com/?api-key=demo',
+    'https://rpc.ankr.com/solana_devnet',
+    'https://solana-devnet.g.alchemy.com/v2/demo',
+  ] as const;
+
+// Solana Mainnet RPC池配置 (使用Helius API密钥)
+export const SOLANA_MAINNET_RPC_POOL = RPC_API_KEYS.length > 0
+  ? RPC_API_KEYS.map(key => `https://mainnet.helius-rpc.com/?api-key=${key}`)
+  : [
+    'https://api.mainnet-beta.solana.com',
+    'https://mainnet.helius-rpc.com/?api-key=demo',
+    'https://rpc.ankr.com/solana',
+    'https://solana-mainnet.g.alchemy.com/v2/demo',
+  ] as const;
+
+// RPC池配置
+export const SOLANA_RPC_POOLS = {
+  devnet: SOLANA_DEVNET_RPC_POOL,
+  mainnet: SOLANA_MAINNET_RPC_POOL,
+} as const;
+
+// 根据环境选择RPC池
+export const CURRENT_RPC_POOL = isDev ? SOLANA_DEVNET_RPC_POOL : SOLANA_MAINNET_RPC_POOL;
+
+// Solana网络配置 - 根据环境选择
+export const SOLANA_NETWORK_CONFIG = isDev
+  ? {
+    cluster: 'devnet',
+    name: 'Solana Devnet', 
+    rpcUrls: SOLANA_DEVNET_RPC_POOL,
+    primaryRpcUrl: SOLANA_DEVNET_RPC_POOL[0],
+    explorerUrl: 'https://explorer.solana.com/?cluster=devnet',
+    commitment: 'confirmed' as const,
+    wsUrl: 'wss://api.devnet.solana.com',
+  }
+  : {
+    cluster: 'mainnet-beta',
+    name: 'Solana Mainnet',
+    rpcUrls: SOLANA_MAINNET_RPC_POOL,
+    primaryRpcUrl: SOLANA_MAINNET_RPC_POOL[0],
+    explorerUrl: 'https://explorer.solana.com',
+    commitment: 'confirmed' as const,
+    wsUrl: 'wss://api.mainnet-beta.solana.com',
+  } as const;
+
+// 导出Solana环境信息
+export const SOLANA_ENVIRONMENT = {
   ENV,
   isDev,
   isRelease,
-  chainId: NETWORK_CONFIG.chainId,
-  networkName: NETWORK_CONFIG.name,
-  explorerUrl: NETWORK_CONFIG.explorerUrl,
+  cluster: SOLANA_NETWORK_CONFIG.cluster,
+  networkName: SOLANA_NETWORK_CONFIG.name,
+  explorerUrl: SOLANA_NETWORK_CONFIG.explorerUrl,
+  commitment: SOLANA_NETWORK_CONFIG.commitment,
+  wsUrl: SOLANA_NETWORK_CONFIG.wsUrl,
+  primaryRpcUrl: SOLANA_NETWORK_CONFIG.primaryRpcUrl,
+  rpcPoolSize: CURRENT_RPC_POOL.length,
 } as const;
 
-// RPC健康检查和故障转移工具
-export class RPCManager {
-  private static instance: RPCManager;
+// Solana RPC健康检查和故障转移工具
+export class SolanaRPCManager {
+  private static instance: SolanaRPCManager;
   private currentRpcIndex = 0;
   private failedRpcs = new Set<number>();
   private lastHealthCheck = 0;
-  private readonly healthCheckInterval = 5 * 60 * 1000;
+  private readonly healthCheckInterval = 5 * 60 * 1000; // 5分钟
 
-  static getInstance(): RPCManager {
-    if (!RPCManager.instance) {
-      RPCManager.instance = new RPCManager();
+  static getInstance(): SolanaRPCManager {
+    if (!SolanaRPCManager.instance) {
+      SolanaRPCManager.instance = new SolanaRPCManager();
     }
-    return RPCManager.instance;
+    return SolanaRPCManager.instance;
   }
 
   getCurrentRPC(): string {
@@ -135,7 +141,7 @@ export class RPCManager {
   }
 
   markCurrentRPCFailed(): string {
-    console.warn(`RPC ${this.getCurrentRPC()} 标记为失败，切换到下一个节点`);
+    console.warn(`Solana RPC ${this.getCurrentRPC()} 标记为失败，切换到下一个节点`);
     this.failedRpcs.add(this.currentRpcIndex);
     this.switchToNextRPC();
     return this.getCurrentRPC();
@@ -146,7 +152,7 @@ export class RPCManager {
       (index) => !this.failedRpcs.has(index)
     );
     if (availableIndices.length === 0) {
-      console.warn('所有RPC节点都失败，重置失败列表');
+      console.warn('所有Solana RPC节点都失败，重置失败列表');
       this.failedRpcs.clear();
       this.currentRpcIndex = 0;
       return;
@@ -162,6 +168,7 @@ export class RPCManager {
       return;
     }
     this.lastHealthCheck = now;
+    
     const healthPromises = CURRENT_RPC_POOL.map(async (rpc, index) => {
       try {
         const response = await fetch(rpc, {
@@ -169,16 +176,18 @@ export class RPCManager {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             jsonrpc: '2.0',
-            method: 'eth_blockNumber',
+            method: 'getHealth',
             params: [],
             id: 1,
           }),
           signal: AbortSignal.timeout(5000),
         });
+        
         if (response.ok) {
           const data = await response.json();
-          if (data.result) {
+          if (data.result === 'ok') {
             if (this.failedRpcs.has(index)) {
+              console.log(`Solana RPC ${rpc} 已恢复健康`);
               this.failedRpcs.delete(index);
             }
             return { index, status: 'healthy', rpc };
@@ -186,16 +195,19 @@ export class RPCManager {
         }
         throw new Error('Invalid response');
       } catch (error) {
-        console.warn(`RPC ${rpc} 健康检查失败:`, error);
+        console.warn(`Solana RPC ${rpc} 健康检查失败:`, error);
         this.failedRpcs.add(index);
         return { index, status: 'failed', rpc };
       }
     });
+
     const results = await Promise.allSettled(healthPromises);
     const healthyCount = results.filter(
       (r) => r.status === 'fulfilled' && r.value.status === 'healthy'
     ).length;
-    console.log(`RPC健康检查完成: ${healthyCount}/${CURRENT_RPC_POOL.length} 节点正常`);
+    
+    console.log(`Solana RPC健康检查完成: ${healthyCount}/${CURRENT_RPC_POOL.length} 节点正常`);
+    console.log(`Helius API密钥数量: ${RPC_API_KEYS.length}`);
   }
 
   getStats() {
@@ -205,7 +217,19 @@ export class RPCManager {
       failed: this.failedRpcs.size,
       current: this.getCurrentRPC(),
       failedRpcs: Array.from(this.failedRpcs).map((i) => CURRENT_RPC_POOL[i]),
-      environment: ENVIRONMENT.networkName,
+      environment: SOLANA_ENVIRONMENT.networkName,
+      heliusKeys: RPC_API_KEYS.length,
+      cluster: SOLANA_ENVIRONMENT.cluster,
     };
   }
-} 
+}
+
+// 导出向后兼容的环境信息（对接原有代码）
+export const ENVIRONMENT = {
+  ENV,
+  isDev,
+  isRelease,
+  chainId: isDev ? 101 : 101, // Solana 主网和测试网都使用 cluster 而非 chainId
+  networkName: SOLANA_ENVIRONMENT.networkName,
+  explorerUrl: SOLANA_ENVIRONMENT.explorerUrl,
+} as const;

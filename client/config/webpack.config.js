@@ -327,6 +327,15 @@ module.exports = function (webpackEnv) {
         '@': paths.appSrc,
         ...(modules.webpackAliases || {}),
       },
+      fallback: {
+        buffer: require.resolve('buffer'),
+        process: require.resolve('process'),
+        util: require.resolve('util'),
+        vm: require.resolve('vm-browserify'),
+        fs: false,
+        path: false,
+        os: false,
+      },
       plugins: [
         // Prevents users from importing files from outside of src/ (or node_modules/).
         // This often causes confusion because we only process files within src/ with babel.
