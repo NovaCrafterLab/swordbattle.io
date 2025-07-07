@@ -207,3 +207,12 @@ env/backup
 CLAUDE.md
 claude-code-kit
 .mcp.json
+
+# Anchor
+.anchor
+.DS_Store
+target
+**/*.rs.bk
+node_modules
+test-ledger
+.yarn
