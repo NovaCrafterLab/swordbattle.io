@@ -1,7 +1,6 @@
 // Load environment variables from a .env file
 require('dotenv').config();
 
-// 环境判断逻辑与前端保持一致
 const ENV = process.env.BUILD_ENV || 'development';
 const isDev = ENV === 'development';
 const isRelease = ENV === 'production';
@@ -38,45 +37,6 @@ module.exports = {
 
   // ReCAPTCHA secret key for verifying ReCAPTCHA responses
   recaptchaSecretKey: process.env.RECAPTCHA_SECRET_KEY,
-
-  // Environment information
-  environment: {
-    ENV,
-    isDev,
-    isRelease,
-    nodeEnv: ENV,
-  },
-
-  // Server type configuration
-  serverType: process.env.SERVER_TYPE || 'NORMAL',
-  isRaceServer: process.env.SERVER_TYPE === 'RACE',
-  enableCycleRestart:process.env.ENABLE_CYCLE_RESTART === 'true' || process.env.SERVER_TYPE === 'RACE',
-
-  // Blockchain configuration
-  blockchain: {
-    enabled: process.env.BLOCKCHAIN_ENABLED === 'true',
-    rpcUrl: process.env.BLOCKCHAIN_RPC_URL, // 可选，会使用内置RPC池
-    contracts: {
-      gameAggregator: isDev
-        ? (process.env.GAME_AGGREGATOR_CONTRACT_TESTNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x6810494B605ac1A6259788Db999202f5578dA4E1')
-        : (process.env.GAME_AGGREGATOR_CONTRACT_MAINNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x6810494B605ac1A6259788Db999202f5578dA4E1'),
-      // SwordBattle 原合约用于基础数据查询 - 更新为最新地址
-      swordBattle: isDev
-        ? (process.env.SWORD_BATTLE_CONTRACT_TESTNET || process.env.SWORD_BATTLE_CONTRACT || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD')
-        : (process.env.SWORD_BATTLE_CONTRACT_MAINNET || process.env.SWORD_BATTLE_CONTRACT || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD'),
-      usd1Token: isDev
-        ? '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16'
-        : '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16',
-    },
-    trustedSigner: process.env.TRUSTED_SIGNER_PRIVATE_KEY,
-    gameLevel: parseInt(process.env.GAME_LEVEL || '0'), 
-    environment: {
-      isDev,
-      isRelease,
-      chainId: isDev ? 97 : 56,
-      networkName: isDev ? 'BSC Testnet' : 'BSC Mainnet',
-    },
-  },
 
   // Game configuration settings
   tickRate: 20,
