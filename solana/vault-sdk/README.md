@@ -130,6 +130,186 @@ const rewardMap = await vaultSDK.getRewardMapAccount(12345);
 const vaultInfo = vaultSDK.getVaultInfo(12345);
 ```
 
+## Event Listening and Querying
+
+The SDK provides comprehensive event listening and querying capabilities for real-time updates and historical data analysis.
+
+### Real-time Event Listening
+
+```typescript
+// Listen to all events
+const allEventsSubscription = vaultSDK.onAllEvents((event, slot) => {
+  console.log('Event received:', event, 'at slot:', slot);
+});
+
+// Listen to specific event types
+const ticketSubscription = vaultSDK.onTicketPurchased((event, slot) => {
+  console.log('Ticket purchased:', {
+    gameId: event.gameId,
+    user: event.user.toString(),
+    amount: event.amount,
+    totalDeposit: event.totalDeposit
+  });
+});
+
+const rewardSubscription = vaultSDK.onRewardClaimed((event, slot) => {
+  console.log('Reward claimed:', {
+    gameId: event.gameId,
+    user: event.user.toString(),
+    rewardAmount: event.rewardAmount
+  });
+});
+
+const finalizeSubscription = vaultSDK.onGameFinalized((event, slot) => {
+  console.log('Game finalized:', {
+    gameId: event.gameId,
+    totalDeposit: event.totalDeposit,
+    rewardCount: event.rewardCount
+  });
+});
+
+const adminWithdrawSubscription = vaultSDK.onAdminWithdrawn((event, slot) => {
+  console.log('Admin withdrawn:', {
+    gameId: event.gameId,
+    authority: event.authority.toString(),
+    amount: event.amount
+  });
+});
+
+const tokenMintSubscription = vaultSDK.onTokenMintChanged((event, slot) => {
+  console.log('Token mint changed:', {
+    gameId: event.gameId,
+    oldMint: event.oldMint.toString(),
+    newMint: event.newMint.toString()
+  });
+});
+
+// Don't forget to unsubscribe when done
+allEventsSubscription.unsubscribe();
+ticketSubscription.unsubscribe();
+rewardSubscription.unsubscribe();
+finalizeSubscription.unsubscribe();
+adminWithdrawSubscription.unsubscribe();
+tokenMintSubscription.unsubscribe();
+```
+
+### Historical Event Querying
+
+```typescript
+// Get all recent events (last 1000 transactions)
+const recentEvents = await vaultSDK.getRecentEvents();
+
+// Get events for a specific game
+const gameEvents = await vaultSDK.getGameEvents(12345);
+
+// Get events for a specific user
+const userEvents = await vaultSDK.getUserEvents(userPublicKey);
+
+// Get events from a specific authority
+const authorityEvents = await vaultSDK.getAuthorityEvents(authorityPublicKey);
+
+// Get events with custom filters
+const filteredEvents = await vaultSDK.getEvents({
+  gameId: 12345,
+  user: userPublicKey,
+  fromSlot: 1000000,
+  toSlot: 2000000
+});
+```
+
+### Event Types
+
+```typescript
+interface GameVaultInitializedEvent {
+  gameId: string;
+  authority: PublicKey;
+  tokenMint: PublicKey;
+  vault: PublicKey;
+}
+
+interface TicketPurchasedEvent {
+  gameId: string;
+  user: PublicKey;
+  amount: string;
+  totalDeposit: string;
+  userTicket: PublicKey;
+}
+
+interface RewardClaimedEvent {
+  gameId: string;
+  user: PublicKey;
+  rewardAmount: string;
+  userTicket: PublicKey;
+}
+
+interface GameFinalizedEvent {
+  gameId: string;
+  authority: PublicKey;
+  totalDeposit: string;
+  rewardCount: string;
+  rewardMap: PublicKey;
+}
+
+interface AdminWithdrawnEvent {
+  gameId: string;
+  authority: PublicKey;
+  amount: string;
+  adminToken: PublicKey;
+}
+
+interface TokenMintChangedEvent {
+  gameId: string;
+  authority: PublicKey;
+  oldMint: PublicKey;
+  newMint: PublicKey;
+}
+```
+
+### Event Monitoring Example
+
+```typescript
+async function monitorGameEvents(gameId: number) {
+  console.log(`🎮 开始监控游戏 ${gameId} 的事件...`);
+
+  // 监听购票事件
+  const ticketSubscription = vaultSDK.onTicketPurchased((event, slot) => {
+    if (event.gameId === gameId.toString()) {
+      console.log(`🎫 新购票: 用户 ${event.user.toString()} 购买了 ${event.amount} 代币`);
+    }
+  });
+
+  // 监听游戏结束事件
+  const finalizeSubscription = vaultSDK.onGameFinalized((event, slot) => {
+    if (event.gameId === gameId.toString()) {
+      console.log(`🏁 游戏结束: 总存款 ${event.totalDeposit}, 奖励数量 ${event.rewardCount}`);
+    }
+  });
+
+  // 监听奖励领取事件
+  const rewardSubscription = vaultSDK.onRewardClaimed((event, slot) => {
+    if (event.gameId === gameId.toString()) {
+      console.log(`🏆 奖励领取: 用户 ${event.user.toString()} 领取了 ${event.rewardAmount} 代币`);
+    }
+  });
+
+  // 返回取消订阅函数
+  return () => {
+    ticketSubscription.unsubscribe();
+    finalizeSubscription.unsubscribe();
+    rewardSubscription.unsubscribe();
+  };
+}
+
+// 使用示例
+const stopMonitoring = await monitorGameEvents(12345);
+
+// 停止监控
+setTimeout(() => {
+  stopMonitoring();
+  console.log('🛑 停止监控');
+}, 60000); // 监控1分钟
+```
+
 ## Complete Example
 
 ```typescript
@@ -262,6 +442,19 @@ interface RewardMap {
 interface RewardEntry {
   user: PublicKey;
   amount: string;
+}
+
+// Event-related types
+interface EventFilter {
+  gameId?: number;
+  user?: PublicKey;
+  authority?: PublicKey;
+  fromSlot?: number;
+  toSlot?: number;
+}
+
+interface EventSubscription {
+  unsubscribe: () => void;
 }
 ```
 

@@ -70,4 +70,61 @@ export interface VaultInfo {
   vaultSigner: PublicKey;
   userTicket?: PublicKey;
   rewardMap?: PublicKey;
+}
+
+// Event types
+export interface GameVaultInitializedEvent {
+  gameId: string;
+  authority: PublicKey;
+  tokenMint: PublicKey;
+  vault: PublicKey;
+}
+
+export interface TicketPurchasedEvent {
+  gameId: string;
+  user: PublicKey;
+  amount: string;
+  totalDeposit: string;
+  userTicket: PublicKey;
+}
+
+export interface RewardClaimedEvent {
+  gameId: string;
+  user: PublicKey;
+  rewardAmount: string;
+  userTicket: PublicKey;
+}
+
+export interface GameFinalizedEvent {
+  gameId: string;
+  authority: PublicKey;
+  totalDeposit: string;
+  rewardCount: string;
+  rewardMap: PublicKey;
+}
+
+export interface AdminWithdrawnEvent {
+  gameId: string;
+  authority: PublicKey;
+  amount: string;
+  adminToken: PublicKey;
+}
+
+export interface TokenMintChangedEvent {
+  gameId: string;
+  authority: PublicKey;
+  oldMint: PublicKey;
+  newMint: PublicKey;
+}
+
+export interface EventFilter {
+  gameId?: number;
+  user?: PublicKey;
+  authority?: PublicKey;
+  fromSlot?: number;
+  toSlot?: number;
+}
+
+export interface EventSubscription {
+  unsubscribe: () => void;
 } 

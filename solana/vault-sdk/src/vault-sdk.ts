@@ -17,7 +17,15 @@ import {
   GameVault, 
   UserTicket, 
   RewardMap,
-  RewardEntry
+  RewardEntry,
+  GameVaultInitializedEvent,
+  TicketPurchasedEvent,
+  RewardClaimedEvent,
+  GameFinalizedEvent,
+  AdminWithdrawnEvent,
+  TokenMintChangedEvent,
+  EventFilter,
+  EventSubscription
 } from './types';
 import vaultIdl from '../vault.json';
 
@@ -325,5 +333,195 @@ export class VaultSDK {
       userTicket,
       rewardMap
     };
+  }
+
+  // ==================== Event Methods ====================
+
+  /**
+   * Listen to all vault events
+   */
+  onAllEvents(callback: (event: any, slot: number) => void): EventSubscription {
+    const subscriptionId = this.connection.onProgramAccountChange(
+      this.program.programId,
+      (accountInfo: any, context: any) => {
+        try {
+          const event = this.program.coder.events.decode(accountInfo.accountInfo.data);
+          if (event) {
+            callback(event, context.slot);
+          }
+        } catch (error) {
+          // Ignore decoding errors for non-event data
+        }
+      },
+      'confirmed'
+    );
+
+    return {
+      unsubscribe: () => {
+        this.connection.removeProgramAccountChangeListener(subscriptionId);
+      }
+    };
+  }
+
+  /**
+   * Listen to specific event types
+   */
+  onEvent<T>(
+    eventName: string, 
+    callback: (event: T, slot: number) => void
+  ): EventSubscription {
+    const subscriptionId = this.connection.onProgramAccountChange(
+      this.program.programId,
+      (accountInfo: any, context: any) => {
+        try {
+          const event = this.program.coder.events.decode(accountInfo.accountInfo.data);
+          if (event && (event as any).eventName === eventName) {
+            callback((event as any).data as T, context.slot);
+          }
+        } catch (error) {
+          // Ignore decoding errors for non-event data
+        }
+      },
+      'confirmed'
+    );
+
+    return {
+      unsubscribe: () => {
+        this.connection.removeProgramAccountChangeListener(subscriptionId);
+      }
+    };
+  }
+
+  /**
+   * Listen to GameVaultInitialized events
+   */
+  onGameVaultInitialized(callback: (event: GameVaultInitializedEvent, slot: number) => void): EventSubscription {
+    return this.onEvent<GameVaultInitializedEvent>('GameVaultInitialized', callback);
+  }
+
+  /**
+   * Listen to TicketPurchased events
+   */
+  onTicketPurchased(callback: (event: TicketPurchasedEvent, slot: number) => void): EventSubscription {
+    return this.onEvent<TicketPurchasedEvent>('TicketPurchased', callback);
+  }
+
+  /**
+   * Listen to RewardClaimed events
+   */
+  onRewardClaimed(callback: (event: RewardClaimedEvent, slot: number) => void): EventSubscription {
+    return this.onEvent<RewardClaimedEvent>('RewardClaimed', callback);
+  }
+
+  /**
+   * Listen to GameFinalized events
+   */
+  onGameFinalized(callback: (event: GameFinalizedEvent, slot: number) => void): EventSubscription {
+    return this.onEvent<GameFinalizedEvent>('GameFinalized', callback);
+  }
+
+  /**
+   * Listen to AdminWithdrawn events
+   */
+  onAdminWithdrawn(callback: (event: AdminWithdrawnEvent, slot: number) => void): EventSubscription {
+    return this.onEvent<AdminWithdrawnEvent>('AdminWithdrawn', callback);
+  }
+
+  /**
+   * Listen to TokenMintChanged events
+   */
+  onTokenMintChanged(callback: (event: TokenMintChangedEvent, slot: number) => void): EventSubscription {
+    return this.onEvent<TokenMintChangedEvent>('TokenMintChanged', callback);
+  }
+
+  /**
+   * Get historical events with filters
+   */
+  async getEvents(filter?: EventFilter): Promise<any[]> {
+    const signatures = await this.connection.getSignaturesForAddress(
+      this.program.programId,
+      {
+        limit: 1000,
+        before: filter?.toSlot ? undefined : undefined,
+        until: filter?.fromSlot ? undefined : undefined,
+      }
+    );
+
+    const events: any[] = [];
+    
+    for (const sig of signatures) {
+      try {
+        const tx = await this.connection.getTransaction(sig.signature, {
+          commitment: 'confirmed',
+          maxSupportedTransactionVersion: 0,
+        });
+
+        if (tx?.meta?.logMessages) {
+          for (const log of tx.meta.logMessages) {
+            try {
+              // Parse program logs for events
+              if (log.includes('Program log:')) {
+                const eventData = log.replace('Program log:', '').trim();
+                const event = this.program.coder.events.decode(eventData);
+                
+                if (event) {
+                  // Apply filters
+                  if (filter?.gameId && event.data.gameId?.toString() !== filter.gameId.toString()) {
+                    continue;
+                  }
+                  if (filter?.user && event.data.user?.toString() !== filter.user.toString()) {
+                    continue;
+                  }
+                  if (filter?.authority && event.data.authority?.toString() !== filter.authority.toString()) {
+                    continue;
+                  }
+
+                  events.push({
+                    ...event,
+                    signature: sig.signature,
+                    slot: sig.slot,
+                    blockTime: sig.blockTime,
+                  });
+                }
+              }
+            } catch (error) {
+              // Ignore parsing errors
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch transaction ${sig.signature}:`, error);
+      }
+    }
+
+    return events;
+  }
+
+  /**
+   * Get events for a specific game
+   */
+  async getGameEvents(gameId: number): Promise<any[]> {
+    return this.getEvents({ gameId });
+  }
+
+  /**
+   * Get events for a specific user
+   */
+  async getUserEvents(user: PublicKey): Promise<any[]> {
+    return this.getEvents({ user });
+  }
+
+  /**
+   * Get events from a specific authority
+   */
+  async getAuthorityEvents(authority: PublicKey): Promise<any[]> {
+    return this.getEvents({ authority });
+  }
+
+  /**
+   * Get recent events (last 1000 transactions)
+   */
+  async getRecentEvents(): Promise<any[]> {
+    return this.getEvents();
   }
 } 
