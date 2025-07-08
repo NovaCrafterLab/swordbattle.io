@@ -4,6 +4,183 @@ import { useEffect, useState, useCallback } from 'react';
 import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 
+// Separate custom hooks to avoid rules of hooks violations
+
+/**
+ * Hook to fetch SOL balance for a wallet address
+ */
+export const useSOLBalance = (walletAddress: string) => {
+  const { connection } = useConnection();
+  const [balance, setBalance] = useState<bigint>(BigInt(0));
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchBalance = useCallback(async () => {
+    if (!walletAddress || !connection) {
+      setBalance(BigInt(0));
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const publicKey = new PublicKey(walletAddress);
+      const lamports = await connection.getBalance(publicKey);
+      setBalance(BigInt(lamports));
+
+      console.log(
+        `💰 SOL Balance for ${walletAddress}: ${lamports / LAMPORTS_PER_SOL} SOL`,
+      );
+    } catch (err) {
+      const error = err as Error;
+      console.error(
+        `❌ Failed to fetch SOL balance for ${walletAddress}:`,
+        error,
+      );
+      setError(error);
+      setBalance(BigInt(0));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [walletAddress, connection]);
+
+  useEffect(() => {
+    fetchBalance();
+  }, [fetchBalance]);
+
+  return {
+    data: balance,
+    isLoading,
+    error,
+    refetch: fetchBalance,
+  };
+};
+
+/**
+ * Hook to fetch current game counter from server
+ */
+export const useGameCounter = () => {
+  const [gameId, setGameId] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchGameCounter = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Get server URL from localStorage or default
+      const serverUrl =
+        localStorage.getItem('selectedServer') || 'localhost:8000';
+      const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+      const url = `${protocol}://${serverUrl}/serverinfo`;
+
+      const response = await fetch(url);
+      const serverInfo = await response.json();
+
+      const currentGameId = serverInfo?.gameStatus?.gameId || 0;
+      setGameId(currentGameId);
+
+      console.log(`🎮 Game Counter from server: ${currentGameId}`);
+    } catch (err) {
+      const error = err as Error;
+      console.error(`❌ Failed to fetch game counter:`, error);
+      setError(error);
+      setGameId(0);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchGameCounter();
+
+    // Poll every 10 seconds
+    const interval = setInterval(fetchGameCounter, 10000);
+    return () => clearInterval(interval);
+  }, [fetchGameCounter]);
+
+  return {
+    data: gameId,
+    isLoading,
+    error,
+    refetch: fetchGameCounter,
+  };
+};
+
+/**
+ * Hook to fetch SPL token balance for a wallet address
+ */
+export const useSPLTokenBalance = (
+  walletAddress: string,
+  tokenMintAddress: string,
+) => {
+  const { connection } = useConnection();
+  const [balance, setBalance] = useState<bigint>(BigInt(0));
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchBalance = useCallback(async () => {
+    if (!walletAddress || !tokenMintAddress || !connection) {
+      setBalance(BigInt(0));
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const walletPubkey = new PublicKey(walletAddress);
+      const mintPubkey = new PublicKey(tokenMintAddress);
+
+      // Get associated token account address
+      const associatedTokenAddress = await getAssociatedTokenAddress(
+        mintPubkey,
+        walletPubkey,
+      );
+
+      // Get token account info
+      const tokenAccount = await getAccount(connection, associatedTokenAddress);
+      setBalance(BigInt(tokenAccount.amount.toString()));
+
+      console.log(
+        `💰 SPL Token Balance for ${walletAddress}: ${tokenAccount.amount.toString()} tokens`,
+      );
+    } catch (err) {
+      const error = err as Error;
+      console.log(
+        `ℹ️ No SPL token account found for ${walletAddress} (${tokenMintAddress.slice(0, 8)}...)`,
+      );
+      setError(null); // Don't treat missing token account as error
+      setBalance(BigInt(0));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [walletAddress, tokenMintAddress, connection]);
+
+  useEffect(() => {
+    fetchBalance();
+  }, [fetchBalance]);
+
+  return {
+    data: balance,
+    isLoading,
+    error,
+    refetch: fetchBalance,
+  };
+};
+
+/**
+ * Hook to fetch SPL token balance using configured token mint
+ */
+export const useSPLBalance = (address: string) => {
+  const tokenMint =
+    process.env.REACT_APP_TOKEN_MINT ||
+    'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr';
+  return useSPLTokenBalance(address, tokenMint);
+};
+
 // Type definitions for backward compatibility
 export interface GameFullInfo {
   gameId: string; // 游戏ID
@@ -98,59 +275,6 @@ export const useBlockchain = () => {
     `🔗 useBlockchain: Solana - Connected: ${isConnected}, Address: ${address?.slice(0, 10)}...`,
   );
 
-  // SOL Balance Hook
-  const useSOLBalance = useCallback(
-    (walletAddress: string) => {
-      const [balance, setBalance] = useState<bigint>(BigInt(0));
-      const [isLoading, setIsLoading] = useState(false);
-      const [error, setError] = useState<Error | null>(null);
-
-      const fetchBalance = useCallback(async () => {
-        if (!walletAddress || !connection) {
-          setBalance(BigInt(0));
-          return;
-        }
-
-        try {
-          setIsLoading(true);
-          setError(null);
-
-          const publicKey = new (await import('@solana/web3.js')).PublicKey(
-            walletAddress,
-          );
-          const lamports = await connection.getBalance(publicKey);
-          setBalance(BigInt(lamports));
-
-          console.log(
-            `💰 SOL Balance for ${walletAddress}: ${lamports / LAMPORTS_PER_SOL} SOL`,
-          );
-        } catch (err) {
-          const error = err as Error;
-          console.error(
-            `❌ Failed to fetch SOL balance for ${walletAddress}:`,
-            error,
-          );
-          setError(error);
-          setBalance(BigInt(0));
-        } finally {
-          setIsLoading(false);
-        }
-      }, [walletAddress, connection]);
-
-      useEffect(() => {
-        fetchBalance();
-      }, [fetchBalance]);
-
-      return {
-        data: balance,
-        isLoading,
-        error,
-        refetch: fetchBalance,
-      };
-    },
-    [connection],
-  );
-
   // Placeholder implementations for backward compatibility
   const useGameFullInfo = (gameId: number) => ({
     data: null,
@@ -158,56 +282,6 @@ export const useBlockchain = () => {
     error: null,
     refetch: () => {},
   });
-
-  // Game Counter Hook - fetches current gameId from server
-  const useGameCounter = useCallback(() => {
-    const [gameId, setGameId] = useState<number>(0);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<Error | null>(null);
-
-    const fetchGameCounter = useCallback(async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        // Get server URL from localStorage or default
-        const serverUrl =
-          localStorage.getItem('selectedServer') || 'localhost:8000';
-        const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
-        const url = `${protocol}://${serverUrl}/serverinfo`;
-
-        const response = await fetch(url);
-        const serverInfo = await response.json();
-
-        const currentGameId = serverInfo?.gameStatus?.gameId || 0;
-        setGameId(currentGameId);
-
-        console.log(`🎮 Game Counter from server: ${currentGameId}`);
-      } catch (err) {
-        const error = err as Error;
-        console.error(`❌ Failed to fetch game counter:`, error);
-        setError(error);
-        setGameId(0);
-      } finally {
-        setIsLoading(false);
-      }
-    }, []);
-
-    useEffect(() => {
-      fetchGameCounter();
-
-      // Poll every 10 seconds
-      const interval = setInterval(fetchGameCounter, 10000);
-      return () => clearInterval(interval);
-    }, [fetchGameCounter]);
-
-    return {
-      data: gameId,
-      isLoading,
-      error,
-      refetch: fetchGameCounter,
-    };
-  }, []);
 
   const useActiveGames = (level: number = 0, limit: number = 10) => ({
     data: [],
@@ -367,76 +441,6 @@ export const useBlockchain = () => {
     refetch: () => {},
   });
 
-  // SPL Token Balance Hook
-  const useSPLTokenBalance = useCallback(
-    (walletAddress: string, tokenMintAddress: string) => {
-      const [balance, setBalance] = useState<bigint>(BigInt(0));
-      const [isLoading, setIsLoading] = useState(false);
-      const [error, setError] = useState<Error | null>(null);
-
-      const fetchBalance = useCallback(async () => {
-        if (!walletAddress || !tokenMintAddress || !connection) {
-          setBalance(BigInt(0));
-          return;
-        }
-
-        try {
-          setIsLoading(true);
-          setError(null);
-
-          const walletPubkey = new PublicKey(walletAddress);
-          const mintPubkey = new PublicKey(tokenMintAddress);
-
-          // Get associated token account address
-          const associatedTokenAddress = await getAssociatedTokenAddress(
-            mintPubkey,
-            walletPubkey,
-          );
-
-          // Get token account info
-          const tokenAccount = await getAccount(
-            connection,
-            associatedTokenAddress,
-          );
-          setBalance(BigInt(tokenAccount.amount.toString()));
-
-          console.log(
-            `💰 SPL Token Balance for ${walletAddress}: ${tokenAccount.amount.toString()} tokens`,
-          );
-        } catch (err) {
-          const error = err as Error;
-          console.log(
-            `ℹ️ No SPL token account found for ${walletAddress} (${tokenMintAddress.slice(0, 8)}...)`,
-          );
-          setError(null); // Don't treat missing token account as error
-          setBalance(BigInt(0));
-        } finally {
-          setIsLoading(false);
-        }
-      }, [walletAddress, tokenMintAddress, connection]);
-
-      useEffect(() => {
-        fetchBalance();
-      }, [fetchBalance]);
-
-      return {
-        data: balance,
-        isLoading,
-        error,
-        refetch: fetchBalance,
-      };
-    },
-    [connection],
-  );
-
-  // SPL Token balance - now using real token balance query
-  const useSPLBalance = (address: string) => {
-    const tokenMint =
-      process.env.REACT_APP_TOKEN_MINT ||
-      'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr';
-    return useSPLTokenBalance(address, tokenMint);
-  };
-
   // SPL Token allowance (placeholder)
   const useSPLAllowance = (owner: string, spender: string) => ({
     data: BigInt(0),
@@ -488,7 +492,7 @@ export const useBlockchain = () => {
     publicKey,
     connected,
 
-    // New Solana read methods
+    // New Solana read methods - now returning references to exported hooks
     useGameCounter,
     useGameFullInfo,
     useActiveGames,
