@@ -47,11 +47,32 @@ export class VaultSDK {
       { commitment: 'confirmed' }
     );
     
+    // Convert new IDL format to legacy format for compatibility
+    const legacyIdl = this.convertToLegacyIdl(vaultIdl as any);
+    
     this.program = new anchor.Program(
-      vaultIdl as any,
-      config.programId,
+      legacyIdl as any,
       provider
     );
+  }
+
+  /**
+   * Convert new Anchor IDL format to legacy format
+   */
+  private convertToLegacyIdl(newIdl: any): any {
+    return {
+      version: newIdl.metadata?.version || "0.1.0",
+      name: newIdl.metadata?.name || "vault",
+      instructions: newIdl.instructions || [],
+      accounts: newIdl.accounts || [],
+      types: newIdl.types || [],
+      events: newIdl.events || [],
+      errors: newIdl.errors || [],
+      constants: newIdl.constants || [],
+      metadata: {
+        address: newIdl.address
+      }
+    };
   }
 
   /**
