@@ -29,10 +29,11 @@ import {
   GameInfo,
   GameDiscoveryOptions
 } from './types';
-import vaultIdl from '../vault.json';
+import { Vault, IDL } from "./idl";
+import { Program } from '@coral-xyz/anchor';
 
 export class VaultSDK {
-  private program: anchor.Program;
+  private program: Program<Vault>;
   private connection: any;
   private wallet: any;
 
@@ -47,11 +48,7 @@ export class VaultSDK {
       { commitment: 'confirmed' }
     );
     
-    this.program = new anchor.Program(
-      vaultIdl as any,
-      config.programId,
-      provider
-    );
+    this.program = new Program<Vault>(IDL as Vault, provider)
   }
 
   /**
@@ -104,10 +101,8 @@ export class VaultSDK {
     const tx = await this.program.methods
       .initializeGameVault(new anchor.BN(params.gameId))
       .accounts({
-        vault: vault,
         authority: this.wallet.publicKey,
-        tokenMint: params.tokenMint,
-        systemProgram: SystemProgram.programId,
+        tokenMint: params.tokenMint
       })
       .rpc();
 
@@ -146,12 +141,9 @@ export class VaultSDK {
       .buyTicket(new anchor.BN(params.amount))
       .accounts({
         vault: vault,
-        userTicket: userTicket,
         userToken: params.userTokenAccount,
         vaultToken: vaultToken,
-        user: this.wallet.publicKey,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
+        user: this.wallet.publicKey
       })
       .rpc();
 
@@ -182,9 +174,7 @@ export class VaultSDK {
         rewardMap: rewardMap,
         vaultToken: vaultToken,
         userToken: params.userTokenAccount,
-        vaultSigner: vaultSigner,
-        user: this.wallet.publicKey,
-        tokenProgram: TOKEN_PROGRAM_ID,
+        user: this.wallet.publicKey
       })
       .rpc();
 
@@ -205,9 +195,7 @@ export class VaultSDK {
       })))
       .accounts({
         vault: vault,
-        rewardMap: rewardMap,
         authority: this.wallet.publicKey,
-        systemProgram: SystemProgram.programId,
       })
       .rpc();
 
@@ -234,9 +222,7 @@ export class VaultSDK {
         vault: vault,
         vaultToken: vaultToken,
         adminToken: params.adminTokenAccount,
-        vaultSigner: vaultSigner,
-        authority: this.wallet.publicKey,
-        tokenProgram: TOKEN_PROGRAM_ID,
+        authority: this.wallet.publicKey
       })
       .rpc();
 
