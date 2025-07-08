@@ -9,7 +9,12 @@
     "dev": "tsc --watch",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
-    "format": "prettier --write src/**/*.ts"
+    "format": "prettier --write src/**/*.ts",
+    "test:local": "node test-local.js",
+    "test:quick": "node quick-test.js",
+    "test:events": "node test-events.js",
+    "test:discovery": "node test-game-discovery.js",
+    "setup": "./start-local-test.sh"
   },
   "keywords": [
     "solana",
