@@ -190,10 +190,74 @@ class SolanaVaultService {
   }
 
   /**
-   * Create a new game vault on Solana using the next available game ID
-   * Replaces the complex BSC game creation
+   * Atomically create the next available game ID and initialize vault
+   * Prevents race conditions when multiple servers start simultaneously
    */
-  async createGame(gameId = null) {
+  async createGameAtomically(tier = 'low') {
+    if (!this.isInitialized || !this.vaultSDK) {
+      throw new Error('Solana vault service not initialized');
+    }
+
+    try {
+      Logger.server.info('🎮 Creating Solana game vault atomically with tier', {
+        tier,
+        message: 'Using atomic creation to prevent server conflicts',
+      });
+
+      // Validate tier configuration
+      const tierConfig = this.getTierConfig(tier);
+
+      // Use configured token mint from environment variables
+      const tokenMintAddress = this.config.tokenMint;
+      Logger.server.info(`🔍 Using configured token mint: ${tokenMintAddress}`);
+
+      let tokenMint;
+      try {
+        tokenMint = new PublicKey(tokenMintAddress);
+        Logger.server.info(`✅ Token mint validated: ${tokenMint.toString()}`);
+      } catch (error) {
+        Logger.server.error(
+          `❌ Failed to create PublicKey from token mint: ${tokenMintAddress} - ${error.message}`,
+        );
+        throw error;
+      }
+
+      // Call VaultSDK to atomically create the next game
+      const result = await this.vaultSDK.createNextGameAtomically({
+        tokenMint: tokenMint,
+        tier,
+        maxRetries: 5,
+      });
+
+      Logger.server.info(
+        `✅ Game vault created atomically on Solana - Game ID: ${result.gameId}, TX: ${result.txHash.slice(0, 8)}..., Token: ${tokenMint.toString()}`,
+      );
+
+      return {
+        success: true,
+        gameId: result.gameId.toString(),
+        tier,
+        tierConfig,
+        txHash: result.txHash,
+        tokenMint: tokenMint.toString(),
+        timestamp: Date.now(),
+        creationMethod: 'atomic',
+      };
+    } catch (error) {
+      Logger.server.error('Failed to create game vault atomically', {
+        tier,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Create a new game vault on Solana with tier specification
+   * Replaces the complex BSC game creation
+   * @deprecated Use createGameAtomically() instead for better concurrency safety
+   */
+  async createGame(gameId = null, tier = 'low') {
     if (!this.isInitialized || !this.vaultSDK) {
       throw new Error('Solana vault service not initialized');
     }
@@ -202,9 +266,13 @@ class SolanaVaultService {
       // If no gameId provided, get the next available one
       const finalGameId = gameId || (await this.getNextGameId());
 
-      Logger.server.info('🎮 Creating Solana game vault', {
+      Logger.server.info('🎮 Creating Solana game vault with tier', {
         gameId: finalGameId,
+        tier,
       });
+
+      // Validate tier configuration
+      const tierConfig = this.getTierConfig(tier);
 
       // Use configured token mint from environment variables
       // Default: SOL native mint (So11111111111111111111111111111112)
@@ -239,6 +307,8 @@ class SolanaVaultService {
       return {
         success: true,
         gameId: finalGameId,
+        tier,
+        tierConfig,
         txHash,
         tokenMint: tokenMint.toString(),
         timestamp: Date.now(),
@@ -253,18 +323,19 @@ class SolanaVaultService {
   }
 
   /**
-   * Check if a player has bought a ticket for the game
+   * Check if a player has bought a ticket for the game with tier validation
    * Replaces BSC player registration verification
    */
-  async verifyPlayerTicket(gameId, playerAddress) {
+  async verifyPlayerTicket(gameId, playerAddress, expectedTier = null) {
     if (!this.isInitialized || !this.vaultSDK) {
       return false;
     }
 
     try {
-      Logger.server.debug('🎫 Checking player ticket', {
+      Logger.server.debug('🎫 Checking player ticket with tier validation', {
         gameId,
         playerAddress,
+        expectedTier,
       });
 
       // Convert string address to PublicKey
@@ -276,20 +347,46 @@ class SolanaVaultService {
         playerPubkey,
       );
 
-      if (ticketAccount && !ticketAccount.hasWithdrawn) {
-        Logger.server.debug('✅ Player has valid ticket', {
-          gameId,
-          playerAddress,
-          ticketAmount: ticketAccount.amount,
-        });
-        return true;
-      } else {
+      if (!ticketAccount || ticketAccount.hasWithdrawn) {
         Logger.server.debug('❌ Player has no valid ticket', {
           gameId,
           playerAddress,
         });
         return false;
       }
+
+      // Tier-based price validation if expectedTier is provided
+      if (expectedTier && this.config.security?.enableStrictPriceValidation) {
+        const tierConfig = this.getTierConfig(expectedTier);
+        const expectedAmountLamports = Math.floor(tierConfig.entranceFee * 1e9);
+        const actualAmountLamports = parseInt(ticketAccount.amount);
+
+        if (actualAmountLamports !== expectedAmountLamports) {
+          Logger.server.warn('❌ Ticket price validation failed', {
+            gameId,
+            playerAddress,
+            expectedTier,
+            expectedAmount: expectedAmountLamports,
+            actualAmount: actualAmountLamports,
+          });
+          return false;
+        }
+
+        Logger.server.debug('✅ Player has valid tier ticket', {
+          gameId,
+          playerAddress,
+          tier: expectedTier,
+          ticketAmount: ticketAccount.amount,
+        });
+      } else {
+        Logger.server.debug('✅ Player has valid ticket (no tier validation)', {
+          gameId,
+          playerAddress,
+          ticketAmount: ticketAccount.amount,
+        });
+      }
+
+      return true;
     } catch (error) {
       Logger.server.warn('Failed to verify player ticket', {
         gameId,
@@ -301,15 +398,17 @@ class SolanaVaultService {
   }
 
   /**
-   * Calculate kill-based rewards
+   * Calculate tier-based kill rewards
    * Replaces complex BSC scoring system
    */
-  calculateKillBasedRewards(players) {
+  calculateKillBasedRewards(players, tier = 'low') {
     const rewards = [];
-    const killReward = 0.001; // 0.001 SOL per kill (configurable)
+    const tierConfig = this.getTierConfig(tier);
+    const killReward = tierConfig.killReward;
 
-    Logger.server.info('💰 Calculating kill-based rewards', {
+    Logger.server.info('💰 Calculating tier-based kill rewards', {
       playerCount: players.length,
+      tier,
       killReward,
     });
 
@@ -322,15 +421,18 @@ class SolanaVaultService {
           playerAddress: player.walletAddress,
           playerName: player.name,
           kills,
+          tier,
           rewardAmount: Math.floor(rewardAmount * 1e9), // Convert to lamports
           rewardSOL: rewardAmount,
         });
       }
     }
 
-    Logger.server.info('💰 Kill-based rewards calculated', {
+    Logger.server.info('💰 Tier-based kill rewards calculated', {
       totalPlayers: players.length,
       rewardedPlayers: rewards.length,
+      tier,
+      killReward,
       totalRewards: rewards.reduce((sum, r) => sum + r.rewardSOL, 0).toFixed(6),
     });
 
@@ -338,22 +440,23 @@ class SolanaVaultService {
   }
 
   /**
-   * Finalize game with rewards using VaultSDK
+   * Finalize game with tier-based rewards using VaultSDK
    * Replaces complex BSC score submission and reward distribution
    */
-  async finalizeGame(gameId, players) {
+  async finalizeGame(gameId, players, tier = 'low') {
     if (!this.isInitialized || !this.vaultSDK) {
       throw new Error('Solana vault service not initialized');
     }
 
     try {
-      Logger.server.info('🏁 Finalizing Solana game', {
+      Logger.server.info('🏁 Finalizing Solana game with tier', {
         gameId,
         playerCount: players.length,
+        tier,
       });
 
-      // Calculate simple kill-based rewards
-      const rewards = this.calculateKillBasedRewards(players);
+      // Calculate tier-based kill rewards
+      const rewards = this.calculateKillBasedRewards(players, tier);
 
       if (rewards.length === 0) {
         Logger.server.warn('No rewards to distribute', { gameId });
@@ -389,6 +492,7 @@ class SolanaVaultService {
       return {
         success: true,
         gameId,
+        tier,
         txHash,
         rewardsDistributed: rewards.length,
         totalRewardSOL: rewards.reduce((sum, r) => sum + r.rewardSOL, 0),
@@ -426,6 +530,125 @@ class SolanaVaultService {
         error: error.message,
       });
       return false;
+    }
+  }
+
+  /**
+   * Get tier configuration from server config
+   */
+  getTierConfig(tier) {
+    if (!this.config.tiers || !this.config.tiers[tier]) {
+      throw new Error(
+        `Invalid tier: ${tier}. Available tiers: ${Object.keys(this.config.tiers || {}).join(', ')}`,
+      );
+    }
+    return this.config.tiers[tier];
+  }
+
+  /**
+   * Get comprehensive token information for a specific game ID
+   */
+  async getGameTokenInfo(gameId) {
+    if (!this.isInitialized || !this.vaultSDK) {
+      throw new Error('Solana vault service not initialized');
+    }
+
+    try {
+      Logger.server.debug('🔍 Getting token info for game', { gameId });
+
+      // Get comprehensive game information including token details
+      const gameInfo = await this.vaultSDK.getGameInfo(parseInt(gameId));
+
+      Logger.server.debug('✅ Retrieved game token info', {
+        gameId,
+        tokenMint: gameInfo.tokenMint.toString(),
+        isActive: gameInfo.isActive,
+        canBuyTickets: gameInfo.canBuyTickets,
+      });
+
+      return {
+        gameId: gameId.toString(),
+        tokenMint: gameInfo.tokenMint.toString(),
+        isActive: gameInfo.isActive,
+        canBuyTickets: gameInfo.canBuyTickets,
+        vault: gameInfo.vault,
+        retrievedAt: Date.now(),
+      };
+    } catch (error) {
+      Logger.server.error('Failed to get game token info', {
+        gameId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get only the token mint address for a specific game ID
+   */
+  async getGameTokenMint(gameId) {
+    if (!this.isInitialized || !this.vaultSDK) {
+      throw new Error('Solana vault service not initialized');
+    }
+
+    try {
+      Logger.server.debug('🪙 Getting token mint for game', { gameId });
+
+      const tokenMint = await this.vaultSDK.getGameTokenMint(parseInt(gameId));
+
+      Logger.server.debug('✅ Retrieved token mint', {
+        gameId,
+        tokenMint: tokenMint.toString(),
+      });
+
+      return tokenMint.toString();
+    } catch (error) {
+      Logger.server.error('Failed to get game token mint', {
+        gameId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get detailed vault account information for a specific game ID
+   */
+  async getVaultAccount(gameId) {
+    if (!this.isInitialized || !this.vaultSDK) {
+      throw new Error('Solana vault service not initialized');
+    }
+
+    try {
+      Logger.server.debug('🏛️ Getting vault account for game', { gameId });
+
+      const vaultAccount = await this.vaultSDK.getVaultAccount(
+        parseInt(gameId),
+      );
+
+      Logger.server.debug('✅ Retrieved vault account', {
+        gameId,
+        tokenMint: vaultAccount.tokenMint.toString(),
+        totalDeposit: vaultAccount.totalDeposit,
+        finalized: vaultAccount.finalized,
+        withdrawEnabled: vaultAccount.withdrawEnabled,
+      });
+
+      return {
+        gameId: vaultAccount.gameId,
+        authority: vaultAccount.authority.toString(),
+        totalDeposit: vaultAccount.totalDeposit,
+        finalized: vaultAccount.finalized,
+        withdrawEnabled: vaultAccount.withdrawEnabled,
+        tokenMint: vaultAccount.tokenMint.toString(),
+        retrievedAt: Date.now(),
+      };
+    } catch (error) {
+      Logger.server.error('Failed to get vault account', {
+        gameId,
+        error: error.message,
+      });
+      throw error;
     }
   }
 
