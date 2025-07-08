@@ -1,0 +1,329 @@
+import * as anchor from '@coral-xyz/anchor';
+import { PublicKey, SystemProgram } from '@solana/web3.js';
+import { 
+  TOKEN_PROGRAM_ID, 
+  getAssociatedTokenAddress, 
+  getOrCreateAssociatedTokenAccount 
+} from '@solana/spl-token';
+import { 
+  VaultConfig, 
+  VaultInfo, 
+  InitializeGameVaultParams, 
+  BuyTicketParams, 
+  ClaimRewardParams, 
+  FinalizeGameParams, 
+  AdminWithdrawParams, 
+  ChangeTokenMintParams, 
+  GameVault, 
+  UserTicket, 
+  RewardMap,
+  RewardEntry
+} from './types';
+import vaultIdl from '../vault.json';
+
+export class VaultSDK {
+  private program: anchor.Program;
+  private connection: any;
+  private wallet: any;
+
+  constructor(config: VaultConfig) {
+    this.connection = config.connection;
+    this.wallet = config.wallet;
+    
+    // Create program instance
+    const provider = new anchor.AnchorProvider(
+      config.connection,
+      config.wallet,
+      { commitment: 'confirmed' }
+    );
+    
+    this.program = new anchor.Program(
+      vaultIdl as any,
+      config.programId,
+      provider
+    );
+  }
+
+  /**
+   * Get vault PDA and related accounts
+   */
+  private getVaultPdas(gameId: number): { vault: PublicKey; vaultSigner: PublicKey } {
+    const [vault] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), new anchor.BN(gameId).toArrayLike(Buffer, "le", 8)],
+      this.program.programId
+    );
+
+    const [vaultSigner] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), new anchor.BN(gameId).toArrayLike(Buffer, "le", 8)],
+      this.program.programId
+    );
+
+    return { vault, vaultSigner };
+  }
+
+  /**
+   * Get user ticket PDA
+   */
+  private getUserTicketPda(gameId: number, user: PublicKey): PublicKey {
+    const { vault } = this.getVaultPdas(gameId);
+    const [userTicket] = PublicKey.findProgramAddressSync(
+      [Buffer.from("ticket"), vault.toBuffer(), user.toBuffer()],
+      this.program.programId
+    );
+    return userTicket;
+  }
+
+  /**
+   * Get reward map PDA
+   */
+  private getRewardMapPda(gameId: number): PublicKey {
+    const { vault } = this.getVaultPdas(gameId);
+    const [rewardMap] = PublicKey.findProgramAddressSync(
+      [Buffer.from("reward_map"), vault.toBuffer()],
+      this.program.programId
+    );
+    return rewardMap;
+  }
+
+  /**
+   * Initialize a new game vault
+   */
+  async initializeGameVault(params: InitializeGameVaultParams): Promise<string> {
+    const { vault } = this.getVaultPdas(params.gameId);
+    
+    const tx = await this.program.methods
+      .initializeGameVault(new anchor.BN(params.gameId))
+      .accounts({
+        vault: vault,
+        authority: this.wallet.publicKey,
+        tokenMint: params.tokenMint,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    // Create vault token account after initialization
+    try {
+      await getOrCreateAssociatedTokenAccount(
+        this.connection,
+        this.wallet,
+        params.tokenMint,
+        vault,
+        true // allowOwnerOffCurve
+      );
+    } catch (error) {
+      console.warn("Vault token account might already exist:", error);
+    }
+
+    return tx;
+  }
+
+  /**
+   * Buy a ticket for a game
+   */
+  async buyTicket(params: BuyTicketParams): Promise<string> {
+    const { vault } = this.getVaultPdas(params.gameId);
+    const userTicket = this.getUserTicketPda(params.gameId, this.wallet.publicKey);
+    
+    // Get vault token account with actual mint
+    const vaultAccount = await this.program.account.gameVault.fetch(vault);
+    const vaultToken = await getAssociatedTokenAddress(
+      vaultAccount.tokenMint as PublicKey,
+      vault,
+      true
+    );
+
+    const tx = await this.program.methods
+      .buyTicket(new anchor.BN(params.amount))
+      .accounts({
+        vault: vault,
+        userTicket: userTicket,
+        userToken: params.userTokenAccount,
+        vaultToken: vaultToken,
+        user: this.wallet.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    return tx;
+  }
+
+  /**
+   * Claim reward for a user
+   */
+  async claimReward(params: ClaimRewardParams): Promise<string> {
+    const { vault, vaultSigner } = this.getVaultPdas(params.gameId);
+    const userTicket = this.getUserTicketPda(params.gameId, this.wallet.publicKey);
+    const rewardMap = this.getRewardMapPda(params.gameId);
+    
+    // Get vault token account with actual mint
+    const vaultAccount = await this.program.account.gameVault.fetch(vault);
+    const vaultToken = await getAssociatedTokenAddress(
+      vaultAccount.tokenMint as PublicKey,
+      vault,
+      true
+    );
+
+    const tx = await this.program.methods
+      .claimReward()
+      .accounts({
+        vault: vault,
+        userTicket: userTicket,
+        rewardMap: rewardMap,
+        vaultToken: vaultToken,
+        userToken: params.userTokenAccount,
+        vaultSigner: vaultSigner,
+        user: this.wallet.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    return tx;
+  }
+
+  /**
+   * Finalize a game with rewards
+   */
+  async finalizeGame(params: FinalizeGameParams): Promise<string> {
+    const { vault } = this.getVaultPdas(params.gameId);
+    const rewardMap = this.getRewardMapPda(params.gameId);
+
+    const tx = await this.program.methods
+      .finalizeGame(params.rewards.map((reward: RewardEntry) => ({
+        user: reward.user,
+        amount: new anchor.BN(reward.amount)
+      })))
+      .accounts({
+        vault: vault,
+        rewardMap: rewardMap,
+        authority: this.wallet.publicKey,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+
+    return tx;
+  }
+
+  /**
+   * Admin withdraw from vault
+   */
+  async adminWithdraw(params: AdminWithdrawParams): Promise<string> {
+    const { vault, vaultSigner } = this.getVaultPdas(params.gameId);
+    
+    // Get vault token account with actual mint
+    const vaultAccount = await this.program.account.gameVault.fetch(vault);
+    const vaultToken = await getAssociatedTokenAddress(
+      vaultAccount.tokenMint as PublicKey,
+      vault,
+      true
+    );
+
+    const tx = await this.program.methods
+      .adminWithdraw(new anchor.BN(params.amount))
+      .accounts({
+        vault: vault,
+        vaultToken: vaultToken,
+        adminToken: params.adminTokenAccount,
+        vaultSigner: vaultSigner,
+        authority: this.wallet.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    return tx;
+  }
+
+  /**
+   * Change token mint for a vault
+   */
+  async changeTokenMint(params: ChangeTokenMintParams): Promise<string> {
+    const { vault } = this.getVaultPdas(params.gameId);
+
+    const tx = await this.program.methods
+      .changeTokenMint(params.newMint)
+      .accounts({
+        vault: vault,
+        authority: this.wallet.publicKey,
+      })
+      .rpc();
+
+    return tx;
+  }
+
+  /**
+   * Get vault account data
+   */
+  async getVaultAccount(gameId: number): Promise<GameVault> {
+    const { vault } = this.getVaultPdas(gameId);
+    const account = await this.program.account.gameVault.fetch(vault);
+    
+    return {
+      gameId: (account.gameId as anchor.BN).toString(),
+      authority: account.authority as PublicKey,
+      totalDeposit: (account.totalDeposit as anchor.BN).toString(),
+      finalized: account.finalized as boolean,
+      withdrawEnabled: account.withdrawEnabled as boolean,
+      tokenMint: account.tokenMint as PublicKey,
+    };
+  }
+
+  /**
+   * Get user ticket account data
+   */
+  async getUserTicketAccount(gameId: number, user: PublicKey): Promise<UserTicket | null> {
+    try {
+      const userTicket = this.getUserTicketPda(gameId, user);
+      const account = await this.program.account.userTicket.fetch(userTicket);
+      
+      return {
+        gameId: (account.gameId as anchor.BN).toString(),
+        user: account.user as PublicKey,
+        amount: (account.amount as anchor.BN).toString(),
+        hasWithdrawn: account.hasWithdrawn as boolean,
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Get reward map account data
+   */
+  async getRewardMapAccount(gameId: number): Promise<RewardMap | null> {
+    try {
+      const rewardMap = this.getRewardMapPda(gameId);
+      const account = await this.program.account.rewardMap.fetch(rewardMap);
+      
+      return {
+        gameId: (account.gameId as anchor.BN).toString(),
+        rewards: (account.rewards as any[]).map((reward: any) => ({
+          user: reward.user as PublicKey,
+          amount: (reward.amount as anchor.BN).toString()
+        }))
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Get all vault info including PDAs
+   */
+  async getVaultInfo(gameId: number): Promise<VaultInfo> {
+    const { vault, vaultSigner } = this.getVaultPdas(gameId);
+    const userTicket = this.getUserTicketPda(gameId, this.wallet.publicKey);
+    const rewardMap = this.getRewardMapPda(gameId);
+    
+    return {
+      vault,
+      vaultSigner,
+      vaultToken: await getAssociatedTokenAddress(
+        new PublicKey("11111111111111111111111111111111"), // Placeholder
+        vault,
+        true
+      ),
+      userTicket,
+      rewardMap
+    };
+  }
+} 

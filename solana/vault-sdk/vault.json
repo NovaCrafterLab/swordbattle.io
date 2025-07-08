@@ -1,0 +1,764 @@
+{
+  "address": "AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV",
+  "metadata": {
+    "name": "vault",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "admin_withdraw",
+      "discriminator": [
+        160,
+        166,
+        147,
+        222,
+        46,
+        220,
+        75,
+        224
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "vault_token",
+          "writable": true
+        },
+        {
+          "name": "admin_token",
+          "writable": true
+        },
+        {
+          "name": "vault_signer",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.game_id",
+                "account": "GameVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "buy_ticket",
+      "discriminator": [
+        11,
+        24,
+        17,
+        193,
+        168,
+        116,
+        164,
+        169
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "user_ticket",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  99,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_token",
+          "writable": true
+        },
+        {
+          "name": "vault_token",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "change_token_mint",
+      "discriminator": [
+        131,
+        157,
+        170,
+        11,
+        176,
+        212,
+        248,
+        239
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "new_mint",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "claim_reward",
+      "discriminator": [
+        149,
+        95,
+        181,
+        242,
+        94,
+        90,
+        158,
+        162
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "user_ticket",
+          "writable": true
+        },
+        {
+          "name": "reward_map"
+        },
+        {
+          "name": "vault_token",
+          "writable": true
+        },
+        {
+          "name": "user_token",
+          "writable": true
+        },
+        {
+          "name": "vault_signer",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.game_id",
+                "account": "GameVault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "finalize_game",
+      "discriminator": [
+        203,
+        227,
+        3,
+        167,
+        186,
+        102,
+        76,
+        10
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "reward_map",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  119,
+                  97,
+                  114,
+                  100,
+                  95,
+                  109,
+                  97,
+                  112
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "rewards",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "RewardEntry"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_game_vault",
+      "discriminator": [
+        150,
+        163,
+        248,
+        101,
+        237,
+        128,
+        208,
+        219
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "game_id",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "GameVault",
+      "discriminator": [
+        152,
+        194,
+        238,
+        3,
+        140,
+        24,
+        51,
+        32
+      ]
+    },
+    {
+      "name": "RewardMap",
+      "discriminator": [
+        59,
+        134,
+        60,
+        69,
+        163,
+        241,
+        171,
+        72
+      ]
+    },
+    {
+      "name": "UserTicket",
+      "discriminator": [
+        180,
+        163,
+        8,
+        176,
+        85,
+        62,
+        213,
+        128
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "AdminWithdrawn",
+      "discriminator": [
+        12,
+        67,
+        18,
+        232,
+        19,
+        82,
+        237,
+        212
+      ]
+    },
+    {
+      "name": "GameFinalized",
+      "discriminator": [
+        29,
+        161,
+        173,
+        86,
+        207,
+        34,
+        220,
+        48
+      ]
+    },
+    {
+      "name": "GameVaultInitialized",
+      "discriminator": [
+        108,
+        6,
+        98,
+        249,
+        184,
+        26,
+        48,
+        135
+      ]
+    },
+    {
+      "name": "RewardClaimed",
+      "discriminator": [
+        49,
+        28,
+        87,
+        84,
+        158,
+        48,
+        229,
+        175
+      ]
+    },
+    {
+      "name": "TicketPurchased",
+      "discriminator": [
+        108,
+        59,
+        246,
+        95,
+        84,
+        145,
+        13,
+        71
+      ]
+    },
+    {
+      "name": "TokenMintChanged",
+      "discriminator": [
+        74,
+        127,
+        112,
+        239,
+        162,
+        80,
+        112,
+        51
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidAmount",
+      "msg": "Invalid ticket amount"
+    },
+    {
+      "code": 6001,
+      "name": "AlreadyWithdrawn",
+      "msg": "Reward already withdrawn"
+    },
+    {
+      "code": 6002,
+      "name": "WithdrawNotEnabled",
+      "msg": "Withdraw not enabled yet"
+    },
+    {
+      "code": 6003,
+      "name": "AlreadyFinalized",
+      "msg": "Game already finalized"
+    },
+    {
+      "code": 6004,
+      "name": "NoReward",
+      "msg": "No reward for this user"
+    },
+    {
+      "code": 6005,
+      "name": "Unauthorized",
+      "msg": "Unauthorized access"
+    }
+  ],
+  "types": [
+    {
+      "name": "AdminWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "game_id",
+            "type": "u64"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "admin_token",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GameFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "game_id",
+            "type": "u64"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_deposit",
+            "type": "u64"
+          },
+          {
+            "name": "reward_count",
+            "type": "u64"
+          },
+          {
+            "name": "reward_map",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GameVault",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "game_id",
+            "type": "u64"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_deposit",
+            "type": "u64"
+          },
+          {
+            "name": "finalized",
+            "type": "bool"
+          },
+          {
+            "name": "withdraw_enabled",
+            "type": "bool"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GameVaultInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "game_id",
+            "type": "u64"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RewardClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "game_id",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "reward_amount",
+            "type": "u64"
+          },
+          {
+            "name": "user_ticket",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RewardEntry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RewardMap",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "game_id",
+            "type": "u64"
+          },
+          {
+            "name": "rewards",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "RewardEntry"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TicketPurchased",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "game_id",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "total_deposit",
+            "type": "u64"
+          },
+          {
+            "name": "user_ticket",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokenMintChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "game_id",
+            "type": "u64"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_mint",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UserTicket",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "game_id",
+            "type": "u64"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "has_withdrawn",
+            "type": "bool"
+          }
+        ]
+      }
+    }
+  ]
+}

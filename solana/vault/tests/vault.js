@@ -5,7 +5,7 @@ const { TOKEN_PROGRAM_ID, createMint, createAccount, mintTo, getAccount, getAsso
 describe("Game Vault", () => {
   // Configure the client to use the local cluster.
   anchor.setProvider(anchor.AnchorProvider.env());
-  const program = anchor.workspace.vault;
+    const program = anchor.workspace.vault;
   const provider = anchor.getProvider();
 
   // Test accounts

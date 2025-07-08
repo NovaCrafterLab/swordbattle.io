@@ -1,0 +1,40 @@
+{
+  "name": "vault-sdk",
+  "version": "1.0.0",
+  "description": "JavaScript SDK for Game Vault Solana smart contract",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts"
+  },
+  "keywords": [
+    "solana",
+    "anchor",
+    "vault",
+    "game",
+    "sdk"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.28.0",
+    "@solana/web3.js": "^1.87.0",
+    "@solana/spl-token": "^0.3.9"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0"
+  },
+  "files": [
+    "dist/**/*",
+    "vault.json"
+  ]
+} 
