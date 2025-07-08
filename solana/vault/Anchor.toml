@@ -12,8 +12,8 @@ vault = "AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
-wallet = "~/.config/solana/id.json"
+cluster = "https://devnet.helius-rpc.com/?api-key=f9996276-63c5-4db7-b9cf-32d914029bf0"
+wallet = "./deploy-wallet/id.json"
 
 [scripts]
 test = "yarn run mocha -t 1000000 tests/"
