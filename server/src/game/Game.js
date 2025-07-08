@@ -34,14 +34,14 @@ class Game {
 
     this._qtTick = 0;
 
-    // 区块链游戏相关属性初始化
-    this.blockchainGameId = null;
+    // Solana vault game related properties
+    this.solanaGameId = null;
     this.gamePhase = 'initializing';
     this.gameStartTime = null;
     this.gameEndTime = null;
     this.registeredPlayers = new Set();
-    this.finalScores = new Map();
-    this.playerScoreSubmitted = new Set();
+    this.finalKillRewards = new Map();
+    this.finalScores = new Map(); // Keep for compatibility
     this.isGameCreationInProgress = false;
     this.gameTimeout = null;
 
@@ -51,6 +51,9 @@ class Game {
     
     // 服务器引用，用于访问客户端连接
     this.server = null;
+    
+    // Solana vault service for blockchain operations
+    this.solanaVaultService = null;
   }
 
   initialize() {
@@ -403,18 +406,18 @@ class Game {
       }
     }
 
-    // 区块链玩家验证（仅在比赛服务器模式下）
-    if (config.isRaceServer && config.blockchain.enabled && this.blockchainService) {
-      // 检查是否提供了钱包地址
+    // Solana player verification (only in race server mode)
+    if (config.isRaceServer && config.solana.enabled && this.solanaVaultService) {
+      // Check if wallet address is provided
       if (!data.walletAddress) {
         console.log(`❌ Player ${name} rejected: No wallet address provided for race server`);
         client.socket.close();
         return;
       }
 
-      // 异步验证玩家注册状态
-      this.verifyAndAddPlayer(client, data, name);
-      return; // 异步处理，不直接返回player
+      // Async verification of player ticket
+      this.verifyAndAddSolanaPlayer(client, data, name);
+      return; // Async processing, don't return player directly
     }
 
     // 正常模式直接添加玩家
@@ -422,31 +425,31 @@ class Game {
   }
 
   /**
-   * 异步验证并添加玩家（区块链模式）
+   * Async verification and addition of Solana players
    */
-  async verifyAndAddPlayer(client, data, name) {
+  async verifyAndAddSolanaPlayer(client, data, name) {
     try {
       const walletAddress = data.walletAddress;
       
-      // 在RACE模式下，使用钱包地址前部分作为玩家名
-      const racePlayerName = walletAddress.slice(0, 11); // 0x + 前9个字符 = 11个字符总长度
-      console.log(`🔍 Verifying player ${racePlayerName} with wallet ${walletAddress}...`);
+      // In RACE mode, use wallet address prefix as player name
+      const racePlayerName = walletAddress.slice(0, 11); // 0x + first 9 chars = 11 total
+      console.log(`🔍 Verifying Solana player ${racePlayerName} with wallet ${walletAddress}...`);
 
-      // 验证玩家是否已在链上注册
-      const isRegistered = await this.verifyPlayerRegistration(walletAddress);
+      // Verify player has bought a ticket for this game
+      const hasTicket = await this.verifySolanaPlayerTicket(walletAddress);
 
-      if (!isRegistered) {
-        console.log(`❌ Player ${racePlayerName} rejected: Not registered for current game`);
-        // 发送错误消息给客户端
+      if (!hasTicket) {
+        console.log(`❌ Player ${racePlayerName} rejected: No ticket found for current game`);
+        // Send error message to client
         client.socket.send(JSON.stringify({
           type: 'error',
-          message: 'You must join the game on-chain first. Please pay the entry fee to participate.',
+          message: 'You must buy a ticket for this game first. Please purchase an entry ticket to participate.',
         }));
         client.socket.close();
         return;
       }
 
-      // 检查玩家是否已经在游戏中
+      // Check if player is already in game
       for (const player of this.players) {
         if (player.client?.walletAddress?.toLowerCase() === walletAddress.toLowerCase()) {
           console.log(`❌ Player ${racePlayerName} rejected: Already in game with this wallet`);
@@ -455,21 +458,21 @@ class Game {
         }
       }
 
-      // 验证通过，创建玩家 - 使用钱包地址作为名字
-      console.log(`✅ Player ${racePlayerName} verified and joining game`);
+      // Verification passed, create player
+      console.log(`✅ Solana player ${racePlayerName} verified and joining game`);
       const player = this.createAndAddPlayer(client, data, racePlayerName);
 
-      // 保存钱包地址到客户端
+      // Save wallet address to client
       client.walletAddress = walletAddress;
 
       return player;
     } catch (error) {
       const walletAddress = data.walletAddress;
       const racePlayerName = walletAddress ? walletAddress.slice(0, 11) : 'Unknown';
-      console.error(`❌ Error verifying player ${racePlayerName}:`, error);
+      console.error(`❌ Error verifying Solana player ${racePlayerName}:`, error);
       client.socket.send(JSON.stringify({
         type: 'error',
-        message: 'Failed to verify blockchain registration. Please try again.',
+        message: 'Failed to verify ticket. Please try again.',
       }));
       client.socket.close();
     }
@@ -497,8 +500,8 @@ class Game {
     this.map.spawnPlayer(player);
     this.addEntity(player);
 
-    // 在比赛模式下，检查是否可以开始游戏
-    if (config.isRaceServer && config.blockchain.enabled && this.gamePhase === 'waiting') {
+    // In race mode, check if game can start
+    if (config.isRaceServer && config.solana.enabled && this.gamePhase === 'waiting') {
       this.checkGameStart();
     }
 
@@ -516,7 +519,7 @@ class Game {
       activeCount,
       registeredCount,
       gamePhase: this.gamePhase,
-      gameId: this.blockchainGameId
+      gameId: this.solanaGameId
     });
 
     // 可以添加更多开始游戏的条件，比如最小玩家数、时间限制等
@@ -544,14 +547,14 @@ class Game {
 
     this.gameTimeoutTimer = setTimeout(() => {
       Logger.game.warn('Game timeout reached, ending game automatically', {
-        gameId: this.blockchainGameId,
+        gameId: this.solanaGameId,
         duration: this.maxGameDuration
       });
-      this.endBlockchainGame('timeout');
+      this.endSolanaGame('timeout');
     }, this.maxGameDuration);
 
     Logger.game.info('Game timeout set', {
-      gameId: this.blockchainGameId,
+      gameId: this.solanaGameId,
       timeoutMinutes: this.maxGameDuration / 1000 / 60
     });
   }
@@ -563,7 +566,7 @@ class Game {
     if (this.gameTimeoutTimer) {
       clearTimeout(this.gameTimeoutTimer);
       this.gameTimeoutTimer = null;
-      Logger.game.info('Game timeout cleared', { gameId: this.blockchainGameId });
+      Logger.game.info('Game timeout cleared', { gameId: this.solanaGameId });
     }
   }
 
@@ -573,7 +576,7 @@ class Game {
   broadcastGameStart() {
     const message = {
       type: 'gameStart',
-      gameId: this.blockchainGameId ? Number(this.blockchainGameId) : null,
+      gameId: this.solanaGameId ? Number(this.solanaGameId) : null,
       phase: this.gamePhase,
       playerCount: this.players.size,
     };
@@ -597,7 +600,7 @@ class Game {
     }
 
     Logger.game.info('Game start message broadcasted', {
-      gameId: this.blockchainGameId,
+      gameId: this.solanaGameId,
       successCount,
       errorCount,
       totalPlayers: this.players.size
@@ -666,14 +669,14 @@ class Game {
     this.globalEntities.cleanup();
   }
 
-  // ============ 区块链相关方法 ============
+  // ============ Solana Vault Methods ============
 
   /**
-   * 初始化区块链游戏
-   * 在服务器启动时调用，创建链上游戏
+   * Initialize Solana game vault
+   * Called on server startup to create on-chain game
    */
-  async initializeBlockchainGame(retryCount = 0) {
-    if (!config.isRaceServer || !config.blockchain.enabled || !this.blockchainService) {
+  async initializeSolanaGame(retryCount = 0) {
+    if (!config.isRaceServer || !config.solana.enabled || !this.solanaVaultService) {
       return;
     }
 
@@ -689,63 +692,85 @@ class Game {
       this.isGameCreationInProgress = true;
       this.gamePhase = 'initializing';
 
-      // 从配置中获取游戏级别
-      const gameLevel = config.blockchain.gameLevel || 0;
-      Logger.server.info(`🎮 Creating blockchain game (attempt ${currentAttempt}/${maxRetries})`);
-
-      // 在创建游戏前记录初始计数器
-      const initialCounter = await this.blockchainService.getGameCounter();
-
-      // 调用合约创建游戏，传入级别参数
-      const createResult = await this.blockchainService.createGame(gameLevel);
-      Logger.server.info('🚀 Game creation TX sent:', createResult.txHash);
-
-      // 监听GameCreated事件获取gameId，传递初始计数器
-      await this.waitForGameCreated(initialCounter);
-
-    } catch (error) {
-      // 记录详细的错误信息
-      Logger.server.error(`❌ Game creation failed (${currentAttempt}/${maxRetries}):`, {
-        error: error.message,
-        stack: error.stack,
-        gameLevel,
-        blockchainService: !!this.blockchainService,
-        isInitialized: this.blockchainService?.isInitialized,
-        walletClient: !!this.blockchainService?.walletClient,
-        account: this.blockchainService?.account?.address,
-        contractAddress: this.blockchainService?.config?.contracts?.gameAggregator
+      // Get next sequential game ID from Solana (latest + 1)
+      const gameId = await this.solanaVaultService.getNextGameId();
+      Logger.server.info(`🎮 Creating Solana game vault (attempt ${currentAttempt}/${maxRetries})`, { 
+        gameId,
+        message: 'Using next sequential game ID from Solana'
       });
 
-      // 如果错误包含特定信息，提供更详细的诊断
-      if (error.message.includes('insufficient funds')) {
-        Logger.server.error('💰 Insufficient funds in wallet for transaction');
-      } else if (error.message.includes('nonce')) {
-        Logger.server.error('🔢 Nonce issue - possible concurrent transactions');
-      } else if (error.message.includes('gas')) {
-        Logger.server.error('⛽ Gas estimation failed or insufficient gas');
-      } else if (error.message.includes('revert')) {
-        Logger.server.error('🔄 Transaction reverted - contract execution failed');
-      } else if (error.message.includes('network')) {
-        Logger.server.error('🌐 Network connection issue');
+      // Create game vault on Solana with the next available ID
+      const createResult = await this.solanaVaultService.createGame(gameId);
+      
+      if (createResult.success) {
+        this.solanaGameId = createResult.gameId; // Use the actual game ID returned
+        this.gamePhase = 'waiting';
+        this.gameStartTime = Date.now();
+
+        Logger.server.info(`✅ Solana game vault created successfully!`, {
+          gameId: this.solanaGameId,
+          txHash: createResult.txHash,
+          tokenMint: createResult.tokenMint
+        });
+        this.isGameCreationInProgress = false;
+      } else {
+        throw new Error('Failed to create game vault');
       }
+
+    } catch (error) {
+      Logger.server.error(`❌ Solana game creation failed (${currentAttempt}/${maxRetries}):`, {
+        error: error.message,
+        stack: error.stack,
+        solanaService: !!this.solanaVaultService,
+        isInitialized: this.solanaVaultService?.isInitialized,
+        walletAddress: this.solanaVaultService?.wallet?.publicKey?.toString()
+      });
 
       this.gamePhase = 'error';
       this.isGameCreationInProgress = false;
 
-      // 如果还有重试次数，等待5秒后重试
+      // Retry if attempts remaining
       if (retryCount < maxRetries - 1) {
         Logger.server.info(`🔄 Retrying in 5s... (${maxRetries - currentAttempt} attempts left)`);
         setTimeout(() => {
-          this.initializeBlockchainGame(retryCount + 1);
+          this.initializeSolanaGame(retryCount + 1);
         }, 5000);
       } else {
-        Logger.server.error('🚫 All retries exhausted - blockchain features disabled');
+        Logger.server.error('🚫 All retries exhausted - Solana features disabled');
       }
     }
   }
 
   /**
-   * 等待GameCreated事件
+   * Verify player has bought a ticket for this Solana game
+   * Replaces complex BSC registration verification
+   */
+  async verifySolanaPlayerTicket(playerAddress) {
+    if (!this.solanaVaultService || !this.solanaGameId) {
+      console.log(`❌ Verification failed - solanaService: ${!!this.solanaVaultService}, gameId: ${this.solanaGameId}`);
+      return false;
+    }
+
+    try {
+      // Check if player has bought a ticket for this game
+      const hasTicket = await this.solanaVaultService.verifyPlayerTicket(this.solanaGameId, playerAddress);
+
+      if (hasTicket) {
+        this.registeredPlayers.add(playerAddress.toLowerCase());
+        console.log(`✅ Player ${playerAddress} has valid ticket`);
+        return true;
+      } else {
+        console.log(`❌ Player ${playerAddress} has no ticket for game ${this.solanaGameId}`);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error verifying player ticket:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Old BSC method - no longer used
    */
   async waitForGameCreated(initialCounter) {
     return new Promise((resolve, reject) => {
@@ -823,22 +848,57 @@ class Game {
   }
 
   /**
-   * 收集玩家最终分数
+   * Collect player kill-based rewards for Solana
+   * Simplified from complex BSC score collection
+   */
+  collectPlayerKillRewards() {
+    this.finalKillRewards.clear();
+
+    for (const player of this.players) {
+      if (player.removed) continue;
+
+      const killReward = this.calculatePlayerKillRewards(player);
+      
+      // Only include players with kills and wallet addresses
+      if (killReward.kills > 0 && player.client?.walletAddress) {
+        const rewardData = {
+          playerId: player.id,
+          playerName: player.name,
+          walletAddress: player.client.walletAddress,
+          kills: killReward.kills,
+          rewardSOL: killReward.rewardSOL,
+          rewardLamports: killReward.rewardLamports
+        };
+
+        this.finalKillRewards.set(player.id, rewardData);
+      }
+    }
+
+    Logger.game.info('Collected player kill rewards', {
+      gameId: this.solanaGameId,
+      rewardCount: this.finalKillRewards.size,
+      totalRewardSOL: Array.from(this.finalKillRewards.values()).reduce((sum, r) => sum + r.rewardSOL, 0).toFixed(6)
+    });
+    
+    return this.finalKillRewards;
+  }
+
+  /**
+   * Legacy BSC score collection - no longer used
    */
   collectPlayerScores() {
+    // Keep for compatibility but not used in Solana mode
     this.finalScores.clear();
 
     for (const player of this.players) {
       if (player.removed) continue;
 
-      // 收集玩家分数数据
       const score = {
         playerId: player.id,
         playerName: player.name,
         kills: player.kills || 0,
         coins: player.levels?.coins || 0,
         playtime: player.playtime || 0,
-        // 可以根据需要添加更多分数计算逻辑
         finalScore: this.calculatePlayerScore(player),
         walletAddress: player.client?.walletAddress || null
       };
@@ -847,89 +907,103 @@ class Game {
     }
 
     Logger.game.info('Collected player scores', {
-      gameId: this.blockchainGameId,
+      gameId: this.solanaGameId,
       scoreCount: this.finalScores.size
     });
     return this.finalScores;
   }
 
   /**
-   * 计算玩家最终分数
+   * Calculate kill-based rewards for Solana
+   * Simplified from complex BSC scoring system
+   */
+  calculatePlayerKillRewards(player) {
+    // Only kills matter for Solana rewards
+    const kills = player.kills || 0;
+    const killReward = config.solana.killReward || 0.001; // SOL per kill
+    
+    return {
+      kills,
+      rewardSOL: kills * killReward,
+      rewardLamports: Math.floor(kills * killReward * 1e9) // Convert to lamports
+    };
+  }
+
+  /**
+   * Legacy BSC score calculation - no longer used
    */
   calculatePlayerScore(player) {
-    // 简单的分数计算逻辑，可以根据需要调整
+    // Keep for compatibility but not used in Solana mode
     const kills = player.kills || 0;
     const coins = player.levels?.coins || 0;
     const playtime = player.playtime || 0;
 
-    // 分数 = 击杀数 * 100 + 金币数 * 10 + 游戏时间（秒）
     return kills * 100 + coins * 10 + Math.floor(playtime / 1000);
   }
 
   /**
-   * 结束区块链游戏 - 等待所有区块链操作完成后重启服务器
+   * End Solana game - simplified version using kill-based rewards
    */
-  async endBlockchainGame(reason = 'normal') {
-    if (!config.isRaceServer || !config.blockchain.enabled || !this.blockchainService) {
+  async endSolanaGame(reason = 'normal') {
+    if (!config.isRaceServer || !config.solana.enabled || !this.solanaVaultService) {
       return;
     }
 
     if (this.gamePhase === 'ending' || this.gamePhase === 'ended') {
       Logger.game.warn('Game already ending or ended', {
-        gameId: this.blockchainGameId,
+        gameId: this.solanaGameId,
         currentPhase: this.gamePhase
       });
       return;
     }
 
     try {
-      // 清除游戏超时定时器
+      // Clear game timeout timer
       this.clearGameTimeout();
 
       this.gamePhase = 'ending';
       this.gameEndTime = Date.now();
 
-      Logger.status('Ending blockchain game', 'game');
-      Logger.game.info('Game end initiated', {
-        gameId: this.blockchainGameId,
+      Logger.status('Ending Solana game', 'game');
+      Logger.game.info('Solana game end initiated', {
+        gameId: this.solanaGameId,
         reason,
         playerCount: this.players.size,
         duration: this.gameEndTime - this.gameStartTime
       });
 
-      // 📢 立即通知所有玩家游戏正在结束
-      console.log(`📢 Game ${this.blockchainGameId} ending (${reason}) - processing final scores and rewards...`);
+      console.log(`📢 Solana Game ${this.solanaGameId} ending (${reason}) - calculating kill-based rewards...`);
       
-      // 收集所有玩家分数
-      const scores = this.collectPlayerScores();
+      // Collect kill-based rewards (much simpler than BSC)
+      const killRewards = this.collectPlayerKillRewards();
       
-      // 向所有客户端发送游戏结束消息
-      this.broadcastGameEnd(reason, scores);
+      // Broadcast game end to all clients
+      this.broadcastSolanaGameEnd(reason, killRewards);
 
-      // 🔄 等待所有区块链操作完成
-      await this.processCompleteBlockchainGameEnd(this.blockchainGameId, scores, reason);
+      // Finalize game with VaultSDK (single operation vs complex BSC flow)
+      await this.finalizeSolanaGameWithRewards(killRewards);
 
-      // 设置游戏为已结束状态
+      // Set game as ended
       this.gamePhase = 'ended';
       
-      // 清理当前游戏状态
+      // Clean up current game state
       this.cleanupCurrentGame();
 
-      console.log(`✅ Game ${this.blockchainGameId} completely finished. Server will restart to begin new game.`);
+      console.log(`✅ Solana Game ${this.solanaGameId} finalized. Server will restart for new game.`);
       
-      // 📡 触发服务器重启
+      // Trigger server restart
       this.triggerServerRestart();
 
     } catch (error) {
-      Logger.game.error('Failed to end blockchain game', {
-        gameId: this.blockchainGameId,
+      Logger.game.error('Failed to end Solana game', {
+        gameId: this.solanaGameId,
         error: error.message,
         stack: error.stack
       });
-      // 即使出错也要尝试设置状态，避免游戏卡在ending状态
+      
       this.gamePhase = 'error';
       
-      // 即使出错也要重启服务器
+      // Restart server even if error occurred
       setTimeout(() => {
         this.triggerServerRestart();
       }, 5000);
@@ -937,8 +1011,74 @@ class Game {
   }
 
   /**
-   * 完整处理区块链游戏结束操作 - 等待所有操作完成
-   * 确保所有提交分数和奖励分配都完成后才结束游戏
+   * Legacy BSC method - no longer used
+   */
+  async endBlockchainGame(reason = 'normal') {
+    // Redirect to Solana method
+    return this.endSolanaGame(reason);
+  }
+
+  /**
+   * Finalize Solana game with kill-based rewards
+   * Replaces complex BSC score submission with single VaultSDK call
+   */
+  async finalizeSolanaGameWithRewards(killRewards) {
+    console.log(`🔄 Finalizing Solana game ${this.solanaGameId} with ${killRewards.size} reward entries`);
+    
+    try {
+      if (killRewards.size === 0) {
+        console.log('⚠️ No kill rewards to distribute');
+        return { success: true, rewardsDistributed: 0 };
+      }
+
+      // Convert rewards to array format expected by SolanaVaultService
+      const rewardArray = Array.from(killRewards.values());
+      
+      console.log(`💰 Distributing rewards:`, {
+        playerCount: rewardArray.length,
+        totalSOL: rewardArray.reduce((sum, r) => sum + r.rewardSOL, 0).toFixed(6),
+        rewards: rewardArray.map(r => `${r.playerName}: ${r.kills} kills = ${r.rewardSOL} SOL`)
+      });
+
+      // Single VaultSDK call to finalize game (vs complex BSC flow)
+      const result = await this.solanaVaultService.finalizeGame(this.solanaGameId, rewardArray);
+      
+      if (result.success) {
+        console.log(`✅ Solana game finalized successfully - ${result.rewardsDistributed} rewards set`);
+        return result;
+      } else {
+        throw new Error('VaultSDK finalizeGame failed');
+      }
+
+    } catch (error) {
+      console.error(`❌ Failed to finalize Solana game:`, error.message);
+      Logger.game.error('Solana game finalization failed', {
+        gameId: this.solanaGameId,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Broadcast Solana game end to all clients
+   * Simplified version of BSC broadcast
+   */
+  broadcastSolanaGameEnd(reason, killRewards) {
+    console.log(`📢 Solana Game ${this.solanaGameId} ending (${reason}) - notifying players`);
+    
+    // Use existing pendingMassKill mechanism to kick players cleanly
+    this.pendingMassKill = true;
+    
+    const playerCount = this.players.size;
+    const rewardCount = killRewards.size;
+    const totalSOL = Array.from(killRewards.values()).reduce((sum, r) => sum + r.rewardSOL, 0);
+    
+    console.log(`🔄 Scheduled ${playerCount} players to be kicked, ${rewardCount} rewards distributed (${totalSOL.toFixed(6)} SOL total)`);
+  }
+
+  /**
+   * Legacy BSC method - complex implementation no longer used
    */
   async processCompleteBlockchainGameEnd(gameId, scores, reason) {
     console.log(`🔄 Starting complete blockchain processing for game ${gameId}`);
@@ -1083,17 +1223,17 @@ class Game {
     setTimeout(() => {
       console.log(`🔄 Executing server restart...`);
       
-      // 清理游戏状态
+      // Clean up game state for Solana
       this.clearGameTimeout();
       Object.assign(this, { 
         gamePhase: 'initializing', 
-        blockchainGameId: null,
+        solanaGameId: null,
         gameStartTime: null,
         gameEndTime: null
       });
       this.registeredPlayers.clear();
-      this.finalScores.clear();
-      this.playerScoreSubmitted.clear();
+      this.finalKillRewards.clear();
+      this.finalScores.clear(); // Keep for compatibility
 
       // 重置所有客户端状态
       if (this.server?.clients) {
@@ -1104,11 +1244,11 @@ class Game {
         }
       }
 
-      // 开始新的区块链游戏
-      console.log(`🎮 Server restarted, initializing new blockchain game...`);
-      this.initializeBlockchainGame().catch(error => {
-        console.error(`❌ Failed to initialize new blockchain game after restart:`, error.message);
-        // 如果新游戏创建失败，再次尝试重启
+      // Start new Solana game
+      console.log(`🎮 Server restarted, initializing new Solana game...`);
+      this.initializeSolanaGame().catch(error => {
+        console.error(`❌ Failed to initialize new Solana game after restart:`, error.message);
+        // If new game creation fails, try restart again
         setTimeout(() => {
           this.triggerServerRestart();
         }, 10000);
@@ -1605,42 +1745,49 @@ class Game {
   }
 
   /**
-   * 获取区块链游戏状态
+   * Get Solana game status
    */
-  getBlockchainGameStatus() {
-    if (!config.isRaceServer || !config.blockchain.enabled) {
+  getSolanaGameStatus() {
+    if (!config.isRaceServer || !config.solana.enabled) {
       return null;
     }
 
     return {
-      gameId: this.blockchainGameId ? Number(this.blockchainGameId) : null,
+      gameId: this.solanaGameId ? Number(this.solanaGameId) : null,
       phase: this.gamePhase,
       registeredPlayersCount: this.registeredPlayers.size,
       activePlayersCount: this.players.size,
       gameStartTime: this.gameStartTime,
       gameEndTime: this.gameEndTime,
-      finalScoresCount: this.finalScores.size,
-      scoresSubmittedCount: this.playerScoreSubmitted.size,
+      killRewardsCount: this.finalKillRewards.size,
+      totalRewardSOL: Array.from(this.finalKillRewards.values()).reduce((sum, r) => sum + r.rewardSOL, 0)
     };
   }
 
   /**
-   * 清理当前游戏状态
+   * Legacy BSC status method - redirects to Solana
+   */
+  getBlockchainGameStatus() {
+    return this.getSolanaGameStatus();
+  }
+
+  /**
+   * Clean up current Solana game state
    */
   cleanupCurrentGame() {
-    Logger.game.info('Cleaning up current game', { gameId: this.blockchainGameId });
+    Logger.game.info('Cleaning up current Solana game', { gameId: this.solanaGameId });
 
-    // 清理区块链相关状态
-    this.blockchainGameId = null;
+    // Clear Solana-related state
+    this.solanaGameId = null;
     this.registeredPlayers.clear();
-    this.finalScores.clear();
-    this.playerScoreSubmitted.clear();
+    this.finalKillRewards.clear();
+    this.finalScores.clear(); // Keep for compatibility
 
-    // 重置游戏时间
+    // Reset game time
     this.gameStartTime = null;
     this.gameEndTime = null;
 
-    // 移除所有玩家（让他们重新连接到新游戏）
+    // Remove all players (let them reconnect to new game)
     const playersToRemove = [...this.players];
     for (const player of playersToRemove) {
       if (player.client) {
@@ -1652,7 +1799,7 @@ class Game {
       this.removeEntity(player);
     }
 
-    Logger.game.info('Game cleanup completed', {
+    Logger.game.info('Solana game cleanup completed', {
       removedPlayers: playersToRemove.length
     });
   }

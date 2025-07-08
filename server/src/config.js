@@ -52,29 +52,18 @@ module.exports = {
   isRaceServer: process.env.SERVER_TYPE === 'RACE',
   enableCycleRestart:process.env.ENABLE_CYCLE_RESTART === 'true' || process.env.SERVER_TYPE === 'RACE',
 
-  // Blockchain configuration
-  blockchain: {
-    enabled: process.env.BLOCKCHAIN_ENABLED === 'true',
-    rpcUrl: process.env.BLOCKCHAIN_RPC_URL, // 可选，会使用内置RPC池
-    contracts: {
-      gameAggregator: isDev
-        ? (process.env.GAME_AGGREGATOR_CONTRACT_TESTNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x6810494B605ac1A6259788Db999202f5578dA4E1')
-        : (process.env.GAME_AGGREGATOR_CONTRACT_MAINNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x6810494B605ac1A6259788Db999202f5578dA4E1'),
-      // SwordBattle 原合约用于基础数据查询 - 更新为最新地址
-      swordBattle: isDev
-        ? (process.env.SWORD_BATTLE_CONTRACT_TESTNET || process.env.SWORD_BATTLE_CONTRACT || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD')
-        : (process.env.SWORD_BATTLE_CONTRACT_MAINNET || process.env.SWORD_BATTLE_CONTRACT || '0xCd2846d73b4bA42c8b000bcBE52Df28c1B1722eD'),
-      usd1Token: isDev
-        ? '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16'
-        : '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16',
-    },
-    trustedSigner: process.env.TRUSTED_SIGNER_PRIVATE_KEY,
-    gameLevel: parseInt(process.env.GAME_LEVEL || '0'), 
+  // Solana configuration - replaces BSC blockchain
+  solana: {
+    enabled: process.env.SOLANA_ENABLED === 'true',
+    rpcUrl: process.env.SOLANA_RPC_URL || (isDev ? 'https://api.devnet.solana.com' : 'https://api.mainnet-beta.solana.com'),
+    privateKey: process.env.SOLANA_PRIVATE_KEY, // Server wallet private key for vault operations
+    programId: process.env.VAULT_PROGRAM_ID || 'AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV', // Vault program ID
+    tokenMint: process.env.SOLANA_TOKEN_MINT || '11111111111111111111111111111111', // Token mint for rewards
+    killReward: parseFloat(process.env.KILL_REWARD || '0.001'), // SOL reward per kill
     environment: {
       isDev,
       isRelease,
-      chainId: isDev ? 97 : 56,
-      networkName: isDev ? 'BSC Testnet' : 'BSC Mainnet',
+      cluster: isDev ? 'devnet' : 'mainnet-beta',
     },
   },
 
@@ -119,50 +108,5 @@ module.exports = {
     worldWidth: 30000,
   },
 
-  /**************************************
-   * Web3
-   **************************************/
-  // Blockchain configuration
-  blockchain: {
-    enabled: process.env.BLOCKCHAIN_ENABLED === 'true',
-    rpcUrl: process.env.BLOCKCHAIN_RPC_URL, // 可选，会使用内置RPC池
-    contracts: {
-      // GameAggregator 合约用于游戏操作
-      gameAggregator: isDev
-        ? (process.env.GAME_AGGREGATOR_CONTRACT_TESTNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x99616B1f031aF994a4b2cc940683255cB76Dd596')
-        : (process.env.GAME_AGGREGATOR_CONTRACT_MAINNET || process.env.GAME_AGGREGATOR_CONTRACT || '0x99616B1f031aF994a4b2cc940683255cB76Dd596'),
-      // SwordBattle 原合约用于基础数据查询
-      swordBattle: isDev
-        ? (process.env.SWORD_BATTLE_CONTRACT_TESTNET || process.env.SWORD_BATTLE_CONTRACT || '0x788aA9aAb214B3ac525c23bd257e93Ff0f10D9E0')
-        : (process.env.SWORD_BATTLE_CONTRACT_MAINNET || process.env.SWORD_BATTLE_CONTRACT || '0x788aA9aAb214B3ac525c23bd257e93Ff0f10D9E0'),
-      usd1Token: isDev
-        ? (process.env.USD1_TOKEN_CONTRACT_TESTNET || process.env.USD1_TOKEN_CONTRACT || '0x7f7d613942d903956e4DCE82fF8551fA8b1dfe16')
-        : (process.env.USD1_TOKEN_CONTRACT_MAINNET || process.env.USD1_TOKEN_CONTRACT),
-      rewardManager: isDev
-        ? (process.env.REWARD_MANAGER_CONTRACT_TESTNET || process.env.REWARD_MANAGER_CONTRACT)
-        : (process.env.REWARD_MANAGER_CONTRACT_MAINNET || process.env.REWARD_MANAGER_CONTRACT),
-    },
-    trustedSigner: process.env.TRUSTED_SIGNER_PRIVATE_KEY,
-    gameLevel: parseInt(process.env.GAME_LEVEL || '0'), // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH
-    environment: {
-      isDev,
-      isRelease,
-      chainId: isDev ? 97 : 56, // BSC测试网:97, BSC主网:56
-      networkName: isDev ? 'BSC Testnet' : 'BSC Mainnet',
-    },
-  },
-
-  // Environment information
-  environment: {
-    ENV,
-    isDev,
-    isRelease,
-    nodeEnv: ENV,
-  },
-
-  // Server type configuration
-  serverType: process.env.SERVER_TYPE || 'NORMAL',
-  isRaceServer: process.env.SERVER_TYPE === 'RACE',
-  enableCycleRestart: process.env.ENABLE_CYCLE_RESTART === 'true' || process.env.SERVER_TYPE === 'RACE',
 
 };

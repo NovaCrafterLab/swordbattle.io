@@ -15,15 +15,16 @@
   },
   "license": "ISC",
   "dependencies": {
+    "@solana/spl-token": "^0.4.13",
+    "@solana/web3.js": "^1.98.2",
     "dotenv": "^16.4.5",
     "leo-profanity": "^1.7.0",
     "luxon": "^3.6.1",
     "poly-decomp": "^0.3.0",
     "protobufjs": "^7.2.5",
     "sat": "^0.9.0",
-    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.44.0",
     "uuid": "^9.0.0",
-    "viem": "^2.0.0",
+    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.44.0",
     "winston": "^3.17.0"
   },
   "devDependencies": {
