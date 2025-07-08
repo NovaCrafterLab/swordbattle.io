@@ -2,9 +2,11 @@ const { Connection, PublicKey, Keypair } = require('@solana/web3.js');
 const { getAssociatedTokenAddress } = require('@solana/spl-token');
 const Logger = require('../utils/Logger');
 
-// Import simplified VaultSDK to bypass IDL compatibility issues
+// Import official VaultSDK with Anchor 0.31.1 support
 const path = require('path');
-const { SimpleVaultSDK } = require(path.resolve(__dirname, '../../../simple-vault-sdk.js'));
+const { VaultSDK } = require(
+  path.resolve(__dirname, '../../../solana/vault-sdk/dist/index.js'),
+);
 
 /**
  * Solana Vault Service - replaces the complex BSC BlockchainService
@@ -17,10 +19,10 @@ class SolanaVaultService {
     this.wallet = null;
     this.vaultSDK = null;
     this.isInitialized = false;
-    
+
     Logger.server.info('Solana Vault Service initializing', {
       rpcUrl: config.rpcUrl,
-      programId: config.programId
+      programId: config.programId,
     });
   }
 
@@ -31,54 +33,83 @@ class SolanaVaultService {
       // Create connection to Solana cluster
       this.connection = new Connection(
         this.config.rpcUrl || 'https://api.devnet.solana.com',
-        'confirmed'
+        'confirmed',
       );
 
       // Initialize wallet from private key
       if (this.config.privateKey) {
-        const privateKeyBytes = Uint8Array.from(Buffer.from(this.config.privateKey, 'hex'));
+        const privateKeyBytes = Uint8Array.from(
+          Buffer.from(this.config.privateKey, 'hex'),
+        );
         this.wallet = Keypair.fromSecretKey(privateKeyBytes);
-        Logger.server.info('🔑 Wallet initialized:', this.wallet.publicKey.toString());
+        Logger.server.info(
+          '🔑 Wallet initialized:',
+          this.wallet.publicKey.toString(),
+        );
       } else {
         // Fallback to id.json file in abis directory
         try {
           const idPath = path.resolve(__dirname, '../../../abis/id.json');
           const privateKeyArray = require(idPath);
           this.wallet = Keypair.fromSecretKey(Uint8Array.from(privateKeyArray));
-          Logger.server.info('🔑 Wallet loaded from id.json:', this.wallet.publicKey.toString());
+          Logger.server.info(
+            '🔑 Wallet loaded from id.json:',
+            this.wallet.publicKey.toString(),
+          );
         } catch (error) {
-          throw new Error('No Solana private key provided and id.json not found');
+          throw new Error(
+            'No Solana private key provided and id.json not found',
+          );
         }
       }
 
       // Test connection
       const latestBlockhash = await this.connection.getLatestBlockhash();
-      Logger.server.info('✅ Solana connected, blockhash:', latestBlockhash.blockhash.slice(0, 8) + '...');
+      Logger.server.info(
+        '✅ Solana connected, blockhash:',
+        latestBlockhash.blockhash.slice(0, 8) + '...',
+      );
 
       // Initialize VaultSDK
-      if (!this.config.programId || this.config.programId === '11111111111111111111111111111111') {
+      if (
+        !this.config.programId ||
+        this.config.programId === '11111111111111111111111111111111'
+      ) {
         throw new Error('Valid Vault program ID is required');
       }
 
-      this.vaultSDK = new SimpleVaultSDK({
+      // Create proper wallet interface for VaultSDK
+      const walletInterface = {
+        publicKey: this.wallet.publicKey,
+        signTransaction: async (tx) => {
+          tx.sign(this.wallet);
+          return tx;
+        },
+        signAllTransactions: async (txs) => {
+          return txs.map((tx) => {
+            tx.sign(this.wallet);
+            return tx;
+          });
+        },
+      };
+
+      this.vaultSDK = new VaultSDK({
         programId: new PublicKey(this.config.programId),
         connection: this.connection,
-        wallet: {
-          publicKey: this.wallet.publicKey,
-          signTransaction: (tx) => Promise.resolve(tx),
-          signAllTransactions: (txs) => Promise.resolve(txs)
-        }
+        wallet: walletInterface,
       });
 
-      Logger.server.info('🔧 SimpleVaultSDK initialized with program:', this.config.programId);
-      
+      Logger.server.info(
+        '🔧 Real VaultSDK initialized with program:',
+        this.config.programId,
+      );
+
       this.isInitialized = true;
       Logger.status('🚀 Solana vault service ready');
-
     } catch (error) {
-      Logger.server.error('Failed to initialize Solana vault service', { 
-        error: error.message, 
-        stack: error.stack 
+      Logger.server.error('Failed to initialize Solana vault service', {
+        error: error.message,
+        stack: error.stack,
       });
       throw error;
     }
@@ -95,10 +126,14 @@ class SolanaVaultService {
     try {
       Logger.server.debug('🔍 Fetching all game IDs from Solana');
       const gameIds = await this.vaultSDK.getAllGameIds();
-      Logger.server.debug('📋 Found game IDs:', gameIds);
+      Logger.server.debug(
+        `📋 Found game IDs: [${gameIds.join(', ')}] (${gameIds.length} total)`,
+      );
       return gameIds;
     } catch (error) {
-      Logger.server.error('Failed to get all game IDs', { error: error.message });
+      Logger.server.error('Failed to get all game IDs', {
+        error: error.message,
+      });
       throw error;
     }
   }
@@ -113,11 +148,17 @@ class SolanaVaultService {
 
     try {
       Logger.server.debug('🔍 Fetching latest game ID from Solana');
-      const latestGameId = await this.vaultSDK.getLatestGameId();
-      Logger.server.debug('🎯 Latest game ID:', latestGameId);
+      const gameIds = await this.getAllGameIds();
+      const latestGameId =
+        gameIds.length > 0 ? gameIds[gameIds.length - 1] : null;
+      Logger.server.debug(
+        `🎯 Latest game ID: ${latestGameId || 'none (fresh start)'}`,
+      );
       return latestGameId;
     } catch (error) {
-      Logger.server.error('Failed to get latest game ID', { error: error.message });
+      Logger.server.error('Failed to get latest game ID', {
+        error: error.message,
+      });
       throw error;
     }
   }
@@ -132,11 +173,18 @@ class SolanaVaultService {
 
     try {
       Logger.server.debug('🔍 Getting next available game ID');
-      const nextGameId = await this.vaultSDK.getNextGameId();
-      Logger.server.debug('🎯 Next game ID:', nextGameId);
+      const latestGameId = await this.getLatestGameId();
+      const nextGameId = latestGameId
+        ? (parseInt(latestGameId) + 1).toString()
+        : '1';
+      Logger.server.debug(
+        `🎯 Next game ID: ${nextGameId} (${latestGameId ? `increment from ${latestGameId}` : 'first game'})`,
+      );
       return nextGameId;
     } catch (error) {
-      Logger.server.error('Failed to get next game ID', { error: error.message });
+      Logger.server.error('Failed to get next game ID', {
+        error: error.message,
+      });
       throw error;
     }
   }
@@ -152,37 +200,66 @@ class SolanaVaultService {
 
     try {
       // If no gameId provided, get the next available one
-      const finalGameId = gameId || await this.getNextGameId();
-      
-      Logger.server.info('🎮 Creating Solana game vault', { gameId: finalGameId });
+      const finalGameId = gameId || (await this.getNextGameId());
 
-      // Use default token mint for now (could be configurable)
-      const tokenMint = new PublicKey(this.config.tokenMint || '11111111111111111111111111111111');
-
-      // Call VaultSDK to actually create the game vault
-      const txHash = await this.vaultSDK.initializeGameVault({
+      Logger.server.info('🎮 Creating Solana game vault', {
         gameId: finalGameId,
-        tokenMint: tokenMint
       });
 
-      Logger.server.info('✅ Game vault created on Solana', { 
-        gameId: finalGameId, 
-        txHash,
-        tokenMint: tokenMint.toString()
-      });
+      // Use Wrapped SOL (WSOL) as default token mint for devnet/mainnet compatibility
+      // Correct WSOL mint address
+      const WSOL_MINT = 'So11111111111111111111111111111112';
+      const NATIVE_LOADER = '11111111111111111111111111111111';
+
+      // Alternative: Use USDC devnet mint for testing
+      const USDC_DEVNET_MINT = 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr';
+
+      let tokenMintAddress = this.config.tokenMint;
+
+      Logger.server.info(
+        `🔍 Token mint configuration: ${this.config.tokenMint || 'not set'} -> ${tokenMintAddress}`,
+      );
+
+      // If config uses native loader ID or is empty, use USDC devnet for testing
+      if (!tokenMintAddress || tokenMintAddress === NATIVE_LOADER) {
+        tokenMintAddress = USDC_DEVNET_MINT;
+        Logger.server.info('🔄 Using USDC devnet mint for vault operations');
+      }
+
+      let tokenMint;
+      let txHash;
+
+      try {
+        tokenMint = new PublicKey(tokenMintAddress);
+        Logger.server.info(`✅ Token mint validated: ${tokenMint.toString()}`);
+
+        // Call VaultSDK to actually create the game vault
+        txHash = await this.vaultSDK.initializeGameVault({
+          gameId: parseInt(finalGameId),
+          tokenMint: tokenMint,
+        });
+      } catch (error) {
+        Logger.server.error(
+          `❌ Failed to create PublicKey from token mint: ${tokenMintAddress} - ${error.message}`,
+        );
+        throw error;
+      }
+
+      Logger.server.info(
+        `✅ Game vault created on Solana - Game ID: ${finalGameId}, TX: ${txHash.slice(0, 8)}..., Token: ${tokenMint.toString()}`,
+      );
 
       return {
         success: true,
         gameId: finalGameId,
         txHash,
         tokenMint: tokenMint.toString(),
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
-
     } catch (error) {
-      Logger.server.error('Failed to create game vault', { 
-        gameId, 
-        error: error.message 
+      Logger.server.error('Failed to create game vault', {
+        gameId,
+        error: error.message,
       });
       throw error;
     }
@@ -198,31 +275,39 @@ class SolanaVaultService {
     }
 
     try {
-      Logger.server.debug('🎫 Checking player ticket', { gameId, playerAddress });
-      
+      Logger.server.debug('🎫 Checking player ticket', {
+        gameId,
+        playerAddress,
+      });
+
       // Convert string address to PublicKey
       const playerPubkey = new PublicKey(playerAddress);
-      
+
       // Use VaultSDK to check if player has a ticket for this game
-      const ticketAccount = await this.vaultSDK.getUserTicketAccount(gameId, playerPubkey);
-      
+      const ticketAccount = await this.vaultSDK.getUserTicketAccount(
+        gameId,
+        playerPubkey,
+      );
+
       if (ticketAccount && !ticketAccount.hasWithdrawn) {
-        Logger.server.debug('✅ Player has valid ticket', { 
-          gameId, 
-          playerAddress, 
-          ticketAmount: ticketAccount.amount 
+        Logger.server.debug('✅ Player has valid ticket', {
+          gameId,
+          playerAddress,
+          ticketAmount: ticketAccount.amount,
         });
         return true;
       } else {
-        Logger.server.debug('❌ Player has no valid ticket', { gameId, playerAddress });
+        Logger.server.debug('❌ Player has no valid ticket', {
+          gameId,
+          playerAddress,
+        });
         return false;
       }
-
     } catch (error) {
-      Logger.server.warn('Failed to verify player ticket', { 
-        gameId, 
-        playerAddress, 
-        error: error.message 
+      Logger.server.warn('Failed to verify player ticket', {
+        gameId,
+        playerAddress,
+        error: error.message,
       });
       return false;
     }
@@ -235,31 +320,31 @@ class SolanaVaultService {
   calculateKillBasedRewards(players) {
     const rewards = [];
     const killReward = 0.001; // 0.001 SOL per kill (configurable)
-    
-    Logger.server.info('💰 Calculating kill-based rewards', { 
+
+    Logger.server.info('💰 Calculating kill-based rewards', {
       playerCount: players.length,
-      killReward 
+      killReward,
     });
 
     for (const player of players) {
       const kills = player.kills || 0;
       const rewardAmount = kills * killReward;
-      
+
       if (kills > 0 && player.walletAddress) {
         rewards.push({
           playerAddress: player.walletAddress,
           playerName: player.name,
           kills,
           rewardAmount: Math.floor(rewardAmount * 1e9), // Convert to lamports
-          rewardSOL: rewardAmount
+          rewardSOL: rewardAmount,
         });
       }
     }
 
-    Logger.server.info('💰 Kill-based rewards calculated', { 
+    Logger.server.info('💰 Kill-based rewards calculated', {
       totalPlayers: players.length,
       rewardedPlayers: rewards.length,
-      totalRewards: rewards.reduce((sum, r) => sum + r.rewardSOL, 0).toFixed(6)
+      totalRewards: rewards.reduce((sum, r) => sum + r.rewardSOL, 0).toFixed(6),
     });
 
     return rewards;
@@ -275,7 +360,10 @@ class SolanaVaultService {
     }
 
     try {
-      Logger.server.info('🏁 Finalizing Solana game', { gameId, playerCount: players.length });
+      Logger.server.info('🏁 Finalizing Solana game', {
+        gameId,
+        playerCount: players.length,
+      });
 
       // Calculate simple kill-based rewards
       const rewards = this.calculateKillBasedRewards(players);
@@ -286,27 +374,29 @@ class SolanaVaultService {
       }
 
       // Convert rewards to format expected by VaultSDK
-      const rewardEntries = rewards.map(reward => ({
+      const rewardEntries = rewards.map((reward) => ({
         user: new PublicKey(reward.playerAddress),
-        amount: reward.rewardAmount.toString()
+        amount: reward.rewardAmount.toString(),
       }));
 
-      Logger.server.info('📝 Reward entries prepared', { 
-        gameId, 
+      Logger.server.info('📝 Reward entries prepared', {
+        gameId,
         entries: rewardEntries.length,
-        totalRewardSOL: rewards.reduce((sum, r) => sum + r.rewardSOL, 0).toFixed(6)
+        totalRewardSOL: rewards
+          .reduce((sum, r) => sum + r.rewardSOL, 0)
+          .toFixed(6),
       });
 
       // Call VaultSDK to actually finalize the game with rewards
       const txHash = await this.vaultSDK.finalizeGame({
         gameId: gameId,
-        rewards: rewardEntries
+        rewards: rewardEntries,
       });
 
-      Logger.server.info('✅ Game finalized on Solana', { 
-        gameId, 
+      Logger.server.info('✅ Game finalized on Solana', {
+        gameId,
         txHash,
-        rewardsDistributed: rewards.length 
+        rewardsDistributed: rewards.length,
       });
 
       return {
@@ -315,13 +405,12 @@ class SolanaVaultService {
         txHash,
         rewardsDistributed: rewards.length,
         totalRewardSOL: rewards.reduce((sum, r) => sum + r.rewardSOL, 0),
-        rewards
+        rewards,
       };
-
     } catch (error) {
-      Logger.server.error('Failed to finalize game', { 
-        gameId, 
-        error: error.message 
+      Logger.server.error('Failed to finalize game', {
+        gameId,
+        error: error.message,
       });
       throw error;
     }
@@ -341,13 +430,13 @@ class SolanaVaultService {
    */
   async isConnected() {
     if (!this.isInitialized) return false;
-    
+
     try {
       await this.connection.getLatestBlockhash();
       return true;
     } catch (error) {
-      Logger.server.error('Solana connection check failed', { 
-        error: error.message 
+      Logger.server.error('Solana connection check failed', {
+        error: error.message,
       });
       return false;
     }
@@ -361,7 +450,7 @@ class SolanaVaultService {
       isInitialized: this.isInitialized,
       walletAddress: this.wallet?.publicKey?.toString() || null,
       rpcUrl: this.config.rpcUrl,
-      programId: this.config.programId
+      programId: this.config.programId,
     };
   }
 }

@@ -1,21 +1,21 @@
 import * as anchor from '@coral-xyz/anchor';
 import { PublicKey, SystemProgram } from '@solana/web3.js';
-import { 
-  TOKEN_PROGRAM_ID, 
-  getAssociatedTokenAddress, 
-  getOrCreateAssociatedTokenAccount 
+import {
+  TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddress,
+  getOrCreateAssociatedTokenAccount,
 } from '@solana/spl-token';
-import { 
-  VaultConfig, 
-  VaultInfo, 
-  InitializeGameVaultParams, 
-  BuyTicketParams, 
-  ClaimRewardParams, 
-  FinalizeGameParams, 
-  AdminWithdrawParams, 
-  ChangeTokenMintParams, 
-  GameVault, 
-  UserTicket, 
+import {
+  VaultConfig,
+  VaultInfo,
+  InitializeGameVaultParams,
+  BuyTicketParams,
+  ClaimRewardParams,
+  FinalizeGameParams,
+  AdminWithdrawParams,
+  ChangeTokenMintParams,
+  GameVault,
+  UserTicket,
   RewardMap,
   RewardEntry,
   GameVaultInitializedEvent,
@@ -27,9 +27,9 @@ import {
   EventFilter,
   EventSubscription,
   GameInfo,
-  GameDiscoveryOptions
+  GameDiscoveryOptions,
 } from './types';
-import { Vault, IDL } from "./idl";
+import { Vault, IDL } from './idl';
 import { Program } from '@coral-xyz/anchor';
 
 export class VaultSDK {
@@ -40,29 +40,38 @@ export class VaultSDK {
   constructor(config: VaultConfig) {
     this.connection = config.connection;
     this.wallet = config.wallet;
-    
+
     // Create program instance
     const provider = new anchor.AnchorProvider(
       config.connection,
       config.wallet,
-      { commitment: 'confirmed' }
+      { commitment: 'confirmed' },
     );
-    
-    this.program = new Program<Vault>(IDL as Vault, provider)
+
+    this.program = new Program<Vault>(IDL as Vault, provider);
   }
 
   /**
    * Get vault PDA and related accounts
    */
-  private getVaultPdas(gameId: number): { vault: PublicKey; vaultSigner: PublicKey } {
+  private getVaultPdas(gameId: number): {
+    vault: PublicKey;
+    vaultSigner: PublicKey;
+  } {
     const [vault] = PublicKey.findProgramAddressSync(
-      [Buffer.from("vault"), new anchor.BN(gameId).toArrayLike(Buffer, "le", 8)],
-      this.program.programId
+      [
+        Buffer.from('vault'),
+        new anchor.BN(gameId).toArrayLike(Buffer, 'le', 8),
+      ],
+      this.program.programId,
     );
 
     const [vaultSigner] = PublicKey.findProgramAddressSync(
-      [Buffer.from("vault"), new anchor.BN(gameId).toArrayLike(Buffer, "le", 8)],
-      this.program.programId
+      [
+        Buffer.from('vault'),
+        new anchor.BN(gameId).toArrayLike(Buffer, 'le', 8),
+      ],
+      this.program.programId,
     );
 
     return { vault, vaultSigner };
@@ -74,8 +83,8 @@ export class VaultSDK {
   private getUserTicketPda(gameId: number, user: PublicKey): PublicKey {
     const { vault } = this.getVaultPdas(gameId);
     const [userTicket] = PublicKey.findProgramAddressSync(
-      [Buffer.from("ticket"), vault.toBuffer(), user.toBuffer()],
-      this.program.programId
+      [Buffer.from('ticket'), vault.toBuffer(), user.toBuffer()],
+      this.program.programId,
     );
     return userTicket;
   }
@@ -86,8 +95,8 @@ export class VaultSDK {
   private getRewardMapPda(gameId: number): PublicKey {
     const { vault } = this.getVaultPdas(gameId);
     const [rewardMap] = PublicKey.findProgramAddressSync(
-      [Buffer.from("reward_map"), vault.toBuffer()],
-      this.program.programId
+      [Buffer.from('reward_map'), vault.toBuffer()],
+      this.program.programId,
     );
     return rewardMap;
   }
@@ -95,14 +104,16 @@ export class VaultSDK {
   /**
    * Initialize a new game vault
    */
-  async initializeGameVault(params: InitializeGameVaultParams): Promise<string> {
+  async initializeGameVault(
+    params: InitializeGameVaultParams,
+  ): Promise<string> {
     const { vault } = this.getVaultPdas(params.gameId);
-    
+
     const tx = await this.program.methods
       .initializeGameVault(new anchor.BN(params.gameId))
       .accounts({
         authority: this.wallet.publicKey,
-        tokenMint: params.tokenMint
+        tokenMint: params.tokenMint,
       })
       .rpc();
 
@@ -113,10 +124,10 @@ export class VaultSDK {
         this.wallet,
         params.tokenMint,
         vault,
-        true // allowOwnerOffCurve
+        true, // allowOwnerOffCurve
       );
     } catch (error) {
-      console.warn("Vault token account might already exist:", error);
+      console.warn('Vault token account might already exist:', error);
     }
 
     return tx;
@@ -127,14 +138,17 @@ export class VaultSDK {
    */
   async buyTicket(params: BuyTicketParams): Promise<string> {
     const { vault } = this.getVaultPdas(params.gameId);
-    const userTicket = this.getUserTicketPda(params.gameId, this.wallet.publicKey);
-    
+    const userTicket = this.getUserTicketPda(
+      params.gameId,
+      this.wallet.publicKey,
+    );
+
     // Get vault token account with actual mint
     const vaultAccount = await this.program.account.gameVault.fetch(vault);
     const vaultToken = await getAssociatedTokenAddress(
       vaultAccount.tokenMint as PublicKey,
       vault,
-      true
+      true,
     );
 
     const tx = await this.program.methods
@@ -143,7 +157,7 @@ export class VaultSDK {
         vault: vault,
         userToken: params.userTokenAccount,
         vaultToken: vaultToken,
-        user: this.wallet.publicKey
+        user: this.wallet.publicKey,
       })
       .rpc();
 
@@ -155,15 +169,18 @@ export class VaultSDK {
    */
   async claimReward(params: ClaimRewardParams): Promise<string> {
     const { vault, vaultSigner } = this.getVaultPdas(params.gameId);
-    const userTicket = this.getUserTicketPda(params.gameId, this.wallet.publicKey);
+    const userTicket = this.getUserTicketPda(
+      params.gameId,
+      this.wallet.publicKey,
+    );
     const rewardMap = this.getRewardMapPda(params.gameId);
-    
+
     // Get vault token account with actual mint
     const vaultAccount = await this.program.account.gameVault.fetch(vault);
     const vaultToken = await getAssociatedTokenAddress(
       vaultAccount.tokenMint as PublicKey,
       vault,
-      true
+      true,
     );
 
     const tx = await this.program.methods
@@ -174,7 +191,7 @@ export class VaultSDK {
         rewardMap: rewardMap,
         vaultToken: vaultToken,
         userToken: params.userTokenAccount,
-        user: this.wallet.publicKey
+        user: this.wallet.publicKey,
       })
       .rpc();
 
@@ -189,10 +206,12 @@ export class VaultSDK {
     const rewardMap = this.getRewardMapPda(params.gameId);
 
     const tx = await this.program.methods
-      .finalizeGame(params.rewards.map((reward: RewardEntry) => ({
-        user: reward.user,
-        amount: new anchor.BN(reward.amount)
-      })))
+      .finalizeGame(
+        params.rewards.map((reward: RewardEntry) => ({
+          user: reward.user,
+          amount: new anchor.BN(reward.amount),
+        })),
+      )
       .accounts({
         vault: vault,
         authority: this.wallet.publicKey,
@@ -207,13 +226,13 @@ export class VaultSDK {
    */
   async adminWithdraw(params: AdminWithdrawParams): Promise<string> {
     const { vault, vaultSigner } = this.getVaultPdas(params.gameId);
-    
+
     // Get vault token account with actual mint
     const vaultAccount = await this.program.account.gameVault.fetch(vault);
     const vaultToken = await getAssociatedTokenAddress(
       vaultAccount.tokenMint as PublicKey,
       vault,
-      true
+      true,
     );
 
     const tx = await this.program.methods
@@ -222,7 +241,7 @@ export class VaultSDK {
         vault: vault,
         vaultToken: vaultToken,
         adminToken: params.adminTokenAccount,
-        authority: this.wallet.publicKey
+        authority: this.wallet.publicKey,
       })
       .rpc();
 
@@ -252,7 +271,7 @@ export class VaultSDK {
   async getVaultAccount(gameId: number): Promise<GameVault> {
     const { vault } = this.getVaultPdas(gameId);
     const account = await this.program.account.gameVault.fetch(vault);
-    
+
     return {
       gameId: (account.gameId as anchor.BN).toString(),
       authority: account.authority as PublicKey,
@@ -266,11 +285,14 @@ export class VaultSDK {
   /**
    * Get user ticket account data
    */
-  async getUserTicketAccount(gameId: number, user: PublicKey): Promise<UserTicket | null> {
+  async getUserTicketAccount(
+    gameId: number,
+    user: PublicKey,
+  ): Promise<UserTicket | null> {
     try {
       const userTicket = this.getUserTicketPda(gameId, user);
       const account = await this.program.account.userTicket.fetch(userTicket);
-      
+
       return {
         gameId: (account.gameId as anchor.BN).toString(),
         user: account.user as PublicKey,
@@ -289,13 +311,13 @@ export class VaultSDK {
     try {
       const rewardMap = this.getRewardMapPda(gameId);
       const account = await this.program.account.rewardMap.fetch(rewardMap);
-      
+
       return {
         gameId: (account.gameId as anchor.BN).toString(),
         rewards: (account.rewards as any[]).map((reward: any) => ({
           user: reward.user as PublicKey,
-          amount: (reward.amount as anchor.BN).toString()
-        }))
+          amount: (reward.amount as anchor.BN).toString(),
+        })),
       };
     } catch (error) {
       return null;
@@ -309,17 +331,17 @@ export class VaultSDK {
     const { vault, vaultSigner } = this.getVaultPdas(gameId);
     const userTicket = this.getUserTicketPda(gameId, this.wallet.publicKey);
     const rewardMap = this.getRewardMapPda(gameId);
-    
+
     return {
       vault,
       vaultSigner,
       vaultToken: await getAssociatedTokenAddress(
-        new PublicKey("11111111111111111111111111111111"), // Placeholder
+        new PublicKey('11111111111111111111111111111111'), // Placeholder
         vault,
-        true
+        true,
       ),
       userTicket,
-      rewardMap
+      rewardMap,
     };
   }
 
@@ -333,7 +355,9 @@ export class VaultSDK {
       this.program.programId,
       (accountInfo: any, context: any) => {
         try {
-          const event = this.program.coder.events.decode(accountInfo.accountInfo.data);
+          const event = this.program.coder.events.decode(
+            accountInfo.accountInfo.data,
+          );
           if (event) {
             callback(event, context.slot);
           }
@@ -341,13 +365,13 @@ export class VaultSDK {
           // Ignore decoding errors for non-event data
         }
       },
-      'confirmed'
+      'confirmed',
     );
 
     return {
       unsubscribe: () => {
         this.connection.removeProgramAccountChangeListener(subscriptionId);
-      }
+      },
     };
   }
 
@@ -355,14 +379,16 @@ export class VaultSDK {
    * Listen to specific event types
    */
   onEvent<T>(
-    eventName: string, 
-    callback: (event: T, slot: number) => void
+    eventName: string,
+    callback: (event: T, slot: number) => void,
   ): EventSubscription {
     const subscriptionId = this.connection.onProgramAccountChange(
       this.program.programId,
       (accountInfo: any, context: any) => {
         try {
-          const event = this.program.coder.events.decode(accountInfo.accountInfo.data);
+          const event = this.program.coder.events.decode(
+            accountInfo.accountInfo.data,
+          );
           if (event && (event as any).eventName === eventName) {
             callback((event as any).data as T, context.slot);
           }
@@ -370,55 +396,70 @@ export class VaultSDK {
           // Ignore decoding errors for non-event data
         }
       },
-      'confirmed'
+      'confirmed',
     );
 
     return {
       unsubscribe: () => {
         this.connection.removeProgramAccountChangeListener(subscriptionId);
-      }
+      },
     };
   }
 
   /**
    * Listen to GameVaultInitialized events
    */
-  onGameVaultInitialized(callback: (event: GameVaultInitializedEvent, slot: number) => void): EventSubscription {
-    return this.onEvent<GameVaultInitializedEvent>('GameVaultInitialized', callback);
+  onGameVaultInitialized(
+    callback: (event: GameVaultInitializedEvent, slot: number) => void,
+  ): EventSubscription {
+    return this.onEvent<GameVaultInitializedEvent>(
+      'GameVaultInitialized',
+      callback,
+    );
   }
 
   /**
    * Listen to TicketPurchased events
    */
-  onTicketPurchased(callback: (event: TicketPurchasedEvent, slot: number) => void): EventSubscription {
+  onTicketPurchased(
+    callback: (event: TicketPurchasedEvent, slot: number) => void,
+  ): EventSubscription {
     return this.onEvent<TicketPurchasedEvent>('TicketPurchased', callback);
   }
 
   /**
    * Listen to RewardClaimed events
    */
-  onRewardClaimed(callback: (event: RewardClaimedEvent, slot: number) => void): EventSubscription {
+  onRewardClaimed(
+    callback: (event: RewardClaimedEvent, slot: number) => void,
+  ): EventSubscription {
     return this.onEvent<RewardClaimedEvent>('RewardClaimed', callback);
   }
 
   /**
    * Listen to GameFinalized events
    */
-  onGameFinalized(callback: (event: GameFinalizedEvent, slot: number) => void): EventSubscription {
+  onGameFinalized(
+    callback: (event: GameFinalizedEvent, slot: number) => void,
+  ): EventSubscription {
     return this.onEvent<GameFinalizedEvent>('GameFinalized', callback);
   }
 
   /**
    * Listen to AdminWithdrawn events
    */
-  onAdminWithdrawn(callback: (event: AdminWithdrawnEvent, slot: number) => void): EventSubscription {
+  onAdminWithdrawn(
+    callback: (event: AdminWithdrawnEvent, slot: number) => void,
+  ): EventSubscription {
     return this.onEvent<AdminWithdrawnEvent>('AdminWithdrawn', callback);
   }
 
   /**
    * Listen to TokenMintChanged events
    */
-  onTokenMintChanged(callback: (event: TokenMintChangedEvent, slot: number) => void): EventSubscription {
+  onTokenMintChanged(
+    callback: (event: TokenMintChangedEvent, slot: number) => void,
+  ): EventSubscription {
     return this.onEvent<TokenMintChangedEvent>('TokenMintChanged', callback);
   }
 
@@ -432,11 +473,11 @@ export class VaultSDK {
         limit: 1000,
         before: filter?.toSlot ? undefined : undefined,
         until: filter?.fromSlot ? undefined : undefined,
-      }
+      },
     );
 
     const events: any[] = [];
-    
+
     for (const sig of signatures) {
       try {
         const tx = await this.connection.getTransaction(sig.signature, {
@@ -451,16 +492,26 @@ export class VaultSDK {
               if (log.includes('Program log:')) {
                 const eventData = log.replace('Program log:', '').trim();
                 const event = this.program.coder.events.decode(eventData);
-                
+
                 if (event) {
                   // Apply filters
-                  if (filter?.gameId && event.data.gameId?.toString() !== filter.gameId.toString()) {
+                  if (
+                    filter?.gameId &&
+                    event.data.gameId?.toString() !== filter.gameId.toString()
+                  ) {
                     continue;
                   }
-                  if (filter?.user && event.data.user?.toString() !== filter.user.toString()) {
+                  if (
+                    filter?.user &&
+                    event.data.user?.toString() !== filter.user.toString()
+                  ) {
                     continue;
                   }
-                  if (filter?.authority && event.data.authority?.toString() !== filter.authority.toString()) {
+                  if (
+                    filter?.authority &&
+                    event.data.authority?.toString() !==
+                      filter.authority.toString()
+                  ) {
                     continue;
                   }
 
@@ -519,36 +570,37 @@ export class VaultSDK {
    * Get all game IDs by scanning program accounts
    */
   async getAllGameIds(): Promise<string[]> {
-    const accounts = await this.connection.getProgramAccounts(
-      this.program.programId,
-      {
-        filters: [
-          {
-            memcmp: {
-              offset: 0,
-              bytes: (this.program.coder.accounts as any).accountDiscriminator("gameVault")
-            }
-          }
-        ]
-      }
-    );
+    try {
+      // Try to get all program accounts without discriminator first
+      const accounts = await this.connection.getProgramAccounts(
+        this.program.programId,
+      );
 
-    const gameIds: string[] = [];
-    
-    for (const account of accounts) {
-      try {
-        const vaultAccount = this.program.coder.accounts.decode(
-          "gameVault",
-          account.account.data
-        );
-        gameIds.push((vaultAccount.gameId as anchor.BN).toString());
-      } catch (error) {
-        // Skip invalid accounts
-        continue;
+      const gameIds: string[] = [];
+
+      for (const account of accounts) {
+        try {
+          // Try to decode as gameVault account
+          const vaultAccount = this.program.coder.accounts.decode(
+            'gameVault',
+            account.account.data,
+          );
+          gameIds.push((vaultAccount.gameId as anchor.BN).toString());
+        } catch (error) {
+          // Skip accounts that can't be decoded as gameVault
+          continue;
+        }
       }
+
+      return gameIds.sort((a, b) => parseInt(a) - parseInt(b));
+    } catch (error) {
+      // If no accounts exist or query fails, return empty array
+      console.log(
+        'No existing game vaults found, starting fresh:',
+        error instanceof Error ? error.message : String(error),
+      );
+      return [];
     }
-
-    return gameIds.sort((a, b) => parseInt(a) - parseInt(b));
   }
 
   /**
@@ -562,20 +614,22 @@ export class VaultSDK {
           {
             memcmp: {
               offset: 0,
-              bytes: (this.program.coder.accounts as any).accountDiscriminator("gameVault")
-            }
-          }
-        ]
-      }
+              bytes: (this.program.coder.accounts as any).accountDiscriminator(
+                'gameVault',
+              ),
+            },
+          },
+        ],
+      },
     );
 
     const games: GameInfo[] = [];
-    
+
     for (const account of accounts) {
       try {
         const vaultAccount = this.program.coder.accounts.decode(
-          "gameVault",
-          account.account.data
+          'gameVault',
+          account.account.data,
         );
 
         const gameInfo: GameInfo = {
@@ -586,20 +640,32 @@ export class VaultSDK {
           finalized: vaultAccount.finalized as boolean,
           withdrawEnabled: vaultAccount.withdrawEnabled as boolean,
           tokenMint: vaultAccount.tokenMint as PublicKey,
-          createdAt: account.account.lamports ? undefined : undefined // Could be enhanced with block time
+          createdAt: account.account.lamports ? undefined : undefined, // Could be enhanced with block time
         };
 
         // Apply filters
-        if (options?.authority && !gameInfo.authority.equals(options.authority)) {
+        if (
+          options?.authority &&
+          !gameInfo.authority.equals(options.authority)
+        ) {
           continue;
         }
-        if (options?.finalized !== undefined && gameInfo.finalized !== options.finalized) {
+        if (
+          options?.finalized !== undefined &&
+          gameInfo.finalized !== options.finalized
+        ) {
           continue;
         }
-        if (options?.withdrawEnabled !== undefined && gameInfo.withdrawEnabled !== options.withdrawEnabled) {
+        if (
+          options?.withdrawEnabled !== undefined &&
+          gameInfo.withdrawEnabled !== options.withdrawEnabled
+        ) {
           continue;
         }
-        if (options?.tokenMint && !gameInfo.tokenMint.equals(options.tokenMint)) {
+        if (
+          options?.tokenMint &&
+          !gameInfo.tokenMint.equals(options.tokenMint)
+        ) {
           continue;
         }
 
@@ -695,12 +761,12 @@ export class VaultSDK {
     withWithdrawEnabled: number;
   }> {
     const allGames = await this.getAllGames();
-    
+
     return {
       total: allGames.length,
-      active: allGames.filter(g => !g.finalized).length,
-      finalized: allGames.filter(g => g.finalized).length,
-      withWithdrawEnabled: allGames.filter(g => g.withdrawEnabled).length
+      active: allGames.filter((g) => !g.finalized).length,
+      finalized: allGames.filter((g) => g.finalized).length,
+      withWithdrawEnabled: allGames.filter((g) => g.withdrawEnabled).length,
     };
   }
-} 
+}

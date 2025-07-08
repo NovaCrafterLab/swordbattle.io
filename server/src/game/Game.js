@@ -14,7 +14,6 @@ const { rectangleRectangle } = require('./collisions');
 const { CYCLE_DATA } = require('../utils/cycleRestart');
 const Logger = require('../utils/Logger');
 
-
 const sharedResp = new SAT.Response();
 
 class Game {
@@ -27,7 +26,7 @@ class Game {
     this.map = new GameMap(this);
     this.globalEntities = new GlobalEntities(this);
 
-    this.logicalTime = 0
+    this.logicalTime = 0;
 
     this.entitiesQuadtree = null;
     this.tps = 0;
@@ -48,10 +47,10 @@ class Game {
     // 游戏最大持续时间 (30分钟)
     this.maxGameDuration = CYCLE_DATA.PERIOD_MS;
     this.pendingMassKill = false;
-    
+
     // 服务器引用，用于访问客户端连接
     this.server = null;
-    
+
     // Solana vault service for blockchain operations
     this.solanaVaultService = null;
   }
@@ -67,7 +66,10 @@ class Game {
     if (this.pendingMassKill) {
       for (const player of this.players) {
         if (!player.removed && !player.isBot) {
-          player.remove('Game Ended - Server Restarting', Types.DisconnectReason.Server);
+          player.remove(
+            'Game Ended - Server Restarting',
+            Types.DisconnectReason.Server,
+          );
         }
       }
       this.pendingMassKill = false;
@@ -111,7 +113,10 @@ class Game {
       const target = candidates[i].entity;
       if (entity === target || target.removed) continue;
 
-      if (target.depthZone && target.depthZone.isPointInside(entityCenter.x, entityCenter.y)) {
+      if (
+        target.depthZone &&
+        target.depthZone.isPointInside(entityCenter.x, entityCenter.y)
+      ) {
         depth = target.id;
       }
 
@@ -284,8 +289,7 @@ class Game {
 
   updateQuadtree() {
     const stable = this.entities.size - this.changeRatio();
-    const needFullRebuild =
-      stable < 0 || stable * stable < this.entities.size;
+    const needFullRebuild = stable < 0 || stable * stable < this.entities.size;
 
     const interval = this.quadtreeTickInterval;
 
@@ -407,10 +411,16 @@ class Game {
     }
 
     // Solana player verification (only in race server mode)
-    if (config.isRaceServer && config.solana.enabled && this.solanaVaultService) {
+    if (
+      config.isRaceServer &&
+      config.solana.enabled &&
+      this.solanaVaultService
+    ) {
       // Check if wallet address is provided
       if (!data.walletAddress) {
-        console.log(`❌ Player ${name} rejected: No wallet address provided for race server`);
+        console.log(
+          `❌ Player ${name} rejected: No wallet address provided for race server`,
+        );
         client.socket.close();
         return;
       }
@@ -430,36 +440,50 @@ class Game {
   async verifyAndAddSolanaPlayer(client, data, name) {
     try {
       const walletAddress = data.walletAddress;
-      
+
       // In RACE mode, use wallet address prefix as player name
       const racePlayerName = walletAddress.slice(0, 11); // 0x + first 9 chars = 11 total
-      console.log(`🔍 Verifying Solana player ${racePlayerName} with wallet ${walletAddress}...`);
+      console.log(
+        `🔍 Verifying Solana player ${racePlayerName} with wallet ${walletAddress}...`,
+      );
 
       // Verify player has bought a ticket for this game
       const hasTicket = await this.verifySolanaPlayerTicket(walletAddress);
 
       if (!hasTicket) {
-        console.log(`❌ Player ${racePlayerName} rejected: No ticket found for current game`);
+        console.log(
+          `❌ Player ${racePlayerName} rejected: No ticket found for current game`,
+        );
         // Send error message to client
-        client.socket.send(JSON.stringify({
-          type: 'error',
-          message: 'You must buy a ticket for this game first. Please purchase an entry ticket to participate.',
-        }));
+        client.socket.send(
+          JSON.stringify({
+            type: 'error',
+            message:
+              'You must buy a ticket for this game first. Please purchase an entry ticket to participate.',
+          }),
+        );
         client.socket.close();
         return;
       }
 
       // Check if player is already in game
       for (const player of this.players) {
-        if (player.client?.walletAddress?.toLowerCase() === walletAddress.toLowerCase()) {
-          console.log(`❌ Player ${racePlayerName} rejected: Already in game with this wallet`);
+        if (
+          player.client?.walletAddress?.toLowerCase() ===
+          walletAddress.toLowerCase()
+        ) {
+          console.log(
+            `❌ Player ${racePlayerName} rejected: Already in game with this wallet`,
+          );
           client.socket.close();
           return;
         }
       }
 
       // Verification passed, create player
-      console.log(`✅ Solana player ${racePlayerName} verified and joining game`);
+      console.log(
+        `✅ Solana player ${racePlayerName} verified and joining game`,
+      );
       const player = this.createAndAddPlayer(client, data, racePlayerName);
 
       // Save wallet address to client
@@ -468,12 +492,19 @@ class Game {
       return player;
     } catch (error) {
       const walletAddress = data.walletAddress;
-      const racePlayerName = walletAddress ? walletAddress.slice(0, 11) : 'Unknown';
-      console.error(`❌ Error verifying Solana player ${racePlayerName}:`, error);
-      client.socket.send(JSON.stringify({
-        type: 'error',
-        message: 'Failed to verify ticket. Please try again.',
-      }));
+      const racePlayerName = walletAddress
+        ? walletAddress.slice(0, 11)
+        : 'Unknown';
+      console.error(
+        `❌ Error verifying Solana player ${racePlayerName}:`,
+        error,
+      );
+      client.socket.send(
+        JSON.stringify({
+          type: 'error',
+          message: 'Failed to verify ticket. Please try again.',
+        }),
+      );
       client.socket.close();
     }
   }
@@ -501,7 +532,11 @@ class Game {
     this.addEntity(player);
 
     // In race mode, check if game can start
-    if (config.isRaceServer && config.solana.enabled && this.gamePhase === 'waiting') {
+    if (
+      config.isRaceServer &&
+      config.solana.enabled &&
+      this.gamePhase === 'waiting'
+    ) {
       this.checkGameStart();
     }
 
@@ -519,11 +554,12 @@ class Game {
       activeCount,
       registeredCount,
       gamePhase: this.gamePhase,
-      gameId: this.solanaGameId
+      gameId: this.solanaGameId,
     });
 
     // 可以添加更多开始游戏的条件，比如最小玩家数、时间限制等
-    if (activeCount >= Math.min(2, registeredCount)) { // 至少2个玩家或所有注册玩家都加入
+    if (activeCount >= Math.min(2, registeredCount)) {
+      // 至少2个玩家或所有注册玩家都加入
       if (this.gamePhase === 'waiting') {
         this.gamePhase = 'active';
         Logger.status('Game started! All players are ready', 'game');
@@ -548,14 +584,14 @@ class Game {
     this.gameTimeoutTimer = setTimeout(() => {
       Logger.game.warn('Game timeout reached, ending game automatically', {
         gameId: this.solanaGameId,
-        duration: this.maxGameDuration
+        duration: this.maxGameDuration,
       });
       this.endSolanaGame('timeout');
     }, this.maxGameDuration);
 
     Logger.game.info('Game timeout set', {
       gameId: this.solanaGameId,
-      timeoutMinutes: this.maxGameDuration / 1000 / 60
+      timeoutMinutes: this.maxGameDuration / 1000 / 60,
     });
   }
 
@@ -592,7 +628,7 @@ class Game {
         } catch (error) {
           Logger.game.error('Error sending game start message to player', {
             playerId: player.id,
-            error: error.message
+            error: error.message,
           });
           errorCount++;
         }
@@ -603,7 +639,7 @@ class Game {
       gameId: this.solanaGameId,
       successCount,
       errorCount,
-      totalPlayers: this.players.size
+      totalPlayers: this.players.size,
     });
   }
 
@@ -676,7 +712,11 @@ class Game {
    * Called on server startup to create on-chain game
    */
   async initializeSolanaGame(retryCount = 0) {
-    if (!config.isRaceServer || !config.solana.enabled || !this.solanaVaultService) {
+    if (
+      !config.isRaceServer ||
+      !config.solana.enabled ||
+      !this.solanaVaultService
+    ) {
       return;
     }
 
@@ -694,14 +734,17 @@ class Game {
 
       // Get next sequential game ID from Solana (latest + 1)
       const gameId = await this.solanaVaultService.getNextGameId();
-      Logger.server.info(`🎮 Creating Solana game vault (attempt ${currentAttempt}/${maxRetries})`, { 
-        gameId,
-        message: 'Using next sequential game ID from Solana'
-      });
+      Logger.server.info(
+        `🎮 Creating Solana game vault (attempt ${currentAttempt}/${maxRetries})`,
+        {
+          gameId,
+          message: 'Using next sequential game ID from Solana',
+        },
+      );
 
       // Create game vault on Solana with the next available ID
       const createResult = await this.solanaVaultService.createGame(gameId);
-      
+
       if (createResult.success) {
         this.solanaGameId = createResult.gameId; // Use the actual game ID returned
         this.gamePhase = 'waiting';
@@ -710,33 +753,39 @@ class Game {
         Logger.server.info(`✅ Solana game vault created successfully!`, {
           gameId: this.solanaGameId,
           txHash: createResult.txHash,
-          tokenMint: createResult.tokenMint
+          tokenMint: createResult.tokenMint,
         });
         this.isGameCreationInProgress = false;
       } else {
         throw new Error('Failed to create game vault');
       }
-
     } catch (error) {
-      Logger.server.error(`❌ Solana game creation failed (${currentAttempt}/${maxRetries}):`, {
-        error: error.message,
-        stack: error.stack,
-        solanaService: !!this.solanaVaultService,
-        isInitialized: this.solanaVaultService?.isInitialized,
-        walletAddress: this.solanaVaultService?.wallet?.publicKey?.toString()
-      });
+      Logger.server.error(
+        `❌ Solana game creation failed (${currentAttempt}/${maxRetries}):`,
+        {
+          error: error.message,
+          stack: error.stack,
+          solanaService: !!this.solanaVaultService,
+          isInitialized: this.solanaVaultService?.isInitialized,
+          walletAddress: this.solanaVaultService?.wallet?.publicKey?.toString(),
+        },
+      );
 
       this.gamePhase = 'error';
       this.isGameCreationInProgress = false;
 
       // Retry if attempts remaining
       if (retryCount < maxRetries - 1) {
-        Logger.server.info(`🔄 Retrying in 5s... (${maxRetries - currentAttempt} attempts left)`);
+        Logger.server.info(
+          `🔄 Retrying in 5s... (${maxRetries - currentAttempt} attempts left)`,
+        );
         setTimeout(() => {
           this.initializeSolanaGame(retryCount + 1);
         }, 5000);
       } else {
-        Logger.server.error('🚫 All retries exhausted - Solana features disabled');
+        Logger.server.error(
+          '🚫 All retries exhausted - Solana features disabled',
+        );
       }
     }
   }
@@ -747,20 +796,27 @@ class Game {
    */
   async verifySolanaPlayerTicket(playerAddress) {
     if (!this.solanaVaultService || !this.solanaGameId) {
-      console.log(`❌ Verification failed - solanaService: ${!!this.solanaVaultService}, gameId: ${this.solanaGameId}`);
+      console.log(
+        `❌ Verification failed - solanaService: ${!!this.solanaVaultService}, gameId: ${this.solanaGameId}`,
+      );
       return false;
     }
 
     try {
       // Check if player has bought a ticket for this game
-      const hasTicket = await this.solanaVaultService.verifyPlayerTicket(this.solanaGameId, playerAddress);
+      const hasTicket = await this.solanaVaultService.verifyPlayerTicket(
+        this.solanaGameId,
+        playerAddress,
+      );
 
       if (hasTicket) {
         this.registeredPlayers.add(playerAddress.toLowerCase());
         console.log(`✅ Player ${playerAddress} has valid ticket`);
         return true;
       } else {
-        console.log(`❌ Player ${playerAddress} has no ticket for game ${this.solanaGameId}`);
+        console.log(
+          `❌ Player ${playerAddress} has no ticket for game ${this.solanaGameId}`,
+        );
         return false;
       }
     } catch (error) {
@@ -775,13 +831,20 @@ class Game {
   async waitForGameCreated(initialCounter) {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('⏱️  Game creation timeout (60s) - transaction may still be pending'));
+        reject(
+          new Error(
+            '⏱️  Game creation timeout (60s) - transaction may still be pending',
+          ),
+        );
       }, 60000); // 60秒超时
 
       const checkGameCreated = async () => {
         try {
           const currentCounter = await this.blockchainService.getGameCounter();
-          Logger.server.debug('Checking game counter', { currentCounter, initialCounter });
+          Logger.server.debug('Checking game counter', {
+            currentCounter,
+            initialCounter,
+          });
 
           // 检查计数器是否增加了（表示新游戏创建成功）
           if (currentCounter > initialCounter) {
@@ -789,7 +852,9 @@ class Game {
             this.gamePhase = 'waiting';
             this.gameStartTime = Date.now();
 
-            Logger.server.info(`🎯 Game created successfully! ID: ${this.blockchainGameId}`);
+            Logger.server.info(
+              `🎯 Game created successfully! ID: ${this.blockchainGameId}`,
+            );
 
             clearTimeout(timeout);
             this.isGameCreationInProgress = false;
@@ -799,7 +864,9 @@ class Game {
             setTimeout(checkGameCreated, 2000);
           }
         } catch (error) {
-          Logger.server.error('Error checking game creation', { error: error.message });
+          Logger.server.error('Error checking game creation', {
+            error: error.message,
+          });
           clearTimeout(timeout);
           this.isGameCreationInProgress = false;
           reject(error);
@@ -816,7 +883,9 @@ class Game {
    */
   async verifyPlayerRegistration(playerAddress) {
     if (!this.blockchainService || !this.blockchainGameId) {
-      console.log(`❌ Verification failed - blockchainService: ${!!this.blockchainService}, gameId: ${this.blockchainGameId}`);
+      console.log(
+        `❌ Verification failed - blockchainService: ${!!this.blockchainService}, gameId: ${this.blockchainGameId}`,
+      );
       return false;
     }
 
@@ -824,20 +893,26 @@ class Game {
       // 验证玩家注册状态
 
       // 检查玩家是否在链上游戏中
-      const players = await this.blockchainService.getGamePlayers(this.blockchainGameId);
+      const players = await this.blockchainService.getGamePlayers(
+        this.blockchainGameId,
+      );
 
       // 确保players是数组
       const playerList = Array.isArray(players) ? players : [];
       // 检查游戏玩家列表
 
-      const isRegistered = playerList.map(p => p.toLowerCase()).includes(playerAddress.toLowerCase());
+      const isRegistered = playerList
+        .map((p) => p.toLowerCase())
+        .includes(playerAddress.toLowerCase());
 
       if (isRegistered) {
         this.registeredPlayers.add(playerAddress.toLowerCase());
         console.log(`✅ Player ${playerAddress} joined game`);
         return true;
       } else {
-        console.log(`❌ Player ${playerAddress} not registered for game ${this.blockchainGameId}`);
+        console.log(
+          `❌ Player ${playerAddress} not registered for game ${this.blockchainGameId}`,
+        );
         console.log(`   Searched for: ${playerAddress.toLowerCase()}`);
         return false;
       }
@@ -858,7 +933,7 @@ class Game {
       if (player.removed) continue;
 
       const killReward = this.calculatePlayerKillRewards(player);
-      
+
       // Only include players with kills and wallet addresses
       if (killReward.kills > 0 && player.client?.walletAddress) {
         const rewardData = {
@@ -867,7 +942,7 @@ class Game {
           walletAddress: player.client.walletAddress,
           kills: killReward.kills,
           rewardSOL: killReward.rewardSOL,
-          rewardLamports: killReward.rewardLamports
+          rewardLamports: killReward.rewardLamports,
         };
 
         this.finalKillRewards.set(player.id, rewardData);
@@ -877,9 +952,11 @@ class Game {
     Logger.game.info('Collected player kill rewards', {
       gameId: this.solanaGameId,
       rewardCount: this.finalKillRewards.size,
-      totalRewardSOL: Array.from(this.finalKillRewards.values()).reduce((sum, r) => sum + r.rewardSOL, 0).toFixed(6)
+      totalRewardSOL: Array.from(this.finalKillRewards.values())
+        .reduce((sum, r) => sum + r.rewardSOL, 0)
+        .toFixed(6),
     });
-    
+
     return this.finalKillRewards;
   }
 
@@ -900,7 +977,7 @@ class Game {
         coins: player.levels?.coins || 0,
         playtime: player.playtime || 0,
         finalScore: this.calculatePlayerScore(player),
-        walletAddress: player.client?.walletAddress || null
+        walletAddress: player.client?.walletAddress || null,
       };
 
       this.finalScores.set(player.id, score);
@@ -908,7 +985,7 @@ class Game {
 
     Logger.game.info('Collected player scores', {
       gameId: this.solanaGameId,
-      scoreCount: this.finalScores.size
+      scoreCount: this.finalScores.size,
     });
     return this.finalScores;
   }
@@ -921,11 +998,11 @@ class Game {
     // Only kills matter for Solana rewards
     const kills = player.kills || 0;
     const killReward = config.solana.killReward || 0.001; // SOL per kill
-    
+
     return {
       kills,
       rewardSOL: kills * killReward,
-      rewardLamports: Math.floor(kills * killReward * 1e9) // Convert to lamports
+      rewardLamports: Math.floor(kills * killReward * 1e9), // Convert to lamports
     };
   }
 
@@ -945,14 +1022,18 @@ class Game {
    * End Solana game - simplified version using kill-based rewards
    */
   async endSolanaGame(reason = 'normal') {
-    if (!config.isRaceServer || !config.solana.enabled || !this.solanaVaultService) {
+    if (
+      !config.isRaceServer ||
+      !config.solana.enabled ||
+      !this.solanaVaultService
+    ) {
       return;
     }
 
     if (this.gamePhase === 'ending' || this.gamePhase === 'ended') {
       Logger.game.warn('Game already ending or ended', {
         gameId: this.solanaGameId,
-        currentPhase: this.gamePhase
+        currentPhase: this.gamePhase,
       });
       return;
     }
@@ -969,14 +1050,16 @@ class Game {
         gameId: this.solanaGameId,
         reason,
         playerCount: this.players.size,
-        duration: this.gameEndTime - this.gameStartTime
+        duration: this.gameEndTime - this.gameStartTime,
       });
 
-      console.log(`📢 Solana Game ${this.solanaGameId} ending (${reason}) - calculating kill-based rewards...`);
-      
+      console.log(
+        `📢 Solana Game ${this.solanaGameId} ending (${reason}) - calculating kill-based rewards...`,
+      );
+
       // Collect kill-based rewards (much simpler than BSC)
       const killRewards = this.collectPlayerKillRewards();
-      
+
       // Broadcast game end to all clients
       this.broadcastSolanaGameEnd(reason, killRewards);
 
@@ -985,24 +1068,25 @@ class Game {
 
       // Set game as ended
       this.gamePhase = 'ended';
-      
+
       // Clean up current game state
       this.cleanupCurrentGame();
 
-      console.log(`✅ Solana Game ${this.solanaGameId} finalized. Server will restart for new game.`);
-      
+      console.log(
+        `✅ Solana Game ${this.solanaGameId} finalized. Server will restart for new game.`,
+      );
+
       // Trigger server restart
       this.triggerServerRestart();
-
     } catch (error) {
       Logger.game.error('Failed to end Solana game', {
         gameId: this.solanaGameId,
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
       });
-      
+
       this.gamePhase = 'error';
-      
+
       // Restart server even if error occurred
       setTimeout(() => {
         this.triggerServerRestart();
@@ -1023,8 +1107,10 @@ class Game {
    * Replaces complex BSC score submission with single VaultSDK call
    */
   async finalizeSolanaGameWithRewards(killRewards) {
-    console.log(`🔄 Finalizing Solana game ${this.solanaGameId} with ${killRewards.size} reward entries`);
-    
+    console.log(
+      `🔄 Finalizing Solana game ${this.solanaGameId} with ${killRewards.size} reward entries`,
+    );
+
     try {
       if (killRewards.size === 0) {
         console.log('⚠️ No kill rewards to distribute');
@@ -1033,28 +1119,36 @@ class Game {
 
       // Convert rewards to array format expected by SolanaVaultService
       const rewardArray = Array.from(killRewards.values());
-      
+
       console.log(`💰 Distributing rewards:`, {
         playerCount: rewardArray.length,
-        totalSOL: rewardArray.reduce((sum, r) => sum + r.rewardSOL, 0).toFixed(6),
-        rewards: rewardArray.map(r => `${r.playerName}: ${r.kills} kills = ${r.rewardSOL} SOL`)
+        totalSOL: rewardArray
+          .reduce((sum, r) => sum + r.rewardSOL, 0)
+          .toFixed(6),
+        rewards: rewardArray.map(
+          (r) => `${r.playerName}: ${r.kills} kills = ${r.rewardSOL} SOL`,
+        ),
       });
 
       // Single VaultSDK call to finalize game (vs complex BSC flow)
-      const result = await this.solanaVaultService.finalizeGame(this.solanaGameId, rewardArray);
-      
+      const result = await this.solanaVaultService.finalizeGame(
+        this.solanaGameId,
+        rewardArray,
+      );
+
       if (result.success) {
-        console.log(`✅ Solana game finalized successfully - ${result.rewardsDistributed} rewards set`);
+        console.log(
+          `✅ Solana game finalized successfully - ${result.rewardsDistributed} rewards set`,
+        );
         return result;
       } else {
         throw new Error('VaultSDK finalizeGame failed');
       }
-
     } catch (error) {
       console.error(`❌ Failed to finalize Solana game:`, error.message);
       Logger.game.error('Solana game finalization failed', {
         gameId: this.solanaGameId,
-        error: error.message
+        error: error.message,
       });
       throw error;
     }
@@ -1065,24 +1159,33 @@ class Game {
    * Simplified version of BSC broadcast
    */
   broadcastSolanaGameEnd(reason, killRewards) {
-    console.log(`📢 Solana Game ${this.solanaGameId} ending (${reason}) - notifying players`);
-    
+    console.log(
+      `📢 Solana Game ${this.solanaGameId} ending (${reason}) - notifying players`,
+    );
+
     // Use existing pendingMassKill mechanism to kick players cleanly
     this.pendingMassKill = true;
-    
+
     const playerCount = this.players.size;
     const rewardCount = killRewards.size;
-    const totalSOL = Array.from(killRewards.values()).reduce((sum, r) => sum + r.rewardSOL, 0);
-    
-    console.log(`🔄 Scheduled ${playerCount} players to be kicked, ${rewardCount} rewards distributed (${totalSOL.toFixed(6)} SOL total)`);
+    const totalSOL = Array.from(killRewards.values()).reduce(
+      (sum, r) => sum + r.rewardSOL,
+      0,
+    );
+
+    console.log(
+      `🔄 Scheduled ${playerCount} players to be kicked, ${rewardCount} rewards distributed (${totalSOL.toFixed(6)} SOL total)`,
+    );
   }
 
   /**
    * Legacy BSC method - complex implementation no longer used
    */
   async processCompleteBlockchainGameEnd(gameId, scores, reason) {
-    console.log(`🔄 Starting complete blockchain processing for game ${gameId}`);
-    
+    console.log(
+      `🔄 Starting complete blockchain processing for game ${gameId}`,
+    );
+
     let scoreSubmissionSuccess = false;
     let gameEndSuccess = false;
     let rewardDistributionSuccess = false;
@@ -1094,17 +1197,16 @@ class Game {
         await this.submitPlayerScores(scores);
         scoreSubmissionSuccess = true;
         console.log(`✅ Score submission completed successfully`);
-        
+
         // 等待分数提交交易确认
         console.log(`⏳ Waiting 30s for score confirmations...`);
-        await new Promise(resolve => setTimeout(resolve, 30000));
+        await new Promise((resolve) => setTimeout(resolve, 30000));
         console.log(`✅ Score confirmation wait completed`);
-        
       } catch (scoreError) {
         console.error(`❌ Failed to submit player scores:`, scoreError.message);
         Logger.game.error('Failed to submit player scores', {
           gameId,
-          error: scoreError.message
+          error: scoreError.message,
         });
         // 继续处理，但记录失败状态
       }
@@ -1115,21 +1217,23 @@ class Game {
         const endTxHash = await this.blockchainService.endGame(gameId);
         gameEndSuccess = true;
         console.log(`✅ Game ${gameId} ended successfully - TX: ${endTxHash}`);
-        
+
         Logger.server.info('Game end transaction sent', {
           gameId,
-          txHash: endTxHash
+          txHash: endTxHash,
         });
 
         // 等待游戏结束交易确认
         console.log(`⏳ Waiting 10s for game end confirmation...`);
-        await new Promise(resolve => setTimeout(resolve, 10000));
-        
+        await new Promise((resolve) => setTimeout(resolve, 10000));
       } catch (endGameError) {
-        console.error(`❌ Failed to end game on blockchain:`, endGameError.message);
+        console.error(
+          `❌ Failed to end game on blockchain:`,
+          endGameError.message,
+        );
         Logger.game.error('Failed to end game on blockchain', {
           gameId,
-          error: endGameError.message
+          error: endGameError.message,
         });
         throw endGameError; // 游戏结束失败是严重错误
       }
@@ -1137,60 +1241,88 @@ class Game {
       // 3. 检查和分发奖励
       console.log(`🎁 Step 3/3: Processing rewards for game ${gameId}...`);
       try {
-        const rewardResult = await this.blockchainService.distributeGameRewards(gameId);
+        const rewardResult =
+          await this.blockchainService.distributeGameRewards(gameId);
         rewardDistributionSuccess = true;
         console.log(`✅ Rewards processed successfully`);
 
         // 获取游戏最终状态
-        const finalGameInfo = await this.blockchainService.getGameFullInfo(gameId);
-        console.log(`🏁 Final game state: Pool ${finalGameInfo.totalPool.toString()}, Duration ${finalGameInfo.gameDuration}s`);
+        const finalGameInfo =
+          await this.blockchainService.getGameFullInfo(gameId);
+        console.log(
+          `🏁 Final game state: Pool ${finalGameInfo.totalPool.toString()}, Duration ${finalGameInfo.gameDuration}s`,
+        );
 
         // 查询所有玩家的奖励分发情况
-        const activePlayers = await this.blockchainService.getGamePlayers(gameId);
-        console.log(`🔍 Checking rewards for ${activePlayers.length} players...`);
-        
+        const activePlayers =
+          await this.blockchainService.getGamePlayers(gameId);
+        console.log(
+          `🔍 Checking rewards for ${activePlayers.length} players...`,
+        );
+
         for (const playerAddress of activePlayers) {
           try {
-            await this.blockchainService.checkPlayerRewards(gameId, playerAddress);
+            await this.blockchainService.checkPlayerRewards(
+              gameId,
+              playerAddress,
+            );
           } catch (playerRewardError) {
-            console.warn(`⚠️ Failed to check rewards for player ${playerAddress}:`, playerRewardError.message);
+            console.warn(
+              `⚠️ Failed to check rewards for player ${playerAddress}:`,
+              playerRewardError.message,
+            );
           }
         }
 
         Logger.game.info('Game rewards distributed', {
           gameId,
-          result: rewardResult
+          result: rewardResult,
         });
       } catch (rewardError) {
-        console.error(`❌ Failed to distribute game rewards:`, rewardError.message);
+        console.error(
+          `❌ Failed to distribute game rewards:`,
+          rewardError.message,
+        );
         Logger.game.error('Failed to distribute game rewards', {
           gameId,
-          error: rewardError.message
+          error: rewardError.message,
         });
         // 奖励分发失败不阻止游戏结束，但记录状态
       }
 
       // 最终状态汇总
       console.log(`📋 Blockchain processing summary for game ${gameId}:`);
-      console.log(`   Score Submission: ${scoreSubmissionSuccess ? '✅ Success' : '❌ Failed'}`);
-      console.log(`   Game End: ${gameEndSuccess ? '✅ Success' : '❌ Failed'}`);
-      console.log(`   Reward Distribution: ${rewardDistributionSuccess ? '✅ Success' : '❌ Failed'}`);
+      console.log(
+        `   Score Submission: ${scoreSubmissionSuccess ? '✅ Success' : '❌ Failed'}`,
+      );
+      console.log(
+        `   Game End: ${gameEndSuccess ? '✅ Success' : '❌ Failed'}`,
+      );
+      console.log(
+        `   Reward Distribution: ${rewardDistributionSuccess ? '✅ Success' : '❌ Failed'}`,
+      );
 
       if (gameEndSuccess) {
-        console.log(`✅ Complete blockchain processing finished for game ${gameId}`);
+        console.log(
+          `✅ Complete blockchain processing finished for game ${gameId}`,
+        );
       } else {
-        console.error(`❌ Critical blockchain operations failed for game ${gameId}`);
+        console.error(
+          `❌ Critical blockchain operations failed for game ${gameId}`,
+        );
       }
-
     } catch (error) {
-      console.error(`❌ Complete blockchain processing failed for game ${gameId}:`, error.message);
+      console.error(
+        `❌ Complete blockchain processing failed for game ${gameId}:`,
+        error.message,
+      );
       Logger.game.error('Complete blockchain processing failed', {
         gameId,
         error: error.message,
         stack: error.stack,
         scoreSubmissionSuccess,
         gameEndSuccess,
-        rewardDistributionSuccess
+        rewardDistributionSuccess,
       });
       throw error;
     }
@@ -1200,14 +1332,18 @@ class Game {
    * 向所有客户端广播游戏结束消息并踢出玩家
    */
   broadcastGameEnd(reason, scores) {
-    console.log(`📢 Game ${this.blockchainGameId} ending (${reason}) - kicking all players to main menu`);
-    
+    console.log(
+      `📢 Game ${this.blockchainGameId} ending (${reason}) - kicking all players to main menu`,
+    );
+
     // 使用pendingMassKill机制，在下一次tick时踢出所有玩家
     // 这与周期重启使用相同的机制，确保玩家被正确踢出并回到主界面
     this.pendingMassKill = true;
-    
+
     const playerCount = this.players.size;
-    console.log(`🔄 Scheduled ${playerCount} players to be kicked in next game tick`);
+    console.log(
+      `🔄 Scheduled ${playerCount} players to be kicked in next game tick`,
+    );
   }
 
   /**
@@ -1215,21 +1351,21 @@ class Game {
    */
   triggerServerRestart() {
     console.log(`🔄 Triggering server restart to begin new game...`);
-    
+
     // 设置标志，准备重启
     this.pendingMassKill = true;
-    
+
     // 给客户端一些时间处理游戏结束状态
     setTimeout(() => {
       console.log(`🔄 Executing server restart...`);
-      
+
       // Clean up game state for Solana
       this.clearGameTimeout();
-      Object.assign(this, { 
-        gamePhase: 'initializing', 
+      Object.assign(this, {
+        gamePhase: 'initializing',
         solanaGameId: null,
         gameStartTime: null,
-        gameEndTime: null
+        gameEndTime: null,
       });
       this.registeredPlayers.clear();
       this.finalKillRewards.clear();
@@ -1246,14 +1382,16 @@ class Game {
 
       // Start new Solana game
       console.log(`🎮 Server restarted, initializing new Solana game...`);
-      this.initializeSolanaGame().catch(error => {
-        console.error(`❌ Failed to initialize new Solana game after restart:`, error.message);
+      this.initializeSolanaGame().catch((error) => {
+        console.error(
+          `❌ Failed to initialize new Solana game after restart:`,
+          error.message,
+        );
         // If new game creation fails, try restart again
         setTimeout(() => {
           this.triggerServerRestart();
         }, 10000);
       });
-      
     }, 3000); // 3秒延迟，给客户端足够时间
   }
 
@@ -1267,33 +1405,43 @@ class Game {
     }
 
     const startTime = Date.now();
-    console.log(`📤 Starting concurrent score submission for game ${this.blockchainGameId} - ${scores.size} players total`);
-    
+    console.log(
+      `📤 Starting concurrent score submission for game ${this.blockchainGameId} - ${scores.size} players total`,
+    );
+
     // 首先显示所有玩家的分数概览
     console.log('📊 Player scores overview:');
     for (const [playerId, scoreData] of scores) {
-      console.log(`   ${scoreData.playerName} (${scoreData.walletAddress || 'NO_WALLET'}): ${scoreData.finalScore} pts, ${scoreData.kills} kills`);
+      console.log(
+        `   ${scoreData.playerName} (${scoreData.walletAddress || 'NO_WALLET'}): ${scoreData.finalScore} pts, ${scoreData.kills} kills`,
+      );
     }
 
     // 过滤出有钱包地址的玩家
-    const playersWithWallet = Array.from(scores.entries()).filter(([playerId, scoreData]) => {
-      if (!scoreData.walletAddress) {
-        console.log(`⚠️ Skipping player ${scoreData.playerName} - no wallet address`);
-        return false;
-      }
-      return true;
-    });
+    const playersWithWallet = Array.from(scores.entries()).filter(
+      ([playerId, scoreData]) => {
+        if (!scoreData.walletAddress) {
+          console.log(
+            `⚠️ Skipping player ${scoreData.playerName} - no wallet address`,
+          );
+          return false;
+        }
+        return true;
+      },
+    );
 
     if (playersWithWallet.length === 0) {
       console.log('⚠️ No players with wallet addresses to submit scores');
       return;
     }
 
-    console.log(`🚀 Starting concurrent submission for ${playersWithWallet.length} players with wallets...`);
+    console.log(
+      `🚀 Starting concurrent submission for ${playersWithWallet.length} players with wallets...`,
+    );
 
     // 创建并发提交Promise数组
-    const submissionPromises = playersWithWallet.map(([playerId, scoreData]) => 
-      this.submitSinglePlayerScore(playerId, scoreData)
+    const submissionPromises = playersWithWallet.map(([playerId, scoreData]) =>
+      this.submitSinglePlayerScore(playerId, scoreData),
     );
 
     // 使用Promise.allSettled等待所有提交完成
@@ -1306,11 +1454,11 @@ class Game {
 
     results.forEach((result, index) => {
       const [playerId, scoreData] = playersWithWallet[index];
-      
+
       if (result.status === 'fulfilled') {
         successful.push({ playerId, scoreData, result: result.value });
         this.playerScoreSubmitted.add(playerId);
-        
+
         // 准备数据库保存数据
         gameDataForDatabase.push({
           gameId: Number(this.blockchainGameId),
@@ -1335,7 +1483,7 @@ class Game {
         failed.push({
           playerId,
           scoreData,
-          error: result.reason
+          error: result.reason,
         });
       }
     });
@@ -1344,26 +1492,34 @@ class Game {
     const totalTime = (endTime - startTime) / 1000;
 
     // 显示并发执行结果
-    console.log(`📊 Concurrent score submission completed in ${totalTime.toFixed(2)}s:`);
+    console.log(
+      `📊 Concurrent score submission completed in ${totalTime.toFixed(2)}s:`,
+    );
     console.log(`   Total players: ${scores.size}`);
     console.log(`   Players with wallet: ${playersWithWallet.length}`);
     console.log(`   Successful submissions: ${successful.length}`);
     console.log(`   Failed submissions: ${failed.length}`);
-    
+
     if (successful.length > 0) {
       console.log(`✅ Successfully submitted scores:`);
       successful.forEach((success, index) => {
-        console.log(`   ${index + 1}. ${success.scoreData.playerName}: ${success.scoreData.finalScore} pts, ${success.scoreData.kills} kills`);
+        console.log(
+          `   ${index + 1}. ${success.scoreData.playerName}: ${success.scoreData.finalScore} pts, ${success.scoreData.kills} kills`,
+        );
       });
     }
-    
+
     if (failed.length > 0) {
       console.log(`❌ Failed submissions:`);
       failed.forEach((failure, index) => {
-        console.log(`   ${index + 1}. ${failure.scoreData.playerName} (${failure.scoreData.walletAddress})`);
-        console.log(`      Score: ${failure.scoreData.finalScore}, Kills: ${failure.scoreData.kills}`);
+        console.log(
+          `   ${index + 1}. ${failure.scoreData.playerName} (${failure.scoreData.walletAddress})`,
+        );
+        console.log(
+          `      Score: ${failure.scoreData.finalScore}, Kills: ${failure.scoreData.kills}`,
+        );
         console.log(`      Error: ${failure.error.message}`);
-        
+
         // 检查特定错误类型
         if (failure.error.message.includes('403')) {
           console.log(`      💡 Likely API authentication issue`);
@@ -1372,14 +1528,18 @@ class Game {
         } else if (failure.error.message.includes('gas')) {
           console.log(`      💡 Likely gas estimation issue`);
         } else if (failure.error.message.includes('timeout')) {
-          console.log(`      💡 Request timeout - try increasing timeout limit`);
+          console.log(
+            `      💡 Request timeout - try increasing timeout limit`,
+          );
         }
       });
     }
 
     // 异步查询成功提交玩家的奖励信息
     if (successful.length > 0) {
-      console.log(`🎁 Scheduling reward queries for ${successful.length} successful submissions...`);
+      console.log(
+        `🎁 Scheduling reward queries for ${successful.length} successful submissions...`,
+      );
       setTimeout(() => {
         this.queryPlayerRewardsAsync(successful);
       }, 5000);
@@ -1388,31 +1548,42 @@ class Game {
     // 保存成功的游戏数据到数据库（不影响区块链操作）
     if (gameDataForDatabase.length > 0) {
       try {
-        console.log(`💾 Attempting to save ${gameDataForDatabase.length} game records to database...`);
+        console.log(
+          `💾 Attempting to save ${gameDataForDatabase.length} game records to database...`,
+        );
         await this.saveGameDataToDatabase(gameDataForDatabase);
         console.log(`✅ Game data saved to database successfully`);
 
         // 🎯 新增：启动异步延迟更新任务，传递当前游戏ID
-        this.scheduleBlockchainRewardUpdate(gameDataForDatabase, this.blockchainGameId);
-
+        this.scheduleBlockchainRewardUpdate(
+          gameDataForDatabase,
+          this.blockchainGameId,
+        );
       } catch (dbError) {
-        console.error(`❌ Database save failed but blockchain operations continue:`, dbError.message);
+        console.error(
+          `❌ Database save failed but blockchain operations continue:`,
+          dbError.message,
+        );
         console.error(`   Error type: ${dbError.constructor.name}`);
-        
+
         // 检查特定错误类型并提供建议
         if (dbError.message.includes('403')) {
-          console.error(`   💡 Check SERVER_SECRET configuration: ${config.serverSecret ? 'SET' : 'NOT_SET'}`);
+          console.error(
+            `   💡 Check SERVER_SECRET configuration: ${config.serverSecret ? 'SET' : 'NOT_SET'}`,
+          );
           console.error(`   💡 Check API endpoint: ${config.apiEndpoint}`);
         }
-        
+
         // 尝试在本地记录未保存的数据供后续处理
         console.log(`📝 Unsaved game data for manual recovery:`);
         console.log(JSON.stringify(gameDataForDatabase, null, 2));
-        
+
         // 不抛出错误，让区块链游戏结束流程继续
       }
     } else {
-      console.log(`⚠️ No game data to save to database (${successfulSubmissions} successful blockchain submissions)`);
+      console.log(
+        `⚠️ No game data to save to database (${successfulSubmissions} successful blockchain submissions)`,
+      );
     }
   }
 
@@ -1421,16 +1592,19 @@ class Game {
    */
   async saveGameDataToDatabase(gameDataArray) {
     try {
-      const response = await fetch(`${config.apiEndpoint}/race-games/save-batch`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.serverSecret}`, // 服务器认证
+      const response = await fetch(
+        `${config.apiEndpoint}/race-games/save-batch`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${config.serverSecret}`, // 服务器认证
+          },
+          body: JSON.stringify({
+            games: gameDataArray,
+          }),
         },
-        body: JSON.stringify({
-          games: gameDataArray
-        }),
-      });
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -1455,12 +1629,16 @@ class Game {
    */
   async submitSinglePlayerScore(playerId, scoreData) {
     const timeout = 60000; // 60秒超时
-    
+
     return Promise.race([
       this.performSingleScoreSubmission(playerId, scoreData),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error(`Submission timeout after ${timeout/1000}s`)), timeout)
-      )
+      new Promise((_, reject) =>
+        setTimeout(
+          () =>
+            reject(new Error(`Submission timeout after ${timeout / 1000}s`)),
+          timeout,
+        ),
+      ),
     ]);
   }
 
@@ -1470,10 +1648,12 @@ class Game {
   async performSingleScoreSubmission(playerId, scoreData) {
     try {
       console.log(`🔄 [${scoreData.playerName}] Starting score submission...`);
-      
+
       // 获取玩家nonce
       console.log(`📋 [${scoreData.playerName}] Getting player nonce...`);
-      const nonce = await this.blockchainService.getPlayerNonce(scoreData.walletAddress);
+      const nonce = await this.blockchainService.getPlayerNonce(
+        scoreData.walletAddress,
+      );
       console.log(`📋 [${scoreData.playerName}] Nonce: ${nonce}`);
 
       // 通过API服务器获取签名
@@ -1483,7 +1663,7 @@ class Game {
         scoreData.walletAddress,
         scoreData.kills,
         scoreData.finalScore,
-        nonce
+        nonce,
       );
       console.log(`✍️ [${scoreData.playerName}] Signature obtained`);
 
@@ -1495,14 +1675,17 @@ class Game {
         scoreData.kills,
         scoreData.finalScore,
         nonce,
-        signature
+        signature,
       );
 
-      console.log(`✅ [${scoreData.playerName}] Score submitted successfully - TX: ${txHash}`);
+      console.log(
+        `✅ [${scoreData.playerName}] Score submitted successfully - TX: ${txHash}`,
+      );
       return { success: true, txHash, playerName: scoreData.playerName };
-      
     } catch (error) {
-      console.error(`❌ [${scoreData.playerName}] Submission failed: ${error.message}`);
+      console.error(
+        `❌ [${scoreData.playerName}] Submission failed: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -1511,17 +1694,23 @@ class Game {
    * 异步查询玩家奖励信息
    */
   async queryPlayerRewardsAsync(successfulSubmissions) {
-    console.log(`🎁 Starting async reward queries for ${successfulSubmissions.length} players...`);
-    
+    console.log(
+      `🎁 Starting async reward queries for ${successfulSubmissions.length} players...`,
+    );
+
     const rewardPromises = successfulSubmissions.map(async (submission) => {
       try {
         await this.blockchainService.checkPlayerRewards(
-          this.blockchainGameId, 
-          submission.scoreData.walletAddress
+          this.blockchainGameId,
+          submission.scoreData.walletAddress,
         );
-        console.log(`🎁 [${submission.scoreData.playerName}] Reward query completed`);
+        console.log(
+          `🎁 [${submission.scoreData.playerName}] Reward query completed`,
+        );
       } catch (error) {
-        console.warn(`⚠️ [${submission.scoreData.playerName}] Reward query failed: ${error.message}`);
+        console.warn(
+          `⚠️ [${submission.scoreData.playerName}] Reward query failed: ${error.message}`,
+        );
       }
     });
 
@@ -1547,7 +1736,10 @@ class Game {
         await this.updateBlockchainRewards(gameDataArray, gameId);
         console.log(`✅ Rewards updated for game ${gameId}`);
       } catch (error) {
-        console.error(`❌ Reward update failed for game ${gameId}:`, error.message);
+        console.error(
+          `❌ Reward update failed for game ${gameId}:`,
+          error.message,
+        );
         // 可以考虑重试机制或者记录到错误日志中
       }
     }, 60000); // 60秒延迟
@@ -1571,24 +1763,25 @@ class Game {
         // 查询玩家奖励
 
         // 从区块链查询真实奖励数据（使用GameAggregator合约）
-        const playerRewardStatus = await this.blockchainService.getPlayerCompleteRewards(
-          gameId,
-          gameData.playerAddress
-        );
+        const playerRewardStatus =
+          await this.blockchainService.getPlayerCompleteRewards(
+            gameId,
+            gameData.playerAddress,
+          );
 
         // getPlayerCompleteRewards返回: PlayerCompleteRewards结构体
         // { usdAmount, nclabAmount, fragmentBonus, ...其他字段 }
-        const usdRewards = playerRewardStatus.usdAmount || BigInt(0);     // USD1奖励总额
+        const usdRewards = playerRewardStatus.usdAmount || BigInt(0); // USD1奖励总额
         const nclabRewards = playerRewardStatus.nclabAmount || BigInt(0); // NCLab奖励总额
-        const fragmentBonus = playerRewardStatus.fragmentBonus || 0;      // 额外碎片数
+        const fragmentBonus = playerRewardStatus.fragmentBonus || 0; // 额外碎片数
 
         // 注意：getPlayerCompleteRewards可能不包含可领取状态信息
         // 这些信息可能需要从其他接口获取，暂时设为默认值
-        const usdClaimable = true;      // 默认可领取
-        const nclabClaimable = true;    // 默认可领取
-        const nclabClaimableTime = 0;   // 默认立即可领取
-        const usdClaimed = false;       // 默认未领取
-        const nclabClaimed = false;     // 默认未领取
+        const usdClaimable = true; // 默认可领取
+        const nclabClaimable = true; // 默认可领取
+        const nclabClaimableTime = 0; // 默认立即可领取
+        const usdClaimed = false; // 默认未领取
+        const nclabClaimed = false; // 默认未领取
 
         // 计算总USD奖励金额（以ETH为单位）
         const usdRewardEth = Number(usdRewards) / 1e18;
@@ -1606,7 +1799,9 @@ class Game {
 
         // 只在有奖励时记录关键信息
         if (isWinner) {
-          console.log(`💰 Player ${gameData.playerAddress}: ${usdRewardEth.toFixed(4)} USD1 + ${nclabRewardEth.toFixed(4)} NCLab`);
+          console.log(
+            `💰 Player ${gameData.playerAddress}: ${usdRewardEth.toFixed(4)} USD1 + ${nclabRewardEth.toFixed(4)} NCLab`,
+          );
         }
 
         // 更新奖励数据
@@ -1625,10 +1820,14 @@ class Game {
         };
 
         updatedGameData.push(updatedData);
-
       } catch (error) {
-        console.error(`❌ 查询玩家 ${gameData.playerAddress} 奖励失败:`, error.message);
-        console.log(`⚠️ 可能原因: 游戏 ${gameId} 的奖励尚未分发到RewardManager合约，或合约地址配置错误`);
+        console.error(
+          `❌ 查询玩家 ${gameData.playerAddress} 奖励失败:`,
+          error.message,
+        );
+        console.log(
+          `⚠️ 可能原因: 游戏 ${gameId} 的奖励尚未分发到RewardManager合约，或合约地址配置错误`,
+        );
         // 如果查询失败，保留原始数据（奖励为0，表示尚未分发）
         updatedGameData.push(gameData);
       }
@@ -1638,7 +1837,9 @@ class Game {
     if (updatedGameData.length > 0) {
       try {
         await this.updateRewardsInDatabase(updatedGameData);
-        console.log(`✅ Database updated with rewards for ${updatedGameData.length} players`);
+        console.log(
+          `✅ Database updated with rewards for ${updatedGameData.length} players`,
+        );
       } catch (dbError) {
         console.error(`❌ 更新数据库奖励信息失败:`, dbError);
       }
@@ -1650,16 +1851,19 @@ class Game {
    */
   async updateRewardsInDatabase(gameDataArray) {
     try {
-      const response = await fetch(`${config.apiEndpoint}/race-games/update-rewards`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.serverSecret}`,
+      const response = await fetch(
+        `${config.apiEndpoint}/race-games/update-rewards`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${config.serverSecret}`,
+          },
+          body: JSON.stringify({
+            games: gameDataArray,
+          }),
         },
-        body: JSON.stringify({
-          games: gameDataArray
-        }),
-      });
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -1687,7 +1891,9 @@ class Game {
       // 验证参数
       console.log(`🔍 Signature request parameters:`);
       console.log(`   gameId: ${gameId} (type: ${typeof gameId})`);
-      console.log(`   playerAddress: ${playerAddress} (type: ${typeof playerAddress})`);
+      console.log(
+        `   playerAddress: ${playerAddress} (type: ${typeof playerAddress})`,
+      );
       console.log(`   kills: ${kills} (type: ${typeof kills})`);
       console.log(`   score: ${score} (type: ${typeof score})`);
       console.log(`   nonce: ${nonce} (type: ${typeof nonce})`);
@@ -1695,7 +1901,11 @@ class Game {
       if (gameId === undefined || gameId === null) {
         throw new Error('gameId is undefined or null');
       }
-      if (playerAddress === undefined || playerAddress === null || playerAddress === '') {
+      if (
+        playerAddress === undefined ||
+        playerAddress === null ||
+        playerAddress === ''
+      ) {
         throw new Error('playerAddress is undefined, null or empty');
       }
       if (kills === undefined || kills === null) {
@@ -1717,16 +1927,21 @@ class Game {
         nonce: typeof nonce === 'bigint' ? nonce.toString() : String(nonce),
       };
 
-      console.log(`📤 Sending request to ${config.apiEndpoint}/blockchain/sign-score`);
+      console.log(
+        `📤 Sending request to ${config.apiEndpoint}/blockchain/sign-score`,
+      );
       console.log(`📤 Request body: ${JSON.stringify(requestBody)}`);
 
-      const response = await fetch(`${config.apiEndpoint}/blockchain/sign-score`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `${config.apiEndpoint}/blockchain/sign-score`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
         },
-        body: JSON.stringify(requestBody),
-      });
+      );
 
       console.log(`📨 Response status: ${response.status}`);
 
@@ -1760,7 +1975,10 @@ class Game {
       gameStartTime: this.gameStartTime,
       gameEndTime: this.gameEndTime,
       killRewardsCount: this.finalKillRewards.size,
-      totalRewardSOL: Array.from(this.finalKillRewards.values()).reduce((sum, r) => sum + r.rewardSOL, 0)
+      totalRewardSOL: Array.from(this.finalKillRewards.values()).reduce(
+        (sum, r) => sum + r.rewardSOL,
+        0,
+      ),
     };
   }
 
@@ -1775,7 +1993,9 @@ class Game {
    * Clean up current Solana game state
    */
   cleanupCurrentGame() {
-    Logger.game.info('Cleaning up current Solana game', { gameId: this.solanaGameId });
+    Logger.game.info('Cleaning up current Solana game', {
+      gameId: this.solanaGameId,
+    });
 
     // Clear Solana-related state
     this.solanaGameId = null;
@@ -1793,14 +2013,14 @@ class Game {
       if (player.client) {
         player.client.disconnectReason = {
           message: 'Game ended',
-          type: 'GameEnd'
+          type: 'GameEnd',
         };
       }
       this.removeEntity(player);
     }
 
     Logger.game.info('Solana game cleanup completed', {
-      removedPlayers: playersToRemove.length
+      removedPlayers: playersToRemove.length,
     });
   }
 
@@ -1815,14 +2035,15 @@ class Game {
       usdClaimable,
       nclabClaimable,
       usdClaimed,
-      nclabClaimed
+      nclabClaimed,
     } = rewardStatus;
 
     const strategy = {
       shouldClaimUSD: usdClaimable && !usdClaimed && usdRewards > BigInt(0),
-      shouldClaimNCLab: nclabClaimable && !nclabClaimed && nclabRewards > BigInt(0),
+      shouldClaimNCLab:
+        nclabClaimable && !nclabClaimed && nclabRewards > BigInt(0),
       canClaimAll: false,
-      recommendedMethod: 'none'
+      recommendedMethod: 'none',
     };
 
     // 如果两种奖励都可以领取，推荐一键领取
@@ -1840,6 +2061,31 @@ class Game {
     }
 
     return strategy;
+  }
+
+  /**
+   * Get Solana game status for /serverinfo endpoint
+   * Provides current game state information to clients
+   */
+  getSolanaGameStatus() {
+    if (!config.isRaceServer || !config.solana.enabled) {
+      return null;
+    }
+
+    return {
+      gameId: this.solanaGameId ? Number(this.solanaGameId) : null,
+      phase: this.gamePhase,
+      registeredPlayersCount: this.registeredPlayers.size,
+      activePlayersCount: this.players.size,
+      gameStartTime: this.gameStartTime,
+      gameEndTime: this.gameEndTime,
+      killRewardsCount: this.finalKillRewards.size,
+      totalRewardSOL: Array.from(this.finalKillRewards.values()).reduce(
+        (sum, r) => sum + r.rewardSOL,
+        0,
+      ),
+      gameCreationInProgress: this.isGameCreationInProgress,
+    };
   }
 }
 
