@@ -6,9 +6,8 @@ const ENV = process.env.BUILD_ENV || 'development';
 const isDev = ENV === 'development';
 const isRelease = ENV === 'production';
 
-console.log("state:", process.env.BUILD_ENV);
+console.log('state:', process.env.BUILD_ENV);
 console.log('workspace:', process.cwd());
-
 
 // Export configuration object for the application
 module.exports = {
@@ -50,16 +49,23 @@ module.exports = {
   // Server type configuration
   serverType: process.env.SERVER_TYPE || 'NORMAL',
   isRaceServer: process.env.SERVER_TYPE === 'RACE',
-  enableCycleRestart:process.env.ENABLE_CYCLE_RESTART === 'true' || process.env.SERVER_TYPE === 'RACE',
+  enableCycleRestart: process.env.ENABLE_CYCLE_RESTART === 'true',
 
   // Solana configuration - replaces BSC blockchain
   solana: {
     enabled: process.env.SOLANA_ENABLED === 'true',
-    rpcUrl: process.env.SOLANA_RPC_URL || (isDev ? 'https://api.devnet.solana.com' : 'https://api.mainnet-beta.solana.com'),
+    rpcUrl:
+      process.env.SOLANA_RPC_URL ||
+      (isDev
+        ? 'https://api.devnet.solana.com'
+        : 'https://api.mainnet-beta.solana.com'),
     privateKey: process.env.SOLANA_PRIVATE_KEY, // Server wallet private key for vault operations
-    programId: process.env.VAULT_PROGRAM_ID || 'AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV', // Vault program ID
-    tokenMint: process.env.SOLANA_TOKEN_MINT || '11111111111111111111111111111111', // Token mint for rewards
-    killReward: parseFloat(process.env.KILL_REWARD || '0.001'), // SOL reward per kill
+    programId:
+      process.env.VAULT_PROGRAM_ID ||
+      'AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV', // Vault program ID
+    tokenMint:
+      process.env.SOLANA_TOKEN_MINT || 'So11111111111111111111111111111112', // Token mint for rewards (default: SOL)
+    killReward: parseFloat(process.env.KILL_REWARD || '0.001'), // Token reward per kill
     environment: {
       isDev,
       isRelease,
@@ -107,6 +113,4 @@ module.exports = {
     worldHeight: 30000,
     worldWidth: 30000,
   },
-
-
 };

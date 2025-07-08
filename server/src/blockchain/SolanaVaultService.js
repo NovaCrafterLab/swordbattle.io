@@ -206,25 +206,12 @@ class SolanaVaultService {
         gameId: finalGameId,
       });
 
-      // Use Wrapped SOL (WSOL) as default token mint for devnet/mainnet compatibility
-      // Correct WSOL mint address
-      const WSOL_MINT = 'So11111111111111111111111111111112';
-      const NATIVE_LOADER = '11111111111111111111111111111111';
+      // Use configured token mint from environment variables
+      // Default: SOL native mint (So11111111111111111111111111111112)
+      // Can be configured to any SPL token via SOLANA_TOKEN_MINT env var
+      const tokenMintAddress = this.config.tokenMint;
 
-      // Alternative: Use USDC devnet mint for testing
-      const USDC_DEVNET_MINT = 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr';
-
-      let tokenMintAddress = this.config.tokenMint;
-
-      Logger.server.info(
-        `🔍 Token mint configuration: ${this.config.tokenMint || 'not set'} -> ${tokenMintAddress}`,
-      );
-
-      // If config uses native loader ID or is empty, use USDC devnet for testing
-      if (!tokenMintAddress || tokenMintAddress === NATIVE_LOADER) {
-        tokenMintAddress = USDC_DEVNET_MINT;
-        Logger.server.info('🔄 Using USDC devnet mint for vault operations');
-      }
+      Logger.server.info(`🔍 Using configured token mint: ${tokenMintAddress}`);
 
       let tokenMint;
       let txHash;

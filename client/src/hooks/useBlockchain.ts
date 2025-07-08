@@ -1,81 +1,84 @@
 // Solana blockchain interaction hook
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useEffect, useState, useCallback } from 'react';
+import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
+import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 
 // Type definitions for backward compatibility
 export interface GameFullInfo {
-  gameId: string;           // 游戏ID
-  level: number;            // 游戏等级 (0=EASY, 1=MEDIUM, 2=HARD)
-  status: number;           // 游戏状态 (0=WAITING, 1=ACTIVE, 2=ENDED)
-  totalPool: string;        // 奖池总额 (lamports)
-  createdAt: string;        // 创建时间戳
-  endedAt: string;          // 结束时间戳
-  gameDuration: number;     // 游戏持续时间 (秒)
-  playerCount: string;      // 玩家数量
-  maxPlayers: string;       // 最大玩家数
-  activePlayers: string[];  // 活跃玩家地址列表
-  canJoin: boolean;         // 是否可加入
-  entryFee: string;         // 入场费 (lamports)
+  gameId: string; // 游戏ID
+  level: number; // 游戏等级 (0=EASY, 1=MEDIUM, 2=HARD)
+  status: number; // 游戏状态 (0=WAITING, 1=ACTIVE, 2=ENDED)
+  totalPool: string; // 奖池总额 (lamports)
+  createdAt: string; // 创建时间戳
+  endedAt: string; // 结束时间戳
+  gameDuration: number; // 游戏持续时间 (秒)
+  playerCount: string; // 玩家数量
+  maxPlayers: string; // 最大玩家数
+  activePlayers: string[]; // 活跃玩家地址列表
+  canJoin: boolean; // 是否可加入
+  entryFee: string; // 入场费 (lamports)
 }
 
 export interface PlayerCompleteRewards {
-  solRewards: string;        // 🟡 SOL 奖励数量 (lamports)
-  splRewards: string;        // 🔵 SPL Token 奖励数量
-  fragmentBalance: string;   // 🟠 碎片余额
-  solClaimable: boolean;     // SOL 是否可领取
-  splClaimable: boolean;     // SPL Token 是否可领取
-  splClaimableTime: string;  // SPL Token 可领取时间戳
-  solClaimed: boolean;       // SOL 是否已领取
-  splClaimed: boolean;       // SPL Token 是否已领取
+  solRewards: string; // 🟡 SOL 奖励数量 (lamports)
+  splRewards: string; // 🔵 SPL Token 奖励数量
+  fragmentBalance: string; // 🟠 碎片余额
+  solClaimable: boolean; // SOL 是否可领取
+  splClaimable: boolean; // SPL Token 是否可领取
+  splClaimableTime: string; // SPL Token 可领取时间戳
+  solClaimed: boolean; // SOL 是否已领取
+  splClaimed: boolean; // SPL Token 是否已领取
 }
 
 export interface PlayerDashboard {
   // 游戏统计
-  totalGamesPlayed: string;    // 总游戏局数
-  totalKills: string;          // 总击杀数
-  totalScore: string;          // 总分数
-  winRate: string;             // 胜率 (百分比 * 100)
-  
+  totalGamesPlayed: string; // 总游戏局数
+  totalKills: string; // 总击杀数
+  totalScore: string; // 总分数
+  winRate: string; // 胜率 (百分比 * 100)
+
   // 奖励统计
-  totalSolEarned: string;      // 🟡 总 SOL 收益 (lamports)
-  totalSplEarned: string;      // 🔵 总 SPL Token 收益
+  totalSolEarned: string; // 🟡 总 SOL 收益 (lamports)
+  totalSplEarned: string; // 🔵 总 SPL Token 收益
   totalFragmentsEarned: string; // 🟠 总碎片收益
-  
+
   // 待领取奖励
-  pendingSolRewards: string;   // 🟡 待领取 SOL (lamports)
-  pendingSplRewards: string;   // 🔵 待领取 SPL Token
-  fragmentBalance: string;     // 🟠 当前碎片余额
-  
+  pendingSolRewards: string; // 🟡 待领取 SOL (lamports)
+  pendingSplRewards: string; // 🔵 待领取 SPL Token
+  fragmentBalance: string; // 🟠 当前碎片余额
+
   // 当前状态
-  currentGameCount: string;    // 当前参与游戏数量
+  currentGameCount: string; // 当前参与游戏数量
   hasClaimableRewards: boolean; // 是否有可领取奖励
 }
 
 export interface PlayerStats {
-  totalGamesPlayed: string;    // 总游戏数
-  totalKills: string;          // 总击杀数
-  totalScore: string;          // 总分数
-  avgScorePerGame: string;     // 平均每局分数
-  winRate: string;             // 胜率
+  totalGamesPlayed: string; // 总游戏数
+  totalKills: string; // 总击杀数
+  totalScore: string; // 总分数
+  avgScorePerGame: string; // 平均每局分数
+  winRate: string; // 胜率
 }
 
 export interface GameStats {
-  totalGames: string;          // 总游戏数
-  totalPlayers: string;        // 总玩家数
-  totalPool: string;           // 总奖池
-  avgPlayersPerGame: string;   // 平均每局玩家数
+  totalGames: string; // 总游戏数
+  totalPlayers: string; // 总玩家数
+  totalPool: string; // 总奖池
+  avgPlayersPerGame: string; // 平均每局玩家数
 }
 
 export interface ClaimableGames {
-  gameIds: string[];           // 可领取奖励的游戏ID列表
-  rewardAmounts: string[];     // 每个游戏的奖励总额 (lamports)
-  claimableTypes: number[];    // 奖励类型位掩码 (1=SOL, 2=SPL, 3=Both)
+  gameIds: string[]; // 可领取奖励的游戏ID列表
+  rewardAmounts: string[]; // 每个游戏的奖励总额 (lamports)
+  claimableTypes: number[]; // 奖励类型位掩码 (1=SOL, 2=SPL, 3=Both)
 }
 
 // 领取类型枚举
 export enum ClaimType {
-  ALL = 0,        // 领取所有类型 (SOL + SPL Token)
-  SOL_ONLY = 1,   // 仅领取 SOL
-  SPL_ONLY = 2    // 仅领取 SPL Token
+  ALL = 0, // 领取所有类型 (SOL + SPL Token)
+  SOL_ONLY = 1, // 仅领取 SOL
+  SPL_ONLY = 2, // 仅领取 SPL Token
 }
 
 /**
@@ -83,7 +86,7 @@ export enum ClaimType {
  * Provides all blockchain functionality through Solana
  */
 export const useBlockchain = () => {
-  // Solana hooks 
+  // Solana hooks
   const { publicKey, connected } = useWallet();
   const { connection } = useConnection();
 
@@ -91,77 +94,178 @@ export const useBlockchain = () => {
   const isConnected = connected;
   const address = publicKey?.toString();
 
-  console.log(`🔗 useBlockchain: Solana - Connected: ${isConnected}, Address: ${address?.slice(0, 10)}...`);
+  console.log(
+    `🔗 useBlockchain: Solana - Connected: ${isConnected}, Address: ${address?.slice(0, 10)}...`,
+  );
+
+  // SOL Balance Hook
+  const useSOLBalance = useCallback(
+    (walletAddress: string) => {
+      const [balance, setBalance] = useState<bigint>(BigInt(0));
+      const [isLoading, setIsLoading] = useState(false);
+      const [error, setError] = useState<Error | null>(null);
+
+      const fetchBalance = useCallback(async () => {
+        if (!walletAddress || !connection) {
+          setBalance(BigInt(0));
+          return;
+        }
+
+        try {
+          setIsLoading(true);
+          setError(null);
+
+          const publicKey = new (await import('@solana/web3.js')).PublicKey(
+            walletAddress,
+          );
+          const lamports = await connection.getBalance(publicKey);
+          setBalance(BigInt(lamports));
+
+          console.log(
+            `💰 SOL Balance for ${walletAddress}: ${lamports / LAMPORTS_PER_SOL} SOL`,
+          );
+        } catch (err) {
+          const error = err as Error;
+          console.error(
+            `❌ Failed to fetch SOL balance for ${walletAddress}:`,
+            error,
+          );
+          setError(error);
+          setBalance(BigInt(0));
+        } finally {
+          setIsLoading(false);
+        }
+      }, [walletAddress, connection]);
+
+      useEffect(() => {
+        fetchBalance();
+      }, [fetchBalance]);
+
+      return {
+        data: balance,
+        isLoading,
+        error,
+        refetch: fetchBalance,
+      };
+    },
+    [connection],
+  );
 
   // Placeholder implementations for backward compatibility
   const useGameFullInfo = (gameId: number) => ({
     data: null,
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
-  const useGameCounter = () => ({
-    data: 0,
-    isLoading: false,
-    error: null,
-    refetch: () => {}
-  });
+  // Game Counter Hook - fetches current gameId from server
+  const useGameCounter = useCallback(() => {
+    const [gameId, setGameId] = useState<number>(0);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<Error | null>(null);
+
+    const fetchGameCounter = useCallback(async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Get server URL from localStorage or default
+        const serverUrl =
+          localStorage.getItem('selectedServer') || 'localhost:8000';
+        const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+        const url = `${protocol}://${serverUrl}/serverinfo`;
+
+        const response = await fetch(url);
+        const serverInfo = await response.json();
+
+        const currentGameId = serverInfo?.gameStatus?.gameId || 0;
+        setGameId(currentGameId);
+
+        console.log(`🎮 Game Counter from server: ${currentGameId}`);
+      } catch (err) {
+        const error = err as Error;
+        console.error(`❌ Failed to fetch game counter:`, error);
+        setError(error);
+        setGameId(0);
+      } finally {
+        setIsLoading(false);
+      }
+    }, []);
+
+    useEffect(() => {
+      fetchGameCounter();
+
+      // Poll every 10 seconds
+      const interval = setInterval(fetchGameCounter, 10000);
+      return () => clearInterval(interval);
+    }, [fetchGameCounter]);
+
+    return {
+      data: gameId,
+      isLoading,
+      error,
+      refetch: fetchGameCounter,
+    };
+  }, []);
 
   const useActiveGames = (level: number = 0, limit: number = 10) => ({
     data: [],
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
   const usePlayerCurrentGames = (playerAddress: string) => ({
     data: [],
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
   const useGameStats = (startTime: number, endTime: number) => ({
     data: null,
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
   const usePlayerStats = (playerAddress: string) => ({
     data: null,
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
   const usePlayerCompleteRewards = (gameId: number, playerAddress: string) => ({
     data: null,
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
   const usePlayerAllRewards = (playerAddress: string) => ({
     data: null,
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
   const usePlayerDashboard = (playerAddress: string) => ({
     data: null,
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
-  const usePlayerClaimableGames = (playerAddress: string, maxGames: number = 25) => ({
+  const usePlayerClaimableGames = (
+    playerAddress: string,
+    maxGames: number = 25,
+  ) => ({
     data: null,
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
   // Game operations - placeholder implementations
@@ -170,20 +274,34 @@ export const useBlockchain = () => {
   };
 
   const smartJoinGame = (level: number = 0, maxWaitTime: number = 300) => {
-    console.log(`🎮 Smart joining Solana game level ${level} - TODO: implement`);
+    console.log(
+      `🎮 Smart joining Solana game level ${level} - TODO: implement`,
+    );
   };
 
   const joinMultipleGames = (gameIds: number[]) => {
-    console.log(`🎮 Joining multiple Solana games ${gameIds} - TODO: implement`);
+    console.log(
+      `🎮 Joining multiple Solana games ${gameIds} - TODO: implement`,
+    );
   };
 
   // Reward claiming - placeholder implementations
-  const claimGameReward = (gameId: number, claimType: ClaimType = ClaimType.ALL) => {
-    console.log(`💰 Claiming Solana rewards for game ${gameId}, type ${claimType} - TODO: implement`);
+  const claimGameReward = (
+    gameId: number,
+    claimType: ClaimType = ClaimType.ALL,
+  ) => {
+    console.log(
+      `💰 Claiming Solana rewards for game ${gameId}, type ${claimType} - TODO: implement`,
+    );
   };
 
-  const claimAllPlayerRewards = (claimType: ClaimType = ClaimType.ALL, maxGames: number = 25) => {
-    console.log(`💰 Claiming all Solana rewards, type ${claimType}, max ${maxGames} games - TODO: implement`);
+  const claimAllPlayerRewards = (
+    claimType: ClaimType = ClaimType.ALL,
+    maxGames: number = 25,
+  ) => {
+    console.log(
+      `💰 Claiming all Solana rewards, type ${claimType}, max ${maxGames} games - TODO: implement`,
+    );
   };
 
   const claimSolRewards = (gameId: number) => {
@@ -204,65 +322,127 @@ export const useBlockchain = () => {
 
   // Compatibility methods (keeping backward compatibility)
   const useEntryFee = (level: number = 0) => ({
-    data: BigInt(1000000), // 0.001 SOL in lamports 
+    data: BigInt(1000000), // 0.001 SOL in lamports
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
   const useLevelConfig = (level: number) => ({
     data: {
       entryFee: BigInt(1000000), // 0.001 SOL in lamports
       killReward: BigInt(100000), // 0.0001 SOL in lamports
-      active: true
+      active: true,
     },
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
   const useGamePlayers = (gameId: number) => ({
     data: [] as string[],
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
   const usePlayerNonce = (playerAddress: string) => ({
     data: BigInt(0),
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
   const usePlayerScore = (gameId: number, playerAddress: string) => ({
     data: BigInt(0),
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
   const useCanClaimReward = (gameId: number, playerAddress: string) => ({
     data: false,
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
-  // SPL Token balance (placeholder)
-  const useSPLBalance = (address: string) => ({
-    data: BigInt(0),
-    isLoading: false,
-    error: null,
-    refetch: () => {}
-  });
+  // SPL Token Balance Hook
+  const useSPLTokenBalance = useCallback(
+    (walletAddress: string, tokenMintAddress: string) => {
+      const [balance, setBalance] = useState<bigint>(BigInt(0));
+      const [isLoading, setIsLoading] = useState(false);
+      const [error, setError] = useState<Error | null>(null);
+
+      const fetchBalance = useCallback(async () => {
+        if (!walletAddress || !tokenMintAddress || !connection) {
+          setBalance(BigInt(0));
+          return;
+        }
+
+        try {
+          setIsLoading(true);
+          setError(null);
+
+          const walletPubkey = new PublicKey(walletAddress);
+          const mintPubkey = new PublicKey(tokenMintAddress);
+
+          // Get associated token account address
+          const associatedTokenAddress = await getAssociatedTokenAddress(
+            mintPubkey,
+            walletPubkey,
+          );
+
+          // Get token account info
+          const tokenAccount = await getAccount(
+            connection,
+            associatedTokenAddress,
+          );
+          setBalance(BigInt(tokenAccount.amount.toString()));
+
+          console.log(
+            `💰 SPL Token Balance for ${walletAddress}: ${tokenAccount.amount.toString()} tokens`,
+          );
+        } catch (err) {
+          const error = err as Error;
+          console.log(
+            `ℹ️ No SPL token account found for ${walletAddress} (${tokenMintAddress.slice(0, 8)}...)`,
+          );
+          setError(null); // Don't treat missing token account as error
+          setBalance(BigInt(0));
+        } finally {
+          setIsLoading(false);
+        }
+      }, [walletAddress, tokenMintAddress, connection]);
+
+      useEffect(() => {
+        fetchBalance();
+      }, [fetchBalance]);
+
+      return {
+        data: balance,
+        isLoading,
+        error,
+        refetch: fetchBalance,
+      };
+    },
+    [connection],
+  );
+
+  // SPL Token balance - now using real token balance query
+  const useSPLBalance = (address: string) => {
+    const tokenMint =
+      process.env.REACT_APP_TOKEN_MINT ||
+      'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr';
+    return useSPLTokenBalance(address, tokenMint);
+  };
 
   // SPL Token allowance (placeholder)
   const useSPLAllowance = (owner: string, spender: string) => ({
     data: BigInt(0),
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
   // Game program address
@@ -270,7 +450,7 @@ export const useBlockchain = () => {
     data: '11111111111111111111111111111112', // System Program as placeholder
     isLoading: false,
     error: null,
-    refetch: () => {}
+    refetch: () => {},
   });
 
   // SPL Token operations (placeholder)
@@ -285,9 +465,10 @@ export const useBlockchain = () => {
   // Deprecated compatibility methods
   const useGameInfo = useGameFullInfo;
   const usePlayerRewards = usePlayerCompleteRewards;
-  const claimReward = (gameId: number) => claimGameReward(gameId, ClaimType.ALL);
+  const claimReward = (gameId: number) =>
+    claimGameReward(gameId, ClaimType.ALL);
   const claimAllRewards = () => claimAllPlayerRewards(ClaimType.ALL, 25);
-  
+
   // Legacy BSC method names mapped to SPL equivalents
   const useUSD1Balance = useSPLBalance;
   const useUSD1Allowance = useSPLAllowance;
@@ -336,7 +517,7 @@ export const useBlockchain = () => {
     useGameProgramAddress,
     approveSPL,
     approveSPLToGameProgram,
-    
+
     // Compatibility methods (keeping backward compatibility)
     useEntryFee,
     useLevelConfig,
