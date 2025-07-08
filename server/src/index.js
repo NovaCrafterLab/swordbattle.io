@@ -59,13 +59,13 @@ async function bootstrap() {
   // Validate critical configuration
   validateServerConfiguration();
   
-  await initializeBlockchainService();     // sets global.blockchainService
+  await initializeSolanaVaultService();     // sets global.solanaVaultService
 
   const game = new Game();
   const server = new Server(game);
 
-  // Attach blockchain service to game instance
-  game.blockchainService = global.blockchainService;
+  // Attach Solana vault service to game instance
+  game.solanaVaultService = global.solanaVaultService;
   
   // Attach server reference to game instance for client broadcasting
   game.server = server;
@@ -80,9 +80,9 @@ async function bootstrap() {
   startGameLoop(game, server);
   setupShutdownHandlers(game, server);
 
-  // Initialize blockchain game for race servers
-  if (config.isRaceServer && config.blockchain.enabled) {
-    await game.initializeBlockchainGame();
+  // Initialize Solana game for race servers
+  if (config.isRaceServer && config.solana.enabled) {
+    await game.initializeSolanaGame();
   }
 
   /* == Periodic restart hook == */
@@ -90,26 +90,26 @@ async function bootstrap() {
     initCycleRestart(async () => {
       Logger.server.info('[CycleRestart] Scheduled restart triggered - ending current game');
 
-      // 使用统一的游戏结束流程
-      // 这将会：1) 踢出玩家 2) 等待区块链操作完成 3) 重启服务器开始新游戏
-      if (config.isRaceServer && config.blockchain.enabled && game.blockchainService) {
+      // Use unified Solana game end flow
+      // This will: 1) Kick players 2) Finalize Solana game 3) Restart server for new game
+      if (config.isRaceServer && config.solana.enabled && game.solanaVaultService) {
         try {
-          await game.endBlockchainGame('cycle_restart');
+          await game.endSolanaGame('cycle_restart');
         } catch (error) {
-          Logger.server.error('Cycle restart failed to end blockchain game properly', {
+          Logger.server.error('Cycle restart failed to end Solana game properly', {
             error: error.message
           });
           
-          // 如果区块链游戏结束失败，降级到简单重启
-          Logger.server.warn('Falling back to simple restart without blockchain operations');
+          // If Solana game end fails, fallback to simple restart
+          Logger.server.warn('Falling back to simple restart without Solana operations');
           game.pendingMassKill = true;
           await new Promise(r => setTimeout(r, 3000));
           
           game.clearGameTimeout();
-          Object.assign(game, { gamePhase: 'initializing', blockchainGameId: null });
+          Object.assign(game, { gamePhase: 'initializing', solanaGameId: null });
           game.registeredPlayers.clear();
+          game.finalKillRewards.clear();
           game.finalScores.clear();
-          game.playerScoreSubmitted.clear();
 
           for (const client of server.clients.values()) {
             client.player = null;
@@ -117,11 +117,11 @@ async function bootstrap() {
             client.fullSync = true;
           }
 
-          await game.initializeBlockchainGame();
+          await game.initializeSolanaGame();
         }
       } else {
-        // 非区块链模式的简单重启
-        Logger.server.info('Non-blockchain cycle restart');
+        // Non-Solana mode simple restart
+        Logger.server.info('Non-Solana cycle restart');
         game.pendingMassKill = true;
         await new Promise(r => setTimeout(r, 3000));
         
@@ -156,7 +156,7 @@ function registerPublicRoutes(app, game) {
 }
 
 function registerAdminRoutes(app, game) {
-  if (!config.isRaceServer || !config.blockchain.enabled) return;
+  if (!config.isRaceServer || !config.solana.enabled) return;
 
   // End game
   app.post('/admin/endgame', async (res) => {
@@ -172,18 +172,11 @@ function registerAdminRoutes(app, game) {
     await handleRestartRequest(res, req, game);
   });
 
-  // Switch RPC node
-  app.post('/admin/switch-rpc', async (res, req) => {
+  // Get Solana service status
+  app.get('/admin/solana-status', async (res) => {
     setCors(res);
     res.writeHeader('Content-Type', 'application/json');
-    await handleSwitchRpcRequest(res, req, game);
-  });
-
-  // Get RPC status
-  app.get('/admin/rpc-status', async (res) => {
-    setCors(res);
-    res.writeHeader('Content-Type', 'application/json');
-    await handleRpcStatusRequest(res, game);
+    await handleSolanaStatusRequest(res, game);
   });
 }
 
@@ -210,12 +203,12 @@ function setupShutdownHandlers(game, server) {
     try {
       Logger.server.warn('Stopping game...', { reason });
 
-      if (global.blockchainService && game.blockchainGameId) {
+      if (global.solanaVaultService && game.solanaGameId) {
         try {
-          Logger.server.info('Ending blockchain game before shutdown...');
-          await game.endBlockchainGame('server_shutdown');
+          Logger.server.info('Ending Solana game before shutdown...');
+          await game.endSolanaGame('server_shutdown');
         } catch (e) {
-          Logger.server.error('Failed to end blockchain game', { error: e.message });
+          Logger.server.error('Failed to end Solana game', { error: e.message });
         }
       }
 
@@ -253,11 +246,11 @@ function setupShutdownHandlers(game, server) {
 // == Route Helpers ==
 function buildServerInfo(game) {
   let gameStatus = null;
-  if (config.isRaceServer && config.blockchain.enabled) {
+  if (config.isRaceServer && config.solana.enabled) {
     try {
-      gameStatus = game.getBlockchainGameStatus();
+      gameStatus = game.getSolanaGameStatus();
     } catch (e) {
-      console.error('Error getting blockchain status:', e);
+      console.error('Error getting Solana game status:', e);
     }
   }
 
@@ -269,12 +262,12 @@ function buildServerInfo(game) {
 
     serverType: config.serverType,
     isRaceServer: config.isRaceServer,
-    blockchainEnabled: config.blockchain.enabled,
+    solanaEnabled: config.solana.enabled,
 
-    blockchainConfig: config.blockchain.enabled ? {
-      gameLevel: config.blockchain.gameLevel || 0,
-      environment: config.blockchain.environment.networkName,
-      chainId: config.blockchain.environment.chainId,
+    solanaConfig: config.solana.enabled ? {
+      cluster: config.solana.environment.cluster,
+      killReward: config.solana.killReward,
+      programId: config.solana.programId,
     } : null,
 
     gameStatus,
@@ -291,12 +284,12 @@ function buildServerInfo(game) {
 async function handleEndGameRequest(res, game) {
   try {
     const phase = game.gamePhase;
-    const gameId = game.blockchainGameId ? Number(game.blockchainGameId) : null;
+    const gameId = game.solanaGameId ? Number(game.solanaGameId) : null;
 
     console.log('🔍 Admin endgame request', { phase, gameId });
 
     if (phase === 'active' || phase === 'waiting') {
-      game.endBlockchainGame('admin_manual').catch(console.error);
+      game.endSolanaGame('admin_manual').catch(console.error);
 
       res.writeStatus('200 OK').end(JSON.stringify({
         success: true,
@@ -334,10 +327,10 @@ async function handleRestartRequest(res, req, game) {
     }
 
     game.clearGameTimeout();
-    Object.assign(game, { gamePhase: 'initializing', blockchainGameId: null });
+    Object.assign(game, { gamePhase: 'initializing', solanaGameId: null });
     game.registeredPlayers.clear();
+    game.finalKillRewards.clear();
     game.finalScores.clear();
-    game.playerScoreSubmitted.clear();
 
     for (const player of game.players) {
       player.client?.socket?.send(JSON.stringify({
@@ -349,9 +342,9 @@ async function handleRestartRequest(res, req, game) {
 
     setTimeout(async () => {
       try {
-        await game.initializeBlockchainGame();
+        await game.initializeSolanaGame();
       } catch (e) {
-        console.error('Failed to restart blockchain game:', e);
+        console.error('Failed to restart Solana game:', e);
       }
     }, 2000);
 
@@ -368,101 +361,27 @@ async function handleRestartRequest(res, req, game) {
   }
 }
 
-// RPC 切换处理函数
-async function handleSwitchRpcRequest(res, req, game) {
+// Solana service status handler
+async function handleSolanaStatusRequest(res, game) {
   try {
-    if (req.getHeader('authorization') !== `Bearer ${config.moderationSecret}`) {
-      res.writeStatus('401 Unauthorized').end(JSON.stringify({
-        success: false,
-        error: 'Unauthorized',
-      }));
-      return;
-    }
-
-    let body = '';
-    res.onData((chunk, isLast) => {
-      body += Buffer.from(chunk).toString();
-      if (isLast) {
-        handleSwitchRpcBody(body, res, game);
-      }
-    });
-  } catch (error) {
-    console.error('Error in switch RPC request:', error);
-    res.writeStatus('500 Internal Server Error').end(JSON.stringify({
-      success: false,
-      error: 'Internal server error',
-    }));
-  }
-}
-
-async function handleSwitchRpcBody(body, res, game) {
-  try {
-    const data = JSON.parse(body || '{}');
-    const { action, index } = data;
-
-    if (!game.blockchainService) {
+    if (!game.solanaVaultService) {
       res.writeStatus('400 Bad Request').end(JSON.stringify({
         success: false,
-        error: 'Blockchain service not available',
+        error: 'Solana vault service not available',
       }));
       return;
     }
 
-    let result;
-    if (action === 'fastest') {
-      // 切换到最快的RPC
-      await game.blockchainService.findAndSwitchToFastestRPC();
-      result = { action: 'switched_to_fastest' };
-    } else if (action === 'switch' && typeof index === 'number') {
-      // 切换到指定索引的RPC
-      const newRpc = await game.blockchainService.switchToRPC(index);
-      result = { action: 'switched', index, rpc: newRpc };
-    } else {
-      res.writeStatus('400 Bad Request').end(JSON.stringify({
-        success: false,
-        error: 'Invalid action or missing index',
-      }));
-      return;
-    }
-
-    // 获取切换后的状态
-    const stats = game.blockchainService.rpcManager.getStats();
-    
-    res.end(JSON.stringify({
-      success: true,
-      result,
-      rpcStats: stats,
-    }));
-  } catch (error) {
-    console.error('Error handling switch RPC body:', error);
-    res.writeStatus('500 Internal Server Error').end(JSON.stringify({
-      success: false,
-      error: error.message,
-    }));
-  }
-}
-
-// RPC 状态查询处理函数
-async function handleRpcStatusRequest(res, game) {
-  try {
-    if (!game.blockchainService) {
-      res.writeStatus('400 Bad Request').end(JSON.stringify({
-        success: false,
-        error: 'Blockchain service not available',
-      }));
-      return;
-    }
-
-    const stats = game.blockchainService.rpcManager.getStats();
-    const isConnected = await game.blockchainService.isConnected();
+    const status = game.solanaVaultService.getStatus();
+    const isConnected = await game.solanaVaultService.isConnected();
     
     res.end(JSON.stringify({
       success: true,
       connected: isConnected,
-      rpcStats: stats,
+      solanaStatus: status,
     }));
   } catch (error) {
-    console.error('Error in RPC status request:', error);
+    console.error('Error in Solana status request:', error);
     res.writeStatus('500 Internal Server Error').end(JSON.stringify({
       success: false,
       error: 'Internal server error',
@@ -481,43 +400,34 @@ function suggestForPhase(phase) {
 }
 
 
-// == Blockchain Service ==
-async function initializeBlockchainService() {
-  if (!config.isRaceServer || !config.blockchain.enabled) {
-    Logger.server.warn('Blockchain service disabled');
+// == Solana Vault Service ==
+async function initializeSolanaVaultService() {
+  if (!config.isRaceServer || !config.solana.enabled) {
+    Logger.server.warn('Solana vault service disabled');
     return null;
   }
 
   try {
-    Logger.server.info('Initializing blockchain service...');
+    Logger.server.info('Initializing Solana vault service...');
 
-    const BlockchainService = require('./blockchain/BlockchainService');
-    const svc = new BlockchainService(config.blockchain);
+    const SolanaVaultService = require('./blockchain/SolanaVaultService');
+    const svc = new SolanaVaultService(config.solana);
 
     await svc.initialize();
 
-    if (!await svc.isConnected()) throw new Error('Failed to connect');
-    Logger.status('Blockchain connection verified');
+    if (!await svc.isConnected()) throw new Error('Failed to connect to Solana');
+    Logger.status('Solana connection verified');
 
-    if (!config.blockchain.contracts?.swordBattle)
-      throw new Error('SwordBattle contract address missing');
-    if (!config.blockchain.trustedSigner)
-      throw new Error('Trusted signer private key missing');
+    if (!config.solana.programId)
+      throw new Error('Vault program ID missing');
 
-    Logger.status('Blockchain config verified');
+    Logger.status('Solana config verified');
 
-    try {
-      const counter = await svc.getGameCounter();
-      Logger.server.info('Current game counter', { counter });
-    } catch (e) {
-      Logger.server.warn('Failed to read game counter', { error: e.message });
-    }
-
-    global.blockchainService = svc;
-    Logger.status('Blockchain service ready');
+    global.solanaVaultService = svc;
+    Logger.status('Solana vault service ready');
     return svc;
   } catch (err) {
-    Logger.server.error('Blockchain init failed', { error: err.message });
+    Logger.server.error('Solana vault init failed', { error: err.message });
     return null;
   }
 }
@@ -535,12 +445,12 @@ function validateServerConfiguration() {
     issues.push('API_ENDPOINT not configured');
   }
   
-  if (config.isRaceServer && config.blockchain.enabled) {
-    if (!config.blockchain.trustedSigner) {
-      issues.push('BLOCKCHAIN_TRUSTED_SIGNER not configured for race server');
+  if (config.isRaceServer && config.solana.enabled) {
+    if (!config.solana.privateKey) {
+      issues.push('SOLANA_PRIVATE_KEY not configured for race server');
     }
-    if (!config.blockchain.contracts?.gameAggregator) {
-      issues.push('GAME_AGGREGATOR_CONTRACT not configured for race server');
+    if (!config.solana.programId) {
+      issues.push('VAULT_PROGRAM_ID not configured for race server');
     }
   }
   
@@ -549,13 +459,13 @@ function validateServerConfiguration() {
   console.log(`   SERVER_SECRET: ${config.serverSecret ? 'SET' : 'NOT_SET'}`);
   console.log(`   API_ENDPOINT: ${config.apiEndpoint || 'NOT_SET'}`);
   console.log(`   RACE_SERVER: ${config.isRaceServer ? 'YES' : 'NO'}`);
-  console.log(`   BLOCKCHAIN_ENABLED: ${config.blockchain?.enabled ? 'YES' : 'NO'}`);
+  console.log(`   SOLANA_ENABLED: ${config.solana?.enabled ? 'YES' : 'NO'}`);
   
   if (issues.length > 0) {
     console.warn('⚠️ Configuration Issues Found:');
     issues.forEach(issue => console.warn(`   - ${issue}`));
     
-    if (config.isRaceServer && config.blockchain.enabled) {
+    if (config.isRaceServer && config.solana.enabled) {
       console.error('❌ Critical configuration issues detected for race server');
       console.error('   Please fix these issues before starting the server');
     } else {
