@@ -130,6 +130,138 @@ const rewardMap = await vaultSDK.getRewardMapAccount(12345);
 const vaultInfo = vaultSDK.getVaultInfo(12345);
 ```
 
+## Game Discovery
+
+The SDK provides comprehensive game discovery capabilities to find and analyze all games on the blockchain.
+
+### Get All Game IDs
+
+```typescript
+// Get all game IDs
+const allGameIds = await vaultSDK.getAllGameIds();
+console.log('All game IDs:', allGameIds); // ['1', '2', '3', ...]
+```
+
+### Get All Games with Details
+
+```typescript
+// Get all games with detailed information
+const allGames = await vaultSDK.getAllGames();
+console.log('Total games:', allGames.length);
+
+allGames.forEach(game => {
+  console.log(`Game ${game.gameId}:`, {
+    vault: game.vault.toString(),
+    authority: game.authority.toString(),
+    totalDeposit: game.totalDeposit,
+    finalized: game.finalized,
+    withdrawEnabled: game.withdrawEnabled,
+    tokenMint: game.tokenMint.toString()
+  });
+});
+```
+
+### Filter Games
+
+```typescript
+// Get games with custom filters
+const filteredGames = await vaultSDK.getAllGames({
+  limit: 10, // Limit to 10 games
+  finalized: false, // Only active games
+  authority: adminPublicKey, // Only games by specific authority
+  tokenMint: tokenMintPublicKey // Only games with specific token
+});
+```
+
+### Get Games by Category
+
+```typescript
+// Get active (non-finalized) games
+const activeGames = await vaultSDK.getActiveGames();
+
+// Get finalized games
+const finalizedGames = await vaultSDK.getFinalizedGames();
+
+// Get games with withdraw enabled
+const withdrawEnabledGames = await vaultSDK.getGamesWithWithdrawEnabled();
+
+// Get games by specific authority
+const authorityGames = await vaultSDK.getGamesByAuthority(authorityPublicKey);
+
+// Get games by specific token mint
+const tokenGames = await vaultSDK.getGamesByTokenMint(tokenMintPublicKey);
+```
+
+### Game Statistics
+
+```typescript
+// Get game statistics
+const stats = await vaultSDK.getGameStats();
+console.log('Game Statistics:', {
+  total: stats.total,
+  active: stats.active,
+  finalized: stats.finalized,
+  withWithdrawEnabled: stats.withWithdrawEnabled
+});
+```
+
+### Game ID Management
+
+```typescript
+// Get the latest game ID
+const latestGameId = await vaultSDK.getLatestGameId();
+console.log('Latest game ID:', latestGameId);
+
+// Get the next available game ID
+const nextGameId = await vaultSDK.getNextGameId();
+console.log('Next available game ID:', nextGameId);
+
+// Check if a game exists
+const exists = await vaultSDK.gameExists(12345);
+console.log('Game 12345 exists:', exists);
+```
+
+### Game Discovery Example
+
+```typescript
+async function analyzeGames() {
+  console.log('🎮 Analyzing all games...');
+
+  // Get all games
+  const allGames = await vaultSDK.getAllGames();
+  
+  // Group by status
+  const activeGames = allGames.filter(g => !g.finalized);
+  const finalizedGames = allGames.filter(g => g.finalized);
+  
+  // Group by authority
+  const authorityMap = new Map();
+  allGames.forEach(game => {
+    const authority = game.authority.toString();
+    if (!authorityMap.has(authority)) {
+      authorityMap.set(authority, []);
+    }
+    authorityMap.get(authority).push(game);
+  });
+
+  console.log(`📊 Analysis Results:`);
+  console.log(`  Total games: ${allGames.length}`);
+  console.log(`  Active games: ${activeGames.length}`);
+  console.log(`  Finalized games: ${finalizedGames.length}`);
+  console.log(`  Unique authorities: ${authorityMap.size}`);
+
+  // Show top authorities
+  const topAuthorities = Array.from(authorityMap.entries())
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, 5);
+
+  console.log(`👑 Top authorities:`);
+  topAuthorities.forEach(([authority, games], index) => {
+    console.log(`  ${index + 1}. ${authority}: ${games.length} games`);
+  });
+}
+```
+
 ## Event Listening and Querying
 
 The SDK provides comprehensive event listening and querying capabilities for real-time updates and historical data analysis.
@@ -455,6 +587,26 @@ interface EventFilter {
 
 interface EventSubscription {
   unsubscribe: () => void;
+}
+
+// Game discovery types
+interface GameInfo {
+  gameId: string;
+  vault: PublicKey;
+  authority: PublicKey;
+  totalDeposit: string;
+  finalized: boolean;
+  withdrawEnabled: boolean;
+  tokenMint: PublicKey;
+  createdAt?: number;
+}
+
+interface GameDiscoveryOptions {
+  limit?: number;
+  authority?: PublicKey;
+  finalized?: boolean;
+  withdrawEnabled?: boolean;
+  tokenMint?: PublicKey;
 }
 ```
 

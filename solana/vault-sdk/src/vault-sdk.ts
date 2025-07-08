@@ -25,7 +25,9 @@ import {
   AdminWithdrawnEvent,
   TokenMintChangedEvent,
   EventFilter,
-  EventSubscription
+  EventSubscription,
+  GameInfo,
+  GameDiscoveryOptions
 } from './types';
 import vaultIdl from '../vault.json';
 
@@ -523,5 +525,196 @@ export class VaultSDK {
    */
   async getRecentEvents(): Promise<any[]> {
     return this.getEvents();
+  }
+
+  // ==================== Game Discovery Methods ====================
+
+  /**
+   * Get all game IDs by scanning program accounts
+   */
+  async getAllGameIds(): Promise<string[]> {
+    const accounts = await this.connection.getProgramAccounts(
+      this.program.programId,
+      {
+        filters: [
+          {
+            memcmp: {
+              offset: 0,
+              bytes: (this.program.coder.accounts as any).accountDiscriminator("gameVault")
+            }
+          }
+        ]
+      }
+    );
+
+    const gameIds: string[] = [];
+    
+    for (const account of accounts) {
+      try {
+        const vaultAccount = this.program.coder.accounts.decode(
+          "gameVault",
+          account.account.data
+        );
+        gameIds.push((vaultAccount.gameId as anchor.BN).toString());
+      } catch (error) {
+        // Skip invalid accounts
+        continue;
+      }
+    }
+
+    return gameIds.sort((a, b) => parseInt(a) - parseInt(b));
+  }
+
+  /**
+   * Get all game vaults with detailed information
+   */
+  async getAllGames(options?: GameDiscoveryOptions): Promise<GameInfo[]> {
+    const accounts = await this.connection.getProgramAccounts(
+      this.program.programId,
+      {
+        filters: [
+          {
+            memcmp: {
+              offset: 0,
+              bytes: (this.program.coder.accounts as any).accountDiscriminator("gameVault")
+            }
+          }
+        ]
+      }
+    );
+
+    const games: GameInfo[] = [];
+    
+    for (const account of accounts) {
+      try {
+        const vaultAccount = this.program.coder.accounts.decode(
+          "gameVault",
+          account.account.data
+        );
+
+        const gameInfo: GameInfo = {
+          gameId: (vaultAccount.gameId as anchor.BN).toString(),
+          vault: account.pubkey,
+          authority: vaultAccount.authority as PublicKey,
+          totalDeposit: (vaultAccount.totalDeposit as anchor.BN).toString(),
+          finalized: vaultAccount.finalized as boolean,
+          withdrawEnabled: vaultAccount.withdrawEnabled as boolean,
+          tokenMint: vaultAccount.tokenMint as PublicKey,
+          createdAt: account.account.lamports ? undefined : undefined // Could be enhanced with block time
+        };
+
+        // Apply filters
+        if (options?.authority && !gameInfo.authority.equals(options.authority)) {
+          continue;
+        }
+        if (options?.finalized !== undefined && gameInfo.finalized !== options.finalized) {
+          continue;
+        }
+        if (options?.withdrawEnabled !== undefined && gameInfo.withdrawEnabled !== options.withdrawEnabled) {
+          continue;
+        }
+        if (options?.tokenMint && !gameInfo.tokenMint.equals(options.tokenMint)) {
+          continue;
+        }
+
+        games.push(gameInfo);
+      } catch (error) {
+        // Skip invalid accounts
+        continue;
+      }
+    }
+
+    // Sort by game ID
+    games.sort((a, b) => parseInt(a.gameId) - parseInt(b.gameId));
+
+    // Apply limit
+    if (options?.limit) {
+      return games.slice(0, options.limit);
+    }
+
+    return games;
+  }
+
+  /**
+   * Get games by authority
+   */
+  async getGamesByAuthority(authority: PublicKey): Promise<GameInfo[]> {
+    return this.getAllGames({ authority });
+  }
+
+  /**
+   * Get active (non-finalized) games
+   */
+  async getActiveGames(): Promise<GameInfo[]> {
+    return this.getAllGames({ finalized: false });
+  }
+
+  /**
+   * Get finalized games
+   */
+  async getFinalizedGames(): Promise<GameInfo[]> {
+    return this.getAllGames({ finalized: true });
+  }
+
+  /**
+   * Get games with withdraw enabled
+   */
+  async getGamesWithWithdrawEnabled(): Promise<GameInfo[]> {
+    return this.getAllGames({ withdrawEnabled: true });
+  }
+
+  /**
+   * Get games by token mint
+   */
+  async getGamesByTokenMint(tokenMint: PublicKey): Promise<GameInfo[]> {
+    return this.getAllGames({ tokenMint });
+  }
+
+  /**
+   * Get the latest game ID (highest number)
+   */
+  async getLatestGameId(): Promise<string | null> {
+    const gameIds = await this.getAllGameIds();
+    return gameIds.length > 0 ? gameIds[gameIds.length - 1] : null;
+  }
+
+  /**
+   * Get the next available game ID
+   */
+  async getNextGameId(): Promise<number> {
+    const latestGameId = await this.getLatestGameId();
+    return latestGameId ? parseInt(latestGameId) + 1 : 1;
+  }
+
+  /**
+   * Check if a game ID exists
+   */
+  async gameExists(gameId: number): Promise<boolean> {
+    try {
+      const { vault } = this.getVaultPdas(gameId);
+      const account = await this.program.account.gameVault.fetch(vault);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Get game count statistics
+   */
+  async getGameStats(): Promise<{
+    total: number;
+    active: number;
+    finalized: number;
+    withWithdrawEnabled: number;
+  }> {
+    const allGames = await this.getAllGames();
+    
+    return {
+      total: allGames.length,
+      active: allGames.filter(g => !g.finalized).length,
+      finalized: allGames.filter(g => g.finalized).length,
+      withWithdrawEnabled: allGames.filter(g => g.withdrawEnabled).length
+    };
   }
 } 

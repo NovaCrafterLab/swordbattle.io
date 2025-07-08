@@ -127,4 +127,24 @@ export interface EventFilter {
 
 export interface EventSubscription {
   unsubscribe: () => void;
+}
+
+// Game discovery types
+export interface GameInfo {
+  gameId: string;
+  vault: PublicKey;
+  authority: PublicKey;
+  totalDeposit: string;
+  finalized: boolean;
+  withdrawEnabled: boolean;
+  tokenMint: PublicKey;
+  createdAt?: number;
+}
+
+export interface GameDiscoveryOptions {
+  limit?: number;
+  authority?: PublicKey;
+  finalized?: boolean;
+  withdrawEnabled?: boolean;
+  tokenMint?: PublicKey;
 } 
