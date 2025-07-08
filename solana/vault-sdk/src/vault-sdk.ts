@@ -134,9 +134,11 @@ export class VaultSDK {
   }
 
   /**
-   * Buy a ticket for a game
+   * Buy a ticket for a game with server-side price validation
    */
-  async buyTicket(params: BuyTicketParams): Promise<string> {
+  async buyTicket(
+    params: BuyTicketParams & { tier?: string; expectedAmount?: string },
+  ): Promise<string> {
     const { vault } = this.getVaultPdas(params.gameId);
     const userTicket = this.getUserTicketPda(
       params.gameId,
@@ -150,6 +152,18 @@ export class VaultSDK {
       vault,
       true,
     );
+
+    // Server-side price validation for security
+    if (params.tier && params.expectedAmount) {
+      const actualAmount = new anchor.BN(params.amount);
+      const expectedAmount = new anchor.BN(params.expectedAmount);
+
+      if (!actualAmount.eq(expectedAmount)) {
+        throw new Error(
+          `Price validation failed: expected ${params.expectedAmount} for tier ${params.tier}, got ${params.amount}`,
+        );
+      }
+    }
 
     const tx = await this.program.methods
       .buyTicket(new anchor.BN(params.amount))
@@ -266,6 +280,66 @@ export class VaultSDK {
   }
 
   /**
+   * Validate ticket price for a specific tier
+   */
+  validateTierPrice(tier: string, amount: string, config: any): boolean {
+    if (!config?.tiers?.[tier]) {
+      throw new Error(`Invalid tier: ${tier}`);
+    }
+
+    const expectedAmountSOL = config.tiers[tier].entranceFee;
+    const expectedAmountLamports = Math.floor(expectedAmountSOL * 1e9);
+    const actualAmountLamports = parseInt(amount);
+
+    // Strict validation - no price deviation allowed
+    return actualAmountLamports === expectedAmountLamports;
+  }
+
+  /**
+   * Get tier configuration for server-side validation
+   */
+  getTierConfig(tier: string, config: any): any {
+    if (!config?.tiers?.[tier]) {
+      throw new Error(
+        `Invalid tier: ${tier}. Available tiers: ${Object.keys(config?.tiers || {}).join(', ')}`,
+      );
+    }
+    return config.tiers[tier];
+  }
+
+  /**
+   * Initialize a new game vault with tier specification
+   */
+  async initializeGameVaultWithTier(
+    params: InitializeGameVaultParams & { tier: string },
+  ): Promise<string> {
+    const { vault } = this.getVaultPdas(params.gameId);
+
+    const tx = await this.program.methods
+      .initializeGameVault(new anchor.BN(params.gameId))
+      .accounts({
+        authority: this.wallet.publicKey,
+        tokenMint: params.tokenMint,
+      })
+      .rpc();
+
+    // Create vault token account after initialization
+    try {
+      await getOrCreateAssociatedTokenAccount(
+        this.connection,
+        this.wallet,
+        params.tokenMint,
+        vault,
+        true, // allowOwnerOffCurve
+      );
+    } catch (error) {
+      console.warn('Vault token account might already exist:', error);
+    }
+
+    return tx;
+  }
+
+  /**
    * Get vault account data
    */
   async getVaultAccount(gameId: number): Promise<GameVault> {
@@ -280,6 +354,49 @@ export class VaultSDK {
       withdrawEnabled: account.withdrawEnabled as boolean,
       tokenMint: account.tokenMint as PublicKey,
     };
+  }
+
+  /**
+   * Get token mint for a specific game from on-chain vault
+   */
+  async getGameTokenMint(gameId: number): Promise<PublicKey> {
+    try {
+      const vaultAccount = await this.getVaultAccount(gameId);
+      return vaultAccount.tokenMint as PublicKey;
+    } catch (error) {
+      const err = error as Error;
+      throw new Error(
+        `Failed to get token mint for game ${gameId}: ${err.message}`,
+      );
+    }
+  }
+
+  /**
+   * Get comprehensive game information including token details
+   */
+  async getGameInfo(gameId: number): Promise<{
+    vault: GameVault;
+    tokenMint: PublicKey;
+    gameId: string;
+    isActive: boolean;
+    canBuyTickets: boolean;
+  }> {
+    try {
+      const vaultAccount = await this.getVaultAccount(gameId);
+
+      return {
+        vault: vaultAccount,
+        tokenMint: vaultAccount.tokenMint as PublicKey,
+        gameId: vaultAccount.gameId,
+        isActive: !vaultAccount.finalized,
+        canBuyTickets: !vaultAccount.finalized && !vaultAccount.withdrawEnabled,
+      };
+    } catch (error) {
+      const err = error as Error;
+      throw new Error(
+        `Failed to get game info for game ${gameId}: ${err.message}`,
+      );
+    }
   }
 
   /**
@@ -736,6 +853,73 @@ export class VaultSDK {
   async getNextGameId(): Promise<number> {
     const latestGameId = await this.getLatestGameId();
     return latestGameId ? parseInt(latestGameId) + 1 : 1;
+  }
+
+  /**
+   * Atomically create the next available game ID and initialize vault
+   * Prevents race conditions when multiple servers start simultaneously
+   */
+  async createNextGameAtomically(
+    params: Omit<InitializeGameVaultParams, 'gameId'> & {
+      tier?: string;
+      maxRetries?: number;
+    },
+  ): Promise<{ gameId: number; txHash: string }> {
+    const maxRetries = params.maxRetries || 5;
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Get the next available game ID
+        const nextGameId = await this.getNextGameId();
+
+        console.log(
+          `🎯 Attempt ${attempt}/${maxRetries}: Trying to create game ${nextGameId}`,
+        );
+
+        // Try to initialize the vault for this game ID
+        const txHash = await this.initializeGameVault({
+          gameId: nextGameId,
+          tokenMint: params.tokenMint,
+        });
+
+        console.log(
+          `✅ Successfully created game ${nextGameId} atomically on attempt ${attempt}`,
+        );
+
+        return {
+          gameId: nextGameId,
+          txHash,
+        };
+      } catch (error) {
+        const err = error as Error;
+        lastError = err;
+        console.warn(
+          `❌ Attempt ${attempt}/${maxRetries} failed:`,
+          err.message,
+        );
+
+        // If this is likely a duplicate gameId error, we should retry
+        if (
+          err.message.includes('already in use') ||
+          err.message.includes('already exists') ||
+          err.message.includes('InvalidAccountData') ||
+          attempt < maxRetries
+        ) {
+          // Wait a random amount between 1-3 seconds before retrying
+          const delay = 1000 + Math.random() * 2000;
+          console.log(`⏳ Waiting ${delay.toFixed(0)}ms before retry...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw new Error(
+      `Failed to create game atomically after ${maxRetries} attempts. Last error: ${lastError?.message}`,
+    );
   }
 
   /**

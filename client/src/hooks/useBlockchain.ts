@@ -58,7 +58,7 @@ export const useSOLBalance = (walletAddress: string) => {
 };
 
 /**
- * Hook to fetch current game counter from server
+ * Hook to fetch current game counter from server (稳定版本)
  */
 export const useGameCounter = () => {
   const [gameId, setGameId] = useState<number>(0);
@@ -79,10 +79,22 @@ export const useGameCounter = () => {
       const response = await fetch(url);
       const serverInfo = await response.json();
 
-      const currentGameId = serverInfo?.gameStatus?.gameId || 0;
-      setGameId(currentGameId);
+      // 优先使用服务器的solanaGameId（这是当前活跃游戏的稳定ID）
+      let currentGameId = 0;
+      if (
+        serverInfo?.gameStatus?.gameId !== null &&
+        serverInfo?.gameStatus?.gameId !== undefined
+      ) {
+        currentGameId = serverInfo.gameStatus.gameId;
+      } else if (serverInfo?.solanaGameId) {
+        // 如果gameStatus中没有，尝试从solanaGameId获取
+        currentGameId = parseInt(serverInfo.solanaGameId) || 0;
+      }
 
-      console.log(`🎮 Game Counter from server: ${currentGameId}`);
+      setGameId(currentGameId);
+      console.log(
+        `🎮 Game Counter from server: ${currentGameId} (source: ${serverInfo?.gameStatus?.gameId ? 'gameStatus' : 'solanaGameId'})`,
+      );
     } catch (err) {
       const error = err as Error;
       console.error(`❌ Failed to fetch game counter:`, error);
@@ -96,8 +108,8 @@ export const useGameCounter = () => {
   useEffect(() => {
     fetchGameCounter();
 
-    // Poll every 10 seconds
-    const interval = setInterval(fetchGameCounter, 10000);
+    // 降低轮询频率到60秒，减少不必要的更新
+    const interval = setInterval(fetchGameCounter, 60000);
     return () => clearInterval(interval);
   }, [fetchGameCounter]);
 
@@ -179,6 +191,335 @@ export const useSPLBalance = (address: string) => {
     process.env.REACT_APP_TOKEN_MINT ||
     'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr';
   return useSPLTokenBalance(address, tokenMint);
+};
+
+/**
+ * Hook to get current game token information dynamically from server
+ */
+export const useCurrentGameToken = () => {
+  const [tokenInfo, setTokenInfo] = useState<{
+    tokenMint: string;
+    tokenSymbol: string;
+    tokenName: string;
+    isSOL: boolean;
+    isUSDC: boolean;
+    gameId: string;
+    tier: string;
+    canBuyTickets: boolean;
+    retrievalMethod: string;
+  } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchCurrentGameToken = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Get server URL from localStorage or default
+      const serverUrl =
+        localStorage.getItem('selectedServer') || 'localhost:8000';
+      const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+      const url = `${protocol}://${serverUrl}/api/current-game-token`;
+
+      const response = await fetch(url);
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to get current game token');
+      }
+
+      // Map token address to symbol and name
+      const tokenMint = result.tokenMint;
+      let tokenSymbol = 'UNKNOWN';
+      let tokenName = 'Unknown Token';
+
+      if (
+        result.tokenInfo?.isSOL ||
+        tokenMint === 'So11111111111111111111111111111112'
+      ) {
+        tokenSymbol = 'SOL';
+        tokenName = 'Solana';
+      } else if (
+        result.tokenInfo?.isUSDC ||
+        tokenMint === 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr'
+      ) {
+        tokenSymbol = 'USDC';
+        tokenName = 'USD Coin';
+      } else {
+        // Try to get token metadata from on-chain (simplified)
+        tokenSymbol = tokenMint.slice(0, 4) + '...';
+        tokenName = 'Custom Token';
+      }
+
+      const gameTokenInfo = {
+        tokenMint,
+        tokenSymbol,
+        tokenName,
+        isSOL: result.tokenInfo?.isSOL || false,
+        isUSDC: result.tokenInfo?.isUSDC || false,
+        gameId: result.currentGameId?.toString() || '0',
+        tier: result.gameStatus?.tier || 'low',
+        canBuyTickets: result.gameStatus?.canBuyTickets || false,
+        retrievalMethod: result.retrievalMethod || 'unknown',
+      };
+
+      setTokenInfo(gameTokenInfo);
+
+      console.log('🎯 Current game token info:', {
+        symbol: tokenSymbol,
+        address: tokenMint.slice(0, 8) + '...',
+        tier: gameTokenInfo.tier,
+        method: gameTokenInfo.retrievalMethod,
+      });
+    } catch (err) {
+      const error = err as Error;
+      console.error('❌ Failed to fetch current game token:', error);
+      setError(error);
+      setTokenInfo(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCurrentGameToken();
+  }, [fetchCurrentGameToken]);
+
+  return {
+    data: tokenInfo,
+    isLoading,
+    error,
+    refetch: fetchCurrentGameToken,
+  };
+};
+
+/**
+ * Hook to get tier-based pricing information
+ */
+export const useTierPricing = (tier: string = 'low') => {
+  const [pricing, setPricing] = useState<{
+    entranceFee: bigint;
+    killReward: bigint;
+    tierName: string;
+    minLevel: number;
+    maxLevel: number;
+    description: string;
+  } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchTierPricing = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Default tier configurations (can be fetched from server later)
+      const tierConfigs = {
+        low: {
+          entranceFee: BigInt(Math.floor(0.01 * LAMPORTS_PER_SOL)), // 0.01 SOL
+          killReward: BigInt(Math.floor(0.001 * LAMPORTS_PER_SOL)), // 0.001 SOL
+          tierName: 'Low Tier Arena',
+          minLevel: 1,
+          maxLevel: 10,
+          description: 'Beginner-friendly arena with basic rewards',
+        },
+        medium: {
+          entranceFee: BigInt(Math.floor(0.05 * LAMPORTS_PER_SOL)), // 0.05 SOL
+          killReward: BigInt(Math.floor(0.005 * LAMPORTS_PER_SOL)), // 0.005 SOL
+          tierName: 'Medium Tier Arena',
+          minLevel: 11,
+          maxLevel: 25,
+          description: 'Intermediate arena with enhanced rewards',
+        },
+        high: {
+          entranceFee: BigInt(Math.floor(0.1 * LAMPORTS_PER_SOL)), // 0.1 SOL
+          killReward: BigInt(Math.floor(0.01 * LAMPORTS_PER_SOL)), // 0.01 SOL
+          tierName: 'High Tier Arena',
+          minLevel: 26,
+          maxLevel: 999,
+          description: 'Advanced arena with premium rewards',
+        },
+      };
+
+      const config = tierConfigs[tier as keyof typeof tierConfigs];
+      if (!config) {
+        throw new Error(`Invalid tier: ${tier}`);
+      }
+
+      setPricing(config);
+
+      console.log(`🎯 Tier pricing for ${tier}:`, {
+        entranceFee: Number(config.entranceFee) / LAMPORTS_PER_SOL,
+        killReward: Number(config.killReward) / LAMPORTS_PER_SOL,
+      });
+    } catch (err) {
+      const error = err as Error;
+      console.error(`❌ Failed to get tier pricing for ${tier}:`, error);
+      setError(error);
+      setPricing(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [tier]);
+
+  useEffect(() => {
+    fetchTierPricing();
+  }, [fetchTierPricing]);
+
+  return {
+    data: pricing,
+    isLoading,
+    error,
+    refetch: fetchTierPricing,
+  };
+};
+
+/**
+ * Hook to get dynamic token balance for current game token
+ */
+export const useDynamicTokenBalance = (walletAddress: string) => {
+  const gameToken = useCurrentGameToken();
+  const solBalance = useSOLBalance(walletAddress);
+  const splBalance = useSPLTokenBalance(
+    walletAddress,
+    gameToken.data?.tokenMint || '',
+  );
+
+  // Return appropriate balance based on token type
+  if (gameToken.data?.isSOL) {
+    return {
+      data: solBalance.data,
+      isLoading: solBalance.isLoading || gameToken.isLoading,
+      error: solBalance.error || gameToken.error,
+      refetch: () => {
+        solBalance.refetch();
+        gameToken.refetch();
+      },
+      tokenInfo: gameToken.data,
+    };
+  } else {
+    return {
+      data: splBalance.data,
+      isLoading: splBalance.isLoading || gameToken.isLoading,
+      error: splBalance.error || gameToken.error,
+      refetch: () => {
+        splBalance.refetch();
+        gameToken.refetch();
+      },
+      tokenInfo: gameToken.data,
+    };
+  }
+};
+
+/**
+ * Hook to check if player has a ticket for current game
+ */
+export const usePlayerTicket = (gameId: number, playerAddress: string) => {
+  const { connection } = useConnection();
+  const [ticket, setTicket] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchTicket = useCallback(async () => {
+    if (!gameId || !playerAddress || !connection) {
+      setTicket(null);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Get server vault info to use VaultSDK
+      const serverUrl =
+        localStorage.getItem('selectedServer') || 'localhost:8000';
+      const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+      const vaultInfoUrl = `${protocol}://${serverUrl}/api/vault-info/${gameId}/${playerAddress}`;
+
+      const response = await fetch(vaultInfoUrl);
+      const result = await response.json();
+
+      setTicket(result.ticket);
+
+      console.log(
+        `🎫 Player ticket for game ${gameId}:`,
+        result.ticket ? 'HAS TICKET' : 'NO TICKET',
+      );
+    } catch (err) {
+      const error = err as Error;
+      console.error(`❌ Failed to fetch player ticket:`, error);
+      setError(error);
+      setTicket(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [gameId, playerAddress, connection]);
+
+  useEffect(() => {
+    fetchTicket();
+  }, [fetchTicket]);
+
+  return {
+    data: ticket,
+    isLoading,
+    error,
+    refetch: fetchTicket,
+    hasTicket: !!ticket,
+  };
+};
+
+/**
+ * Hook to get game vault information including entry fee
+ */
+export const useGameVault = (gameId: number) => {
+  const { connection } = useConnection();
+  const [vault, setVault] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchVault = useCallback(async () => {
+    if (!gameId || !connection) {
+      setVault(null);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Get server vault info
+      const serverUrl =
+        localStorage.getItem('selectedServer') || 'localhost:8000';
+      const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+      const vaultInfoUrl = `${protocol}://${serverUrl}/api/vault-info/${gameId}`;
+
+      const response = await fetch(vaultInfoUrl);
+      const result = await response.json();
+
+      setVault(result.vault);
+
+      console.log(`🏦 Game vault ${gameId}:`, result.vault);
+    } catch (err) {
+      const error = err as Error;
+      console.error(`❌ Failed to fetch game vault:`, error);
+      setError(error);
+      setVault(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [gameId, connection]);
+
+  useEffect(() => {
+    fetchVault();
+  }, [fetchVault]);
+
+  return {
+    data: vault,
+    isLoading,
+    error,
+    refetch: fetchVault,
+  };
 };
 
 // Type definitions for backward compatibility
@@ -271,207 +612,352 @@ export const useBlockchain = () => {
   const isConnected = connected;
   const address = publicKey?.toString();
 
-  console.log(
-    `🔗 useBlockchain: Solana - Connected: ${isConnected}, Address: ${address?.slice(0, 10)}...`,
-  );
+  // Only log on connection state changes, not every render
+  useEffect(() => {
+    console.log(
+      `🔗 useBlockchain: Solana - Connected: ${isConnected}, Address: ${address?.slice(0, 10)}...`,
+    );
+  }, [isConnected, address]);
 
   // Placeholder implementations for backward compatibility
-  const useGameFullInfo = (gameId: number) => ({
-    data: null,
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const useGameFullInfo = useCallback(
+    (gameId: number) => ({
+      data: null,
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
-  const useActiveGames = (level: number = 0, limit: number = 10) => ({
-    data: [],
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const useActiveGames = useCallback(
+    (level: number = 0, limit: number = 10) => ({
+      data: [],
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
-  const usePlayerCurrentGames = (playerAddress: string) => ({
-    data: [],
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const usePlayerCurrentGames = useCallback(
+    (playerAddress: string) => ({
+      data: [],
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
-  const useGameStats = (startTime: number, endTime: number) => ({
-    data: null,
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const useGameStats = useCallback(
+    (startTime: number, endTime: number) => ({
+      data: null,
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
-  const usePlayerStats = (playerAddress: string) => ({
-    data: null,
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const usePlayerStats = useCallback(
+    (playerAddress: string) => ({
+      data: null,
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
-  const usePlayerCompleteRewards = (gameId: number, playerAddress: string) => ({
-    data: null,
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const usePlayerCompleteRewards = useCallback(
+    (gameId: number, playerAddress: string) => ({
+      data: null,
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
-  const usePlayerAllRewards = (playerAddress: string) => ({
-    data: null,
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const usePlayerAllRewards = useCallback(
+    (playerAddress: string) => ({
+      data: null,
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
-  const usePlayerDashboard = (playerAddress: string) => ({
-    data: null,
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const usePlayerDashboard = useCallback(
+    (playerAddress: string) => ({
+      data: null,
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
-  const usePlayerClaimableGames = (
-    playerAddress: string,
-    maxGames: number = 25,
-  ) => ({
-    data: null,
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const usePlayerClaimableGames = useCallback(
+    (playerAddress: string, maxGames: number = 25) => ({
+      data: null,
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
-  // Game operations - placeholder implementations
-  const joinGame = (gameId: number) => {
-    console.log(`🎮 Joining Solana game ${gameId} - TODO: implement`);
-  };
+  // Game operations - buy ticket implementation with dynamic token and tier support
+  const buyTicket = useCallback(
+    async (gameId: number, tier: string = 'low', playerLevel: number = 1) => {
+      if (!isConnected || !address) {
+        throw new Error('Wallet not connected');
+      }
 
-  const smartJoinGame = (level: number = 0, maxWaitTime: number = 300) => {
-    console.log(
-      `🎮 Smart joining Solana game level ${level} - TODO: implement`,
-    );
-  };
+      try {
+        console.log(
+          `🎫 Buying ticket for game ${gameId}, tier: ${tier}, level: ${playerLevel}`,
+        );
 
-  const joinMultipleGames = (gameIds: number[]) => {
+        // Get tier pricing to determine the correct amount
+        const tierPricing = await new Promise<any>((resolve, reject) => {
+          const tierConfigs = {
+            low: { entranceFee: BigInt(Math.floor(0.01 * LAMPORTS_PER_SOL)) },
+            medium: {
+              entranceFee: BigInt(Math.floor(0.05 * LAMPORTS_PER_SOL)),
+            },
+            high: { entranceFee: BigInt(Math.floor(0.1 * LAMPORTS_PER_SOL)) },
+          };
+          const config = tierConfigs[tier as keyof typeof tierConfigs];
+          if (config) resolve(config);
+          else reject(new Error(`Invalid tier: ${tier}`));
+        });
+
+        const amount = tierPricing.entranceFee.toString();
+
+        // Call server to handle ticket purchase with tier validation
+        const serverUrl =
+          localStorage.getItem('selectedServer') || 'localhost:8000';
+        const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+        const buyTicketUrl = `${protocol}://${serverUrl}/api/buy-ticket`;
+
+        const response = await fetch(buyTicketUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            gameId,
+            amount,
+            walletAddress: address,
+            tier,
+            playerLevel,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to buy ticket');
+        }
+
+        console.log(
+          `✅ Secure ticket purchased successfully - Tier: ${tier}, TX: ${result.txHash}`,
+        );
+        return result;
+      } catch (error) {
+        console.error(`❌ Failed to buy ticket:`, error);
+        throw error;
+      }
+    },
+    [isConnected, address],
+  );
+
+  const joinGame = useCallback(
+    (gameId: number, tier: string = 'low', playerLevel: number = 1) => {
+      console.log(
+        `🎮 Joining game ${gameId} with tier ${tier} and level ${playerLevel}`,
+      );
+      return buyTicket(gameId, tier, playerLevel);
+    },
+    [buyTicket],
+  );
+
+  const smartJoinGame = useCallback(
+    (level: number = 0, maxWaitTime: number = 300) => {
+      console.log(
+        `🎮 Smart joining Solana game level ${level} - TODO: implement`,
+      );
+    },
+    [],
+  );
+
+  const joinMultipleGames = useCallback((gameIds: number[]) => {
     console.log(
       `🎮 Joining multiple Solana games ${gameIds} - TODO: implement`,
     );
-  };
+  }, []);
 
   // Reward claiming - placeholder implementations
-  const claimGameReward = (
-    gameId: number,
-    claimType: ClaimType = ClaimType.ALL,
-  ) => {
-    console.log(
-      `💰 Claiming Solana rewards for game ${gameId}, type ${claimType} - TODO: implement`,
-    );
-  };
+  const claimGameReward = useCallback(
+    (gameId: number, claimType: ClaimType = ClaimType.ALL) => {
+      console.log(
+        `💰 Claiming Solana rewards for game ${gameId}, type ${claimType} - TODO: implement`,
+      );
+    },
+    [],
+  );
 
-  const claimAllPlayerRewards = (
-    claimType: ClaimType = ClaimType.ALL,
-    maxGames: number = 25,
-  ) => {
-    console.log(
-      `💰 Claiming all Solana rewards, type ${claimType}, max ${maxGames} games - TODO: implement`,
-    );
-  };
+  const claimAllPlayerRewards = useCallback(
+    (claimType: ClaimType = ClaimType.ALL, maxGames: number = 25) => {
+      console.log(
+        `💰 Claiming all Solana rewards, type ${claimType}, max ${maxGames} games - TODO: implement`,
+      );
+    },
+    [],
+  );
 
-  const claimSolRewards = (gameId: number) => {
-    claimGameReward(gameId, ClaimType.SOL_ONLY);
-  };
+  const claimSolRewards = useCallback(
+    (gameId: number) => {
+      claimGameReward(gameId, ClaimType.SOL_ONLY);
+    },
+    [claimGameReward],
+  );
 
-  const claimSplRewards = (gameId: number) => {
-    claimGameReward(gameId, ClaimType.SPL_ONLY);
-  };
+  const claimSplRewards = useCallback(
+    (gameId: number) => {
+      claimGameReward(gameId, ClaimType.SPL_ONLY);
+    },
+    [claimGameReward],
+  );
 
-  const claimAllSolRewards = (maxGames: number = 25) => {
-    claimAllPlayerRewards(ClaimType.SOL_ONLY, maxGames);
-  };
+  const claimAllSolRewards = useCallback(
+    (maxGames: number = 25) => {
+      claimAllPlayerRewards(ClaimType.SOL_ONLY, maxGames);
+    },
+    [claimAllPlayerRewards],
+  );
 
-  const claimAllSplRewards = (maxGames: number = 25) => {
-    claimAllPlayerRewards(ClaimType.SPL_ONLY, maxGames);
-  };
+  const claimAllSplRewards = useCallback(
+    (maxGames: number = 25) => {
+      claimAllPlayerRewards(ClaimType.SPL_ONLY, maxGames);
+    },
+    [claimAllPlayerRewards],
+  );
 
   // Compatibility methods (keeping backward compatibility)
-  const useEntryFee = (level: number = 0) => ({
-    data: BigInt(1000000), // 0.001 SOL in lamports
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const useEntryFee = useCallback(
+    (level: number = 0) => ({
+      data: BigInt(1000000), // 0.001 SOL in lamports
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
-  const useLevelConfig = (level: number) => ({
-    data: {
-      entryFee: BigInt(1000000), // 0.001 SOL in lamports
-      killReward: BigInt(100000), // 0.0001 SOL in lamports
-      active: true,
-    },
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const useLevelConfig = useCallback(
+    (level: number) => ({
+      data: {
+        entryFee: BigInt(1000000), // 0.001 SOL in lamports
+        killReward: BigInt(100000), // 0.0001 SOL in lamports
+        active: true,
+      },
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
-  const useGamePlayers = (gameId: number) => ({
-    data: [] as string[],
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const useGamePlayers = useCallback(
+    (gameId: number) => ({
+      data: [] as string[],
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
-  const usePlayerNonce = (playerAddress: string) => ({
-    data: BigInt(0),
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const usePlayerNonce = useCallback(
+    (playerAddress: string) => ({
+      data: BigInt(0),
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
-  const usePlayerScore = (gameId: number, playerAddress: string) => ({
-    data: BigInt(0),
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const usePlayerScore = useCallback(
+    (gameId: number, playerAddress: string) => ({
+      data: BigInt(0),
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
-  const useCanClaimReward = (gameId: number, playerAddress: string) => ({
-    data: false,
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const useCanClaimReward = useCallback(
+    (gameId: number, playerAddress: string) => ({
+      data: false,
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
   // SPL Token allowance (placeholder)
-  const useSPLAllowance = (owner: string, spender: string) => ({
-    data: BigInt(0),
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const useSPLAllowance = useCallback(
+    (owner: string, spender: string) => ({
+      data: BigInt(0),
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
   // Game program address
-  const useGameProgramAddress = () => ({
-    data: '11111111111111111111111111111112', // System Program as placeholder
-    isLoading: false,
-    error: null,
-    refetch: () => {},
-  });
+  const useGameProgramAddress = useCallback(
+    () => ({
+      data: '11111111111111111111111111111112', // System Program as placeholder
+      isLoading: false,
+      error: null,
+      refetch: () => {},
+    }),
+    [],
+  );
 
   // SPL Token operations (placeholder)
-  const approveSPL = (spenderOrAmount: string | bigint, amount?: bigint) => {
-    console.log(`🪙 Approving SPL tokens - TODO: implement`);
-  };
+  const approveSPL = useCallback(
+    (spenderOrAmount: string | bigint, amount?: bigint) => {
+      console.log(`🪙 Approving SPL tokens - TODO: implement`);
+    },
+    [],
+  );
 
-  const approveSPLToGameProgram = (amount: bigint) => {
+  const approveSPLToGameProgram = useCallback((amount: bigint) => {
     console.log(`🪙 Approving SPL to game program - TODO: implement`);
-  };
+  }, []);
 
   // Deprecated compatibility methods
   const useGameInfo = useGameFullInfo;
   const usePlayerRewards = usePlayerCompleteRewards;
-  const claimReward = (gameId: number) =>
-    claimGameReward(gameId, ClaimType.ALL);
-  const claimAllRewards = () => claimAllPlayerRewards(ClaimType.ALL, 25);
+  const claimReward = useCallback(
+    (gameId: number) => claimGameReward(gameId, ClaimType.ALL),
+    [claimGameReward],
+  );
+  const claimAllRewards = useCallback(
+    () => claimAllPlayerRewards(ClaimType.ALL, 25),
+    [claimAllPlayerRewards],
+  );
 
   // Legacy BSC method names mapped to SPL equivalents
   const useUSD1Balance = useSPLBalance;
@@ -504,7 +990,17 @@ export const useBlockchain = () => {
     usePlayerDashboard,
     usePlayerClaimableGames,
 
+    // New ticket and vault methods
+    usePlayerTicket,
+    useGameVault,
+
+    // New dynamic token and tier methods
+    useCurrentGameToken,
+    useTierPricing,
+    useDynamicTokenBalance,
+
     // Game operations
+    buyTicket,
     joinGame,
     smartJoinGame,
     joinMultipleGames,

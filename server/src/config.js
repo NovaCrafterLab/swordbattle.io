@@ -65,11 +65,45 @@ module.exports = {
       'AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV', // Vault program ID
     tokenMint:
       process.env.SOLANA_TOKEN_MINT || 'So11111111111111111111111111111112', // Token mint for rewards (default: SOL)
-    killReward: parseFloat(process.env.KILL_REWARD || '0.001'), // Token reward per kill
+    killReward: parseFloat(process.env.KILL_REWARD || '0.001'), // Token reward per kill (deprecated - use tiers)
     environment: {
       isDev,
       isRelease,
       cluster: isDev ? 'devnet' : 'mainnet-beta',
+    },
+    // Game tier configuration for secure pricing control
+    tiers: {
+      low: {
+        name: 'Low Tier Arena',
+        entranceFee: parseFloat(process.env.LOW_TIER_ENTRANCE_FEE || '0.01'), // 0.01 SOL
+        killReward: parseFloat(process.env.LOW_TIER_KILL_REWARD || '0.001'), // 0.001 SOL per kill
+        minLevel: 1,
+        maxLevel: 10,
+        description: 'Beginner-friendly arena with basic rewards',
+      },
+      medium: {
+        name: 'Medium Tier Arena',
+        entranceFee: parseFloat(process.env.MID_TIER_ENTRANCE_FEE || '0.05'), // 0.05 SOL
+        killReward: parseFloat(process.env.MID_TIER_KILL_REWARD || '0.005'), // 0.005 SOL per kill
+        minLevel: 11,
+        maxLevel: 25,
+        description: 'Intermediate arena with enhanced rewards',
+      },
+      high: {
+        name: 'High Tier Arena',
+        entranceFee: parseFloat(process.env.HIGH_TIER_ENTRANCE_FEE || '0.1'), // 0.1 SOL
+        killReward: parseFloat(process.env.HIGH_TIER_KILL_REWARD || '0.01'), // 0.01 SOL per kill
+        minLevel: 26,
+        maxLevel: 999,
+        description: 'Advanced arena with premium rewards',
+      },
+    },
+    // Security settings for tier validation
+    security: {
+      enableStrictPriceValidation:
+        process.env.ENABLE_STRICT_PRICE_VALIDATION !== 'false', // Default enabled
+      allowPriceDeviation: parseFloat(process.env.ALLOW_PRICE_DEVIATION || '0'), // No deviation allowed by default
+      requireExactTierMatch: process.env.REQUIRE_EXACT_TIER_MATCH !== 'false', // Default enabled
     },
   },
 

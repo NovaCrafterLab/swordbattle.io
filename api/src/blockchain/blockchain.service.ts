@@ -1,13 +1,28 @@
-// 区块链服务
+// 区块链服务 - LEGACY BSC SERVICE (DEPRECATED)
 // 提供区块链相关的业务逻辑
+//
+// ⚠️ WARNING: This service is deprecated and disabled by default
+// The project has migrated to Solana. This service is kept for compatibility
+// but should be disabled via BLOCKCHAIN_ENABLED=false environment variable
 
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { createPublicClient, createWalletClient, http, formatEther, parseEther, getAddress } from 'viem';
+import {
+  createPublicClient,
+  createWalletClient,
+  http,
+  formatEther,
+  parseEther,
+  getAddress,
+} from 'viem';
 import { bsc, bscTestnet } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
-import { BlockchainConfig, defaultBlockchainConfig, validateBlockchainConfig } from './blockchain.config';
+import {
+  BlockchainConfig,
+  defaultBlockchainConfig,
+  validateBlockchainConfig,
+} from './blockchain.config';
 
-// 导入ABI - 只使用GameAggregator
+// 导入ABI - 只使用GameAggregator (Legacy placeholder)
 import { GAME_AGGREGATOR_ABI } from './abis/GameAggregator.abi';
 
 // RPC池配置
@@ -39,10 +54,24 @@ export class BlockchainService implements OnModuleInit {
   }
 
   async onModuleInit() {
+    this.logger.warn('🚨 BSC Blockchain Service is DEPRECATED');
+    this.logger.warn(
+      '🚨 Project has migrated to Solana - this service should be disabled',
+    );
+    this.logger.warn(
+      '🚨 Set BLOCKCHAIN_ENABLED=false to disable this legacy service',
+    );
+
     if (this.config.enabled) {
+      this.logger.warn(
+        '⚠️ Legacy BSC service is enabled - this may cause issues',
+      );
+      this.logger.warn('⚠️ Consider disabling with BLOCKCHAIN_ENABLED=false');
       await this.initialize();
     } else {
-      this.logger.log('Blockchain service disabled');
+      this.logger.log(
+        '✅ Legacy BSC blockchain service is disabled (recommended)',
+      );
     }
   }
 
@@ -57,7 +86,9 @@ export class BlockchainService implements OnModuleInit {
 
       // 选择链和RPC
       const chain = this.config.environment.isDev ? bscTestnet : bsc;
-      const rpcPool = this.config.environment.isDev ? BSC_TESTNET_RPC_POOL : BSC_MAINNET_RPC_POOL;
+      const rpcPool = this.config.environment.isDev
+        ? BSC_TESTNET_RPC_POOL
+        : BSC_MAINNET_RPC_POOL;
       const rpcUrl = this.config.rpcUrl || rpcPool[0];
 
       this.logger.log(`Using ${chain.name} (Chain ID: ${chain.id})`);
@@ -71,7 +102,9 @@ export class BlockchainService implements OnModuleInit {
 
       // 创建钱包客户端（如果有私钥）
       if (this.config.trustedSigner) {
-        this.account = privateKeyToAccount(this.config.trustedSigner as `0x${string}`);
+        this.account = privateKeyToAccount(
+          this.config.trustedSigner as `0x${string}`,
+        );
         this.walletClient = createWalletClient({
           account: this.account,
           chain,
@@ -159,7 +192,10 @@ export class BlockchainService implements OnModuleInit {
 
       return result;
     } catch (error) {
-      this.logger.error(`Failed to get game full info for game ${gameId}:`, error);
+      this.logger.error(
+        `Failed to get game full info for game ${gameId}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -180,7 +216,10 @@ export class BlockchainService implements OnModuleInit {
 
       return result;
     } catch (error) {
-      this.logger.error(`Failed to get player complete rewards for game ${gameId}, player ${playerAddress}:`, error);
+      this.logger.error(
+        `Failed to get player complete rewards for game ${gameId}, player ${playerAddress}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -201,7 +240,10 @@ export class BlockchainService implements OnModuleInit {
 
       return result;
     } catch (error) {
-      this.logger.error(`Failed to get player dashboard for ${playerAddress}:`, error);
+      this.logger.error(
+        `Failed to get player dashboard for ${playerAddress}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -229,7 +271,10 @@ export class BlockchainService implements OnModuleInit {
         nextClaimTime: result[4] as bigint,
       };
     } catch (error) {
-      this.logger.error(`Failed to get player all rewards for ${playerAddress}:`, error);
+      this.logger.error(
+        `Failed to get player all rewards for ${playerAddress}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -250,7 +295,10 @@ export class BlockchainService implements OnModuleInit {
 
       return result;
     } catch (error) {
-      this.logger.error(`Failed to get player claimable games for ${playerAddress}:`, error);
+      this.logger.error(
+        `Failed to get player claimable games for ${playerAddress}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -271,7 +319,9 @@ export class BlockchainService implements OnModuleInit {
 
       // 检查返回结果是否有效 - 支持对象和数组两种格式
       if (!result) {
-        this.logger.warn(`Invalid result from getPlayerCompleteRewards for game ${gameId}, player ${playerAddress}: result is null/undefined`);
+        this.logger.warn(
+          `Invalid result from getPlayerCompleteRewards for game ${gameId}, player ${playerAddress}: result is null/undefined`,
+        );
         // 返回默认值而不是抛出错误
         return {
           killReward: '0',
@@ -292,17 +342,25 @@ export class BlockchainService implements OnModuleInit {
       }
 
       let usdAmount: bigint, nclabAmount: bigint, fragmentBonus: bigint;
-      let usdClaimable: boolean, nclabClaimable: boolean, nclabClaimableTime: bigint;
+      let usdClaimable: boolean,
+        nclabClaimable: boolean,
+        nclabClaimableTime: bigint;
       let usdClaimed: boolean, nclabClaimed: boolean;
 
       // 处理对象格式的返回值（新格式）
       if (typeof result === 'object' && !Array.isArray(result)) {
         usdAmount = result.usdRewards ? BigInt(result.usdRewards) : BigInt(0);
-        nclabAmount = result.nclabRewards ? BigInt(result.nclabRewards) : BigInt(0);
-        fragmentBonus = result.fragmentBalance ? BigInt(result.fragmentBalance) : BigInt(0);
+        nclabAmount = result.nclabRewards
+          ? BigInt(result.nclabRewards)
+          : BigInt(0);
+        fragmentBonus = result.fragmentBalance
+          ? BigInt(result.fragmentBalance)
+          : BigInt(0);
         usdClaimable = Boolean(result.usdClaimable);
         nclabClaimable = Boolean(result.nclabClaimable);
-        nclabClaimableTime = result.nclabClaimableTime ? BigInt(result.nclabClaimableTime) : BigInt(0);
+        nclabClaimableTime = result.nclabClaimableTime
+          ? BigInt(result.nclabClaimableTime)
+          : BigInt(0);
         usdClaimed = Boolean(result.usdClaimed);
         nclabClaimed = Boolean(result.nclabClaimed);
       }
@@ -319,7 +377,9 @@ export class BlockchainService implements OnModuleInit {
       }
       // 无效格式
       else {
-        this.logger.warn(`Invalid result format from getPlayerCompleteRewards for game ${gameId}, player ${playerAddress}: expected object or array with 8+ elements`);
+        this.logger.warn(
+          `Invalid result format from getPlayerCompleteRewards for game ${gameId}, player ${playerAddress}: expected object or array with 8+ elements`,
+        );
         return {
           killReward: '0',
           lotteryReward: '0',
@@ -359,7 +419,10 @@ export class BlockchainService implements OnModuleInit {
         nclabClaimed,
       };
     } catch (error) {
-      this.logger.error(`Failed to get player rewards for ${playerAddress} in game ${gameId}:`, error);
+      this.logger.error(
+        `Failed to get player rewards for ${playerAddress} in game ${gameId}:`,
+        error,
+      );
       // 返回默认值而不是抛出错误，避免影响整个API响应
       return {
         killReward: '0',
@@ -396,7 +459,10 @@ export class BlockchainService implements OnModuleInit {
 
       return Number(nonce);
     } catch (error) {
-      this.logger.error(`Failed to get player nonce for ${playerAddress}:`, error);
+      this.logger.error(
+        `Failed to get player nonce for ${playerAddress}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -410,12 +476,13 @@ export class BlockchainService implements OnModuleInit {
     try {
       // 新合约没有getPlayerInfo函数，从奖励数据推断基本信息
       const rewardData = await this.getPlayerRewards(gameId, playerAddress);
-      
+
       return {
         playerAddr: playerAddress,
         kills: 0, // 从奖励数据无法获取击杀数
         score: 0, // 从奖励数据无法获取分数
-        submitted: rewardData.usdAmount !== '0' || rewardData.nclabAmount !== '0', // 有奖励说明已提交
+        submitted:
+          rewardData.usdAmount !== '0' || rewardData.nclabAmount !== '0', // 有奖励说明已提交
         fragmentReward: rewardData.fragmentReward,
         // 添加奖励相关字段作为补充
         reward: rewardData.totalReward,
@@ -431,7 +498,10 @@ export class BlockchainService implements OnModuleInit {
         claimableTime: rewardData.claimableTime,
       };
     } catch (error) {
-      this.logger.error(`Failed to get player info for ${playerAddress} in game ${gameId}:`, error);
+      this.logger.error(
+        `Failed to get player info for ${playerAddress} in game ${gameId}:`,
+        error,
+      );
       // 返回默认值而不是抛出错误
       return {
         playerAddr: playerAddress,
@@ -502,35 +572,42 @@ export class BlockchainService implements OnModuleInit {
 
     try {
       this.logger.log(`Getting game history for player: ${playerAddress}`);
-      
+
       // 获取当前游戏计数器，从最新的游戏开始查找
       const currentGameId = await this.getGameCounter();
-      
+
       const gameHistory = [];
       let foundGames = 0;
-      
+
       // 从最新的游戏往前查找，直到找到足够多的游戏或检查完所有游戏
-      for (let gameId = currentGameId; gameId >= 1 && foundGames < maxGames; gameId--) {
+      for (
+        let gameId = currentGameId;
+        gameId >= 1 && foundGames < maxGames;
+        gameId--
+      ) {
         try {
           // 检查玩家是否参与了这个游戏
           const players = await this.getGamePlayers(gameId);
           const playerLowerCase = playerAddress.toLowerCase();
-          
-          if (players.some(p => p.toLowerCase() === playerLowerCase)) {
+
+          if (players.some((p) => p.toLowerCase() === playerLowerCase)) {
             // 获取玩家在这个游戏中的详细信息
             const playerInfo = await this.getPlayerInfo(gameId, playerAddress);
-            const playerRewards = await this.getPlayerRewards(gameId, playerAddress);
+            const playerRewards = await this.getPlayerRewards(
+              gameId,
+              playerAddress,
+            );
             const gameInfo = await this.getGameInfo(gameId);
-            
+
             // 获取排名
             let rank = 0;
             let isWinner = false;
-            
+
             // 排名信息现在从GameAggregator的奖励数据推断
             // 如果有奖励且大于0，认为是获胜者
             isWinner = parseFloat(playerRewards.totalReward) > 0;
             rank = isWinner ? 1 : 0; // 简化排名逻辑
-            
+
             gameHistory.push({
               gameId,
               score: playerInfo.score,
@@ -539,10 +616,13 @@ export class BlockchainService implements OnModuleInit {
               rank,
               isWinner,
               level: gameInfo.level,
-              timestamp: gameInfo.endedAt > 0 ? gameInfo.endedAt * 1000 : gameInfo.createdAt * 1000,
+              timestamp:
+                gameInfo.endedAt > 0
+                  ? gameInfo.endedAt * 1000
+                  : gameInfo.createdAt * 1000,
               gameEnded: gameInfo.status === 2, // status 2 = ENDED
             });
-            
+
             foundGames++;
           }
         } catch (error) {
@@ -551,17 +631,28 @@ export class BlockchainService implements OnModuleInit {
           continue;
         }
       }
-      
-      this.logger.log(`Found ${gameHistory.length} games for player ${playerAddress}`);
+
+      this.logger.log(
+        `Found ${gameHistory.length} games for player ${playerAddress}`,
+      );
       return gameHistory;
     } catch (error) {
-      this.logger.error(`Failed to get player game history for ${playerAddress}:`, error);
+      this.logger.error(
+        `Failed to get player game history for ${playerAddress}:`,
+        error,
+      );
       throw error;
     }
   }
 
   // EIP-712签名分数提交
-  async signScoreSubmission(gameId: number, playerAddress: string, kills: number, score: number, nonce: number): Promise<string> {
+  async signScoreSubmission(
+    gameId: number,
+    playerAddress: string,
+    kills: number,
+    score: number,
+    nonce: number,
+  ): Promise<string> {
     if (!this.isAvailable() || !this.walletClient) {
       throw new Error('Blockchain service or wallet not available');
     }
@@ -572,7 +663,9 @@ export class BlockchainService implements OnModuleInit {
         name: 'SwordBattle',
         version: '1',
         chainId: await this.publicClient.getChainId(),
-        verifyingContract: getAddress(this.config.contracts.gameAggregator as `0x${string}`),
+        verifyingContract: getAddress(
+          this.config.contracts.gameAggregator as `0x${string}`,
+        ),
       };
 
       // 消息类型定义
@@ -603,7 +696,9 @@ export class BlockchainService implements OnModuleInit {
         message,
       });
 
-      this.logger.log(`Signed score submission for player ${playerAddress}, game ${gameId}, kills ${kills}, score ${score}`);
+      this.logger.log(
+        `Signed score submission for player ${playerAddress}, game ${gameId}, kills ${kills}, score ${score}`,
+      );
       return signature;
     } catch (error) {
       this.logger.error(`Failed to sign score submission:`, error);
@@ -628,7 +723,10 @@ export class BlockchainService implements OnModuleInit {
       // getPlayerRewardStatus返回: [usdRewards, nclabRewards, usdClaimable, nclabClaimable, nclabClaimableTime, usdClaimed, nclabClaimed]
       return result;
     } catch (error) {
-      this.logger.error(`Failed to get player reward status for game ${gameId}, player ${playerAddress}:`, error);
+      this.logger.error(
+        `Failed to get player reward status for game ${gameId}, player ${playerAddress}:`,
+        error,
+      );
       throw error;
     }
   }
@@ -642,4 +740,4 @@ export class BlockchainService implements OnModuleInit {
       isInitialized: this.isInitialized,
     };
   }
-} 
+}

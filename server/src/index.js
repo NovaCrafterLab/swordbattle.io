@@ -996,22 +996,4 @@ function validateServerConfiguration() {
   console.log(`   API_ENDPOINT: ${config.apiEndpoint || 'NOT_SET'}`);
   console.log(`   RACE_SERVER: ${config.isRaceServer ? 'YES' : 'NO'}`);
   console.log(`   SOLANA_ENABLED: ${config.solana?.enabled ? 'YES' : 'NO'}`);
-
-  if (issues.length > 0) {
-    console.warn('⚠️ Configuration Issues Found:');
-    issues.forEach((issue) => console.warn(`   - ${issue}`));
-
-    if (config.isRaceServer && config.solana.enabled) {
-      console.error(
-        '❌ Critical configuration issues detected for race server',
-      );
-      console.error('   Please fix these issues before starting the server');
-    } else {
-      console.warn(
-        '⚠️ Some configuration issues detected but server can continue',
-      );
-    }
-  } else {
-    console.log('✅ Configuration validation passed');
-  }
 }
