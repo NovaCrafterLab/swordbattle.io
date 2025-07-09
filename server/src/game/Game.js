@@ -2306,9 +2306,9 @@ class Game {
       if (tokenMint) {
         tokenInfo = {
           address: tokenMint,
-          isSOL: tokenMint === 'So11111111111111111111111111111112',
+          isSOL: tokenMint === 'So11111111111111111111111111111111111111112',
           isUSDC: tokenMint === 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
-          isWSol: tokenMint === 'So11111111111111111111111111111112',
+          isWSol: tokenMint === 'So11111111111111111111111111111111111111112',
         };
       }
     } catch (error) {

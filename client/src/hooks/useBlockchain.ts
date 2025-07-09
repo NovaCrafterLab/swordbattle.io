@@ -256,7 +256,7 @@ export const useCurrentGameToken = () => {
       // 使用 tokenInfo 中的信息，或基于 tokenMint 地址判断
       if (
         tokenInfoData?.isSOL ||
-        tokenMint === 'So11111111111111111111111111111112'
+        tokenMint === 'So11111111111111111111111111111111111111112'
       ) {
         tokenSymbol = 'SOL';
         tokenName = 'Solana';
@@ -278,7 +278,7 @@ export const useCurrentGameToken = () => {
         tokenName,
         isSOL:
           tokenInfoData?.isSOL ||
-          tokenMint === 'So11111111111111111111111111111112',
+          tokenMint === 'So11111111111111111111111111111111111111112',
         isUSDC:
           tokenInfoData?.isUSDC ||
           tokenMint === 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
