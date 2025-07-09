@@ -1336,9 +1336,14 @@ async function processBuyTicketRequest(
       tokenMint = new PublicKey(config.solana.tokenMint);
     }
 
+    // 🔧 修复：统一使用SPL Token处理（包括WSOL）
     const userTokenAccount = await getAssociatedTokenAddress(
       tokenMint,
       userPubkey,
+    );
+
+    console.log(
+      `🪙 Using SPL token ${tokenMint.toString()} with ATA ${userTokenAccount.toString()} for ${walletAddress}`,
     );
 
     // Get expected amount for tier validation
