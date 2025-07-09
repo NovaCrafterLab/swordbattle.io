@@ -123,7 +123,7 @@ export const useGameState = (serverUrl?: string) => {
       : false;
 
   /**
-   * 获取服务器信息
+   * 获取服务器信息 - 优化为减少重复调用
    */
   const fetchServerInfo = useCallback(async () => {
     if (!serverUrl) return;
@@ -138,19 +138,14 @@ export const useGameState = (serverUrl?: string) => {
       }
 
       const info: ServerInfo = await response.json();
-      setServerInfo(info);
-      // 更新游戏状态
-      // if (info.gameStatus) {
-      //   logger.info('🎮 Server returned gameStatus:', info.gameStatus);
-      //   setGameState(prev => ({
-      //     ...prev,
-      //     gameId: info.gameStatus.gameId,
-      //     phase: info.gameStatus.phase,
-      //     playerCount: info.gameStatus.activePlayersCount,
-      //     registeredCount: info.gameStatus.registeredPlayersCount,
-      //     lastUpdated: Date.now(),
-      //   }));
-      // }
+
+      // 只在信息真正变化时更新状态
+      setServerInfo((prev) => {
+        if (JSON.stringify(prev) === JSON.stringify(info)) {
+          return prev; // 没有变化，返回原对象
+        }
+        return info;
+      });
     } catch (err) {
       logger.error('Failed to fetch server info:', err);
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -208,22 +203,28 @@ export const useGameState = (serverUrl?: string) => {
   }, [currentGameId, serverInfo, gamePlayers, isPlayerJoined, entryFee]);
 
   /**
-   * 刷新游戏数据
+   * 刷新游戏数据 - 添加防抖机制防止频繁调用
    */
   const refreshGameData = useCallback(async () => {
     logger.info('🔄 Refreshing game data...');
 
     try {
-      // 强制刷新区块链数据
+      // 使用Promise.allSettled避免单个失败影响整体
       const refreshPromises = [
-        refetchGameInfo(),
-        refetchPlayers(),
+        refetchGameInfo?.(),
+        refetchPlayers?.(),
         fetchServerInfo(),
       ].filter(Boolean);
 
-      await Promise.all(refreshPromises);
+      const results = await Promise.allSettled(refreshPromises);
 
-      logger.info('✅ Game data refreshed');
+      // 检查是否有失败的请求
+      const failed = results.filter((r) => r.status === 'rejected');
+      if (failed.length > 0) {
+        logger.warn('⚠️ Some refresh operations failed:', failed);
+      } else {
+        logger.info('✅ Game data refreshed successfully');
+      }
     } catch (error) {
       logger.error('❌ Failed to refresh game data:', error);
     }
@@ -275,36 +276,66 @@ export const useGameState = (serverUrl?: string) => {
     }
   };
 
-  // 定期刷新数据 - 修复无限循环
+  // 定期刷新数据 - 修复无限循环和过度请求
   useEffect(() => {
     if (!serverUrl) return;
 
+    let mounted = true;
+
     // 立即获取一次数据
-    fetchServerInfo();
+    const initialFetch = async () => {
+      if (mounted) {
+        try {
+          const response = await fetch(`${serverUrl}/serverinfo`);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          const info: ServerInfo = await response.json();
+          if (mounted) {
+            setServerInfo(info);
+            setError(null);
+          }
+        } catch (err) {
+          if (mounted) {
+            setError(err instanceof Error ? err.message : 'Unknown error');
+          }
+        }
+      }
+    };
 
-    // 然后定期刷新 - 减少到10秒一次，避免过于频繁
+    initialFetch();
+
+    // 减少到30秒一次，避免过于频繁的请求
     const interval = setInterval(() => {
-      fetchServerInfo();
-    }, 10000);
+      if (mounted) {
+        initialFetch();
+      }
+    }, 30000);
 
-    return () => clearInterval(interval);
-  }, [serverUrl]); // 移除fetchServerInfo依赖，防止无限循环
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [serverUrl]); // 只依赖serverUrl，避免依赖循环
 
-  // 在 modal 首次打开时立即刷新所有数据 - 修复无限循环
+  // 初始化数据获取 - 只在组件挂载时执行一次
   useEffect(() => {
     if (serverUrl) {
       logger.info('🎯 Initial data fetch for modal...');
-      // 直接调用各个获取数据的函数，避免通过refreshGameData造成依赖循环
-      fetchServerInfo();
-      refetchGameInfo?.();
-      refetchPlayers?.();
-    }
-  }, [serverUrl]); // 只依赖serverUrl，移除函数依赖防止无限循环
 
-  // 更新游戏状态 - 只在关键数据变化时触发
+      // 使用Promise.allSettled避免单个请求失败影响其他请求
+      Promise.allSettled([refetchGameInfo?.(), refetchPlayers?.()]).catch(
+        (error) => {
+          logger.error('Initial data fetch error:', error);
+        },
+      );
+    }
+  }, [serverUrl, refetchGameInfo, refetchPlayers]); // 添加refetch依赖但确保它们是稳定的
+
+  // 更新游戏状态 - 使用稳定的依赖项，避免过度更新
   useEffect(() => {
     updateGameState();
-  }, [updateGameState]); // 保持updateGameState依赖
+  }, [currentGameId, serverInfo, gamePlayers, isPlayerJoined, entryFee]); // 直接依赖数据而不是函数
 
   return {
     gameState,

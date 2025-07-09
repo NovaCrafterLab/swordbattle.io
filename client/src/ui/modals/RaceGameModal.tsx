@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
@@ -42,6 +42,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
   const [txStep, setTxStep] = useState<
     'idle' | 'approving' | 'joining' | 'waiting'
   >('idle');
+  const [lastRefreshTime, setLastRefreshTime] = useState(0);
 
   // Get entry fee from tier pricing (dynamic) or fallback to default
   const entryFeeAmount =
@@ -81,46 +82,112 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     dynamicBalance.data && dynamicBalance.data >= entryFeeAmount;
   const needsApproval = !gameToken.data?.isSOL && !hasSufficientBalance; // Only for non-SOL tokens
 
-  // Refresh all data when component mounts
-  useEffect(() => {
-    gameState.refreshGameData();
-    gameToken.refetch();
-    tierPricing.refetch();
-  }, []);
+  // Stable refresh functions to prevent dependency issues
+  const refreshGameData = useCallback(() => {
+    return gameState.refreshGameData();
+  }, [gameState]);
 
-  // 监听钱包连接状态，主动刷新玩家数据
+  const refreshTokenData = useCallback(() => {
+    return Promise.allSettled([gameToken.refetch(), tierPricing.refetch()]);
+  }, [gameToken, tierPricing]);
+
+  const refreshWalletData = useCallback(() => {
+    if (isConnected && address) {
+      return Promise.allSettled([
+        playerData.refreshPlayerData(),
+        dynamicBalance.refetch(),
+      ]);
+    }
+    return Promise.resolve();
+  }, [isConnected, address, playerData, dynamicBalance]);
+
+  // Initial data refresh when component mounts - prevent cascading updates
+  useEffect(() => {
+    let mounted = true;
+
+    const performInitialRefresh = async () => {
+      if (!mounted) return;
+
+      try {
+        await Promise.allSettled([refreshGameData(), refreshTokenData()]);
+      } catch (error) {
+        console.warn('Initial refresh failed:', error);
+      }
+    };
+
+    performInitialRefresh();
+
+    return () => {
+      mounted = false;
+    };
+  }, [refreshGameData, refreshTokenData]);
+
+  // Monitor wallet connection state changes - optimize to prevent loops
   useEffect(() => {
     if (isConnected && address) {
-      playerData.refreshPlayerData();
-      dynamicBalance.refetch();
-    }
-  }, [isConnected, address]);
+      let mounted = true;
 
-  // Auto-refresh mechanism - refresh data every 10 seconds to keep it current
-  useEffect(() => {
-    const autoRefreshInterval = setInterval(() => {
-      // Only auto-refresh if modal is open and no transactions are pending
-      if (txStep === 'idle' && !blockchain.isWritePending) {
-        gameState.refreshGameData();
-        gameToken.refetch();
-        tierPricing.refetch();
+      const refreshWalletDataInternal = async () => {
+        if (!mounted) return;
 
-        if (isConnected && address) {
-          dynamicBalance.refetch();
+        try {
+          await refreshWalletData();
+        } catch (error) {
+          console.warn('Wallet data refresh failed:', error);
         }
+      };
+
+      refreshWalletDataInternal();
+
+      return () => {
+        mounted = false;
+      };
+    }
+  }, [isConnected, address, refreshWalletData]);
+
+  // Auto-refresh mechanism - reduce frequency and add proper cleanup
+  useEffect(() => {
+    // Only run auto-refresh if component is still mounted and no critical operations are pending
+    if (txStep !== 'idle' || blockchain.isWritePending) {
+      return; // Skip auto-refresh during transactions
+    }
+
+    const autoRefreshInterval = setInterval(() => {
+      // Additional check to ensure component is still active
+      if (txStep === 'idle' && !blockchain.isWritePending) {
+        // Batch refresh operations to avoid rapid successive calls
+        Promise.allSettled([
+          refreshGameData(),
+          refreshTokenData(),
+          refreshWalletData(),
+        ]).catch((error) => {
+          console.warn('Auto-refresh failed:', error);
+        });
       }
-    }, 10000); // Every 10 seconds
+    }, 15000); // Increased to 15 seconds to reduce load
 
     return () => clearInterval(autoRefreshInterval);
-  }, [txStep, blockchain.isWritePending, isConnected, address]);
+  }, [
+    txStep,
+    blockchain.isWritePending,
+    refreshGameData,
+    refreshTokenData,
+    refreshWalletData,
+  ]);
 
-  // Refresh data when gameId changes to ensure we have the latest info
+  // Refresh data when gameId changes - use stable reference and debounce
   useEffect(() => {
     if (gameState.gameId !== null && gameState.gameId !== undefined) {
-      gameToken.refetch();
-      tierPricing.refetch();
+      // Debounce rapid gameId changes
+      const timeoutId = setTimeout(() => {
+        refreshTokenData().catch((error: any) => {
+          console.warn('GameId change refresh failed:', error);
+        });
+      }, 500);
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [gameState.gameId]);
+  }, [gameState.gameId, refreshTokenData]);
 
   /**
    * 连接钱包
@@ -205,18 +272,17 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     if (blockchain.isConfirmed && txStep !== 'idle') {
       if (txStep === 'approving') {
         // 授权完成，刷新数据
-        playerData
-          .refreshPlayerData()
+        refreshWalletData()
           .then(() => {
             setTxStep('idle');
           })
-          .catch((error) => {
+          .catch((error: any) => {
             console.error('Error refreshing player data:', error);
             setTxStep('idle');
           });
       } else if (txStep === 'joining') {
         // 加入游戏完成
-        gameState.refreshGameData();
+        refreshGameData();
         setTxStep('waiting');
 
         // 进入游戏
@@ -226,7 +292,15 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
         }, 1000);
       }
     }
-  }, [blockchain.isConfirmed, txStep]);
+  }, [
+    blockchain.isConfirmed,
+    txStep,
+    refreshWalletData,
+    refreshGameData,
+    onJoinGame,
+    onClose,
+    address,
+  ]);
 
   /**
    * 获取按钮状态和文本
@@ -320,19 +394,38 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
           <span className="server-url">{new URL(serverUrl).hostname}</span>
           {gameState.isRaceServer && <span className="race-badge">RACE</span>}
           {gameState.isRaceServer && gameToken.data && (
-            <span
-              className="level-badge"
-              style={{
-                backgroundColor: getLevelDisplayColor(currentTier),
-                color: 'white',
-                padding: '3px 8px',
-                borderRadius: '4px',
-                fontSize: '0.7em',
-                fontWeight: 'bold',
-              }}
-            >
-              {getLevelDisplayName(currentTier)} • {gameToken.data.tokenSymbol}
-            </span>
+            <div className="game-tier-info">
+              <span
+                className="level-badge"
+                style={{
+                  backgroundColor: getLevelDisplayColor(currentTier),
+                  color: 'white',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  fontSize: '0.75em',
+                  fontWeight: 'bold',
+                  textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+                  border: `1px solid ${getLevelDisplayColor(currentTier)}dd`,
+                }}
+              >
+                {getLevelDisplayName(currentTier)} TIER
+              </span>
+              <span
+                className="token-badge"
+                style={{
+                  backgroundColor: '#2d3748',
+                  color: '#90cdf4',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  fontSize: '0.7em',
+                  fontWeight: 'bold',
+                  border: '1px solid #4a5568',
+                  marginLeft: '6px',
+                }}
+              >
+                {gameToken.data.tokenSymbol}
+              </span>
+            </div>
           )}
         </div>
       </div>
@@ -389,14 +482,19 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             )}
             <button
               onClick={() => {
-                // Refresh all data including dynamic token information
-                gameState.refreshGameData();
-                gameToken.refetch();
-                tierPricing.refetch();
-                if (isConnected && address) {
-                  playerData.refreshPlayerData();
-                  dynamicBalance.refetch();
-                }
+                // Debounce refresh button clicks to prevent spam
+                const now = Date.now();
+                if (now - lastRefreshTime < 2000) return; // 2 second debounce
+                setLastRefreshTime(now);
+
+                // Batch all refresh operations using stable functions
+                Promise.allSettled([
+                  refreshGameData(),
+                  refreshTokenData(),
+                  refreshWalletData(),
+                ]).catch((error) => {
+                  console.warn('Manual refresh failed:', error);
+                });
               }}
               className="race-btn race-btn-secondary"
               style={{ fontSize: '12px', padding: '4px 8px' }}
@@ -422,21 +520,46 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   #{gameState.gameId || 'Loading...'}
                 </span>
               </div>
-              <div className="info-item">
+              <div className="info-item tier-highlight">
                 <label>⚡ Game Tier</label>
-                <span
-                  style={{
-                    color: getLevelDisplayColor(currentTier),
-                    fontWeight: 'bold',
-                    fontSize: '1.05em',
-                  }}
-                >
-                  {tierPricing.data?.tierName ||
-                    getLevelDisplayName(currentTier)}
-                  <span style={{ fontSize: '0.8em', marginLeft: '4px' }}>
+                <div className="tier-display">
+                  <span
+                    className="tier-name"
+                    style={{
+                      color: getLevelDisplayColor(currentTier),
+                      fontWeight: 'bold',
+                      fontSize: '1.1em',
+                      textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                    }}
+                  >
+                    {tierPricing.data?.tierName ||
+                      getLevelDisplayName(currentTier)}
+                  </span>
+                  <span
+                    className="tier-level"
+                    style={{
+                      fontSize: '0.8em',
+                      marginLeft: '6px',
+                      color: '#9ca3af',
+                      fontWeight: 'normal',
+                    }}
+                  >
                     ({currentTier})
                   </span>
-                </span>
+                </div>
+                <div
+                  className="tier-level-range"
+                  style={{
+                    fontSize: '0.75em',
+                    color: '#6b7280',
+                    marginTop: '2px',
+                  }}
+                >
+                  Level{' '}
+                  {tierPricing.data
+                    ? `${tierPricing.data.minLevel}-${tierPricing.data.maxLevel}`
+                    : '---'}
+                </div>
               </div>
               <div className="info-item">
                 <label>💰 Payment Token</label>
@@ -459,18 +582,43 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   </span>
                 </span>
               </div>
-              <div className="info-item">
+              <div className="info-item entry-fee-highlight">
                 <label>🎫 Entry Fee</label>
-                <span
+                <div className="fee-display">
+                  <span
+                    className="fee-amount"
+                    style={{
+                      fontWeight: 'bold',
+                      color: '#fbbf24',
+                      fontSize: '1.15em',
+                      textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                    }}
+                  >
+                    {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}
+                  </span>
+                  <span
+                    className="fee-token"
+                    style={{
+                      fontWeight: 'bold',
+                      color: '#e5e7eb',
+                      fontSize: '0.9em',
+                      marginLeft: '4px',
+                    }}
+                  >
+                    {gameToken.data.tokenSymbol}
+                  </span>
+                </div>
+                <div
+                  className="fee-tier-info"
                   style={{
-                    fontWeight: 'bold',
-                    color: '#f59e0b',
-                    fontSize: '1.05em',
+                    fontSize: '0.75em',
+                    color: '#9ca3af',
+                    marginTop: '2px',
+                    fontStyle: 'italic',
                   }}
                 >
-                  {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}{' '}
-                  {gameToken.data.tokenSymbol}
-                </span>
+                  {getLevelDisplayName(currentTier)} tier pricing
+                </div>
               </div>
               <div className="info-item">
                 <label>🏆 Kill Reward</label>
@@ -602,15 +750,20 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                     fontWeight: 'bold',
                     color: hasSufficientBalance ? '#10b981' : '#ef4444',
                     fontSize: '1.05em',
+                    transition: 'color 0.2s ease',
                   }}
                 >
-                  {dynamicBalance.isLoading
-                    ? '⏳ Loading...'
-                    : (
+                  {dynamicBalance.isLoading ? (
+                    <span style={{ opacity: 0.7 }}>⏳ Loading...</span>
+                  ) : (
+                    <span>
+                      {(
                         Number(dynamicBalance.data || BigInt(0)) /
                         LAMPORTS_PER_SOL
                       ).toFixed(4)}{' '}
-                  {gameToken.data?.tokenSymbol || ''}
+                      {gameToken.data?.tokenSymbol || ''}
+                    </span>
+                  )}
                 </span>
               </div>
               {gameToken.data && (
@@ -665,12 +818,14 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   backgroundColor: '#f0f9ff',
                   borderRadius: '4px',
                   border: '1px solid #bae6fd',
+                  opacity: 0.8,
+                  transition: 'opacity 0.3s ease',
                 }}
               >
                 🎯 Loading game token information...
               </div>
             )}
-            {(dynamicBalance.isLoading || tierPricing.isLoading) && (
+            {(gameToken.isLoading || tierPricing.isLoading) && (
               <div
                 className="loading-hint"
                 style={{
@@ -681,6 +836,8 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   backgroundColor: '#f0f9ff',
                   borderRadius: '4px',
                   border: '1px solid #bae6fd',
+                  opacity: 0.8,
+                  transition: 'opacity 0.3s ease',
                 }}
               >
                 💡 Fetching dynamic pricing and balance...

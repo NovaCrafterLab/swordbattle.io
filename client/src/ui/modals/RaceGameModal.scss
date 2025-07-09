@@ -1,7 +1,7 @@
 .race-game-modal-wrapper {
   min-width: 450px;
   max-width: 600px;
-  
+
   .race-game-modal {
     .race-header {
       display: flex;
@@ -38,6 +38,13 @@
           font-weight: bold;
           text-transform: uppercase;
         }
+
+        .game-tier-info {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          flex-wrap: wrap;
+        }
       }
     }
 
@@ -60,12 +67,22 @@
             width: 12px;
             height: 12px;
             border-radius: 50%;
-            
-            &.orange { background-color: #ff9500; }
-            &.blue { background-color: #007aff; }
-            &.green { background-color: #34c759; }
-            &.yellow { background-color: #ffcc00; }
-            &.gray { background-color: #8e8e93; }
+
+            &.orange {
+              background-color: #ff9500;
+            }
+            &.blue {
+              background-color: #007aff;
+            }
+            &.green {
+              background-color: #34c759;
+            }
+            &.yellow {
+              background-color: #ffcc00;
+            }
+            &.gray {
+              background-color: #8e8e93;
+            }
           }
 
           .status-text {
@@ -104,6 +121,32 @@
               font-size: 1.1em;
               font-weight: bold;
               color: #ffd700;
+            }
+
+            &.entry-fee-highlight {
+              background: rgba(251, 191, 36, 0.1);
+              border: 1px solid rgba(251, 191, 36, 0.3);
+              border-radius: 8px;
+              padding: 12px;
+
+              .fee-display {
+                display: flex;
+                align-items: baseline;
+                gap: 4px;
+              }
+            }
+
+            &.tier-highlight {
+              background: rgba(59, 130, 246, 0.1);
+              border: 1px solid rgba(59, 130, 246, 0.3);
+              border-radius: 8px;
+              padding: 12px;
+
+              .tier-display {
+                display: flex;
+                align-items: baseline;
+                gap: 4px;
+              }
             }
           }
         }
@@ -183,7 +226,7 @@
         &.race-btn-primary {
           background: linear-gradient(45deg, #007aff, #00c7ff);
           color: white;
-          
+
           &:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0, 122, 255, 0.4);
@@ -194,7 +237,7 @@
           background: rgba(255, 255, 255, 0.1);
           color: white;
           border: 1px solid rgba(255, 255, 255, 0.3);
-          
+
           &:hover:not(:disabled) {
             background: rgba(255, 255, 255, 0.2);
           }
@@ -203,7 +246,7 @@
         &.race-btn-success {
           background: linear-gradient(45deg, #34c759, #00ff88);
           color: white;
-          
+
           &:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(52, 199, 89, 0.4);
@@ -213,7 +256,7 @@
         &.race-btn-warning {
           background: linear-gradient(45deg, #ff9500, #ffc107);
           color: white;
-          
+
           &:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(255, 149, 0, 0.4);
@@ -235,7 +278,7 @@
   .race-game-modal-wrapper {
     min-width: 90vw;
     max-width: 90vw;
-    
+
     .race-game-modal {
       .race-header {
         flex-direction: column;
@@ -247,7 +290,7 @@
         .game-info .info-grid {
           grid-template-columns: 1fr;
         }
-        
+
         .wallet-info .balance-info {
           span {
             font-size: 0.8em;
@@ -257,11 +300,11 @@
 
       .race-actions {
         flex-direction: column;
-        
+
         .race-btn {
           width: 100%;
         }
       }
     }
   }
-} 
+}

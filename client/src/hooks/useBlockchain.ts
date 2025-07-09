@@ -108,7 +108,7 @@ export const useGameCounter = () => {
   useEffect(() => {
     fetchGameCounter();
 
-    // 降低轮询频率到60秒，减少不必要的更新
+    // 增加到60秒一次轮询，减少不必要的更新和服务器负载
     const interval = setInterval(fetchGameCounter, 60000);
     return () => clearInterval(interval);
   }, [fetchGameCounter]);
