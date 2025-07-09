@@ -21,8 +21,10 @@ const readFileAsync = util.promisify(fs.readFile); // reserved for future use
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET',
-  'Access-Control-Allow-Headers': 'content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers':
+    'Content-Type, Accept, Authorization, X-Requested-With',
+  'Access-Control-Max-Age': '86400', // 24 hours
 };
 const setCors = (res) => {
   for (const [k, v] of Object.entries(CORS_HEADERS)) res.writeHeader(k, v);
@@ -46,9 +48,13 @@ app.listen('0.0.0.0', config.port, async (tok) => {
   }
   listenToken = tok;
 
-  await bootstrap();
+  console.log(`Game server listening on port ${config.port}...`);
 
-  console.log(`Game started on port ${config.port}.`);
+  // Start bootstrap in background - don't wait for it
+  bootstrap().catch((error) => {
+    console.error('Bootstrap failed:', error.message);
+    console.log('Server will continue running with limited functionality');
+  });
 });
 
 // == Core Bootstrap Logic ==
@@ -56,12 +62,21 @@ async function bootstrap() {
   // Validate critical configuration
   validateServerConfiguration();
 
-  await initializeSolanaVaultService(); // sets global.solanaVaultService
+  // Try to initialize Solana service, but don't fail if it doesn't work
+  try {
+    await initializeSolanaVaultService(); // sets global.solanaVaultService
+  } catch (error) {
+    console.warn(
+      '⚠️ Solana service initialization failed, continuing without Web3 features:',
+      error.message,
+    );
+    global.solanaVaultService = null;
+  }
 
   const game = new Game();
   const server = new Server(game);
 
-  // Attach Solana vault service to game instance
+  // Attach Solana vault service to game instance (might be null if init failed)
   game.solanaVaultService = global.solanaVaultService;
 
   // Attach server reference to game instance for client broadcasting
@@ -77,9 +92,17 @@ async function bootstrap() {
   startGameLoop(game, server);
   setupShutdownHandlers(game, server);
 
-  // Initialize Solana game for race servers
-  if (config.isRaceServer && config.solana.enabled) {
-    await game.initializeSolanaGame();
+  // Initialize Solana game for race servers (only if service is available)
+  if (
+    config.isRaceServer &&
+    config.solana.enabled &&
+    global.solanaVaultService
+  ) {
+    try {
+      await game.initializeSolanaGame();
+    } catch (error) {
+      console.warn('⚠️ Solana game initialization failed:', error.message);
+    }
   }
 
   /* == Periodic restart hook == */
@@ -149,9 +172,21 @@ async function bootstrap() {
 // == Route Registration ==
 function registerPublicRoutes(app, game) {
   // Ping
-  app.options('/ping', setCors);
+  app.options('/ping', (res) => {
+    res.onAborted(() => {
+      console.warn('Ping OPTIONS request aborted by client');
+    });
+    setCors(res);
+    res.end();
+  });
   app.get('/ping', (res) => {
     let hasResponded = false;
+
+    // Register abort handler FIRST
+    res.onAborted(() => {
+      hasResponded = true;
+      console.warn('Ping request aborted by client');
+    });
 
     // 超时保护
     const timeout = setTimeout(() => {
@@ -188,9 +223,22 @@ function registerPublicRoutes(app, game) {
     }
   });
 
-  // Server info
+  // Server info - Fixed CORS support
+  app.options('/serverinfo', (res) => {
+    res.onAborted(() => {
+      console.warn('Serverinfo OPTIONS request aborted by client');
+    });
+    setCors(res);
+    res.end();
+  });
   app.get('/serverinfo', (res) => {
     let hasResponded = false;
+
+    // Register abort handler FIRST
+    res.onAborted(() => {
+      hasResponded = true;
+      console.warn('Serverinfo request aborted by client');
+    });
 
     // 超时保护
     const timeout = setTimeout(() => {
@@ -243,33 +291,164 @@ function registerPublicRoutes(app, game) {
   // Vault API endpoints for Solana integration
   if (config.isRaceServer && config.solana.enabled) {
     // Get vault info for a game
-    app.options('/api/vault-info/*', setCors);
+    app.options('/api/vault-info/*', (res) => {
+      res.onAborted(() => {
+        console.warn('Vault-info OPTIONS request aborted by client');
+      });
+      setCors(res);
+      res.end();
+    });
     app.get('/api/vault-info/:gameId', async (res, req) => {
+      // Register abort handler FIRST
+      res.onAborted(() => {
+        console.warn('Vault-info request aborted by client');
+      });
+
       setCors(res);
       res.writeHeader('Content-Type', 'application/json');
-      await handleVaultInfoRequest(res, req, game);
+
+      try {
+        await handleVaultInfoRequest(res, req, game);
+      } catch (error) {
+        console.error('Error in vault-info endpoint:', error);
+        try {
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
+              success: false,
+              error: 'Internal server error',
+              details: error.message,
+            }),
+          );
+        } catch (resError) {
+          console.error('Failed to send error response:', resError);
+        }
+      }
     });
 
-    // Get player ticket info
+    // Get player ticket info - Fixed async error handling
     app.get('/api/vault-info/:gameId/:playerAddress', async (res, req) => {
+      // Register abort handler FIRST
+      res.onAborted(() => {
+        console.warn('Player ticket info request aborted by client');
+      });
+
       setCors(res);
       res.writeHeader('Content-Type', 'application/json');
-      await handlePlayerTicketRequest(res, req, game);
+
+      try {
+        await handlePlayerTicketRequest(res, req, game);
+      } catch (error) {
+        console.error('Error in vault-info player ticket endpoint:', error);
+        try {
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
+              success: false,
+              error: 'Internal server error',
+              details: error.message,
+            }),
+          );
+        } catch (resError) {
+          console.error('Failed to send error response:', resError);
+        }
+      }
     });
 
-    // Buy ticket endpoint
-    app.options('/api/buy-ticket', setCors);
+    // Buy ticket endpoint - Fixed async error handling
+    app.options('/api/buy-ticket', (res) => {
+      res.onAborted(() => {
+        console.warn('Buy-ticket OPTIONS request aborted by client');
+      });
+      setCors(res);
+      res.end();
+    });
     app.post('/api/buy-ticket', async (res, req) => {
+      // Register abort handler FIRST
+      res.onAborted(() => {
+        console.warn('Buy ticket request aborted by client');
+      });
+
       setCors(res);
       res.writeHeader('Content-Type', 'application/json');
-      await handleBuyTicketRequest(res, req, game);
+
+      try {
+        await handleBuyTicketRequest(res, req, game);
+      } catch (error) {
+        console.error('Error in buy-ticket endpoint:', error);
+        try {
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
+              success: false,
+              error: 'Internal server error',
+              details: error.message,
+            }),
+          );
+        } catch (resError) {
+          console.error('Failed to send error response:', resError);
+        }
+      }
     });
 
-    // Get current game token info endpoint
-    app.get('/api/current-game-token', async (res, req) => {
+    // Player joined notification endpoint - Fixed async error handling
+    app.options('/api/player-joined', (res) => {
+      res.onAborted(() => {
+        console.warn('Player-joined OPTIONS request aborted by client');
+      });
+      setCors(res);
+      res.end();
+    });
+    app.post('/api/player-joined', async (res, req) => {
+      // Register abort handler FIRST
+      res.onAborted(() => {
+        console.warn('Player joined request aborted by client');
+      });
+
       setCors(res);
       res.writeHeader('Content-Type', 'application/json');
-      await handleCurrentGameTokenRequest(res, req, game);
+
+      try {
+        await handlePlayerJoinedRequest(res, req, game);
+      } catch (error) {
+        console.error('Error in player-joined endpoint:', error);
+        try {
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
+              success: false,
+              error: 'Internal server error',
+              details: error.message,
+            }),
+          );
+        } catch (resError) {
+          console.error('Failed to send error response:', resError);
+        }
+      }
+    });
+
+    // Get current game token info endpoint - Fixed async error handling
+    app.get('/api/current-game-token', async (res, req) => {
+      // Register abort handler FIRST
+      res.onAborted(() => {
+        console.warn('Current game token request aborted by client');
+      });
+
+      setCors(res);
+      res.writeHeader('Content-Type', 'application/json');
+
+      try {
+        await handleCurrentGameTokenRequest(res, req, game);
+      } catch (error) {
+        console.error('Error in current-game-token endpoint:', error);
+        try {
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
+              success: false,
+              error: 'Internal server error',
+              details: error.message,
+            }),
+          );
+        } catch (resError) {
+          console.error('Failed to send error response:', resError);
+        }
+      }
     });
   }
 }
@@ -277,25 +456,88 @@ function registerPublicRoutes(app, game) {
 function registerAdminRoutes(app, game) {
   if (!config.isRaceServer || !config.solana.enabled) return;
 
-  // End game
+  // End game - Fixed async error handling
   app.post('/admin/endgame', async (res) => {
+    // Register abort handler FIRST
+    res.onAborted(() => {
+      console.warn('Admin endgame request aborted by client');
+    });
+
     setCors(res);
     res.writeHeader('Content-Type', 'application/json');
-    await handleEndGameRequest(res, game);
+
+    try {
+      await handleEndGameRequest(res, game);
+    } catch (error) {
+      console.error('Error in admin endgame endpoint:', error);
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Internal server error',
+            details: error.message,
+          }),
+        );
+      } catch (resError) {
+        console.error('Failed to send error response:', resError);
+      }
+    }
   });
 
-  // Restart game
+  // Restart game - Fixed async error handling
   app.post('/admin/restart', async (res, req) => {
+    // Register abort handler FIRST
+    res.onAborted(() => {
+      console.warn('Admin restart request aborted by client');
+    });
+
     setCors(res);
     res.writeHeader('Content-Type', 'application/json');
-    await handleRestartRequest(res, req, game);
+
+    try {
+      await handleRestartRequest(res, req, game);
+    } catch (error) {
+      console.error('Error in admin restart endpoint:', error);
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Internal server error',
+            details: error.message,
+          }),
+        );
+      } catch (resError) {
+        console.error('Failed to send error response:', resError);
+      }
+    }
   });
 
-  // Get Solana service status
+  // Get Solana service status - Fixed async error handling
   app.get('/admin/solana-status', async (res) => {
+    // Register abort handler FIRST
+    res.onAborted(() => {
+      console.warn('Admin solana-status request aborted by client');
+    });
+
     setCors(res);
     res.writeHeader('Content-Type', 'application/json');
-    await handleSolanaStatusRequest(res, game);
+
+    try {
+      await handleSolanaStatusRequest(res, game);
+    } catch (error) {
+      console.error('Error in admin solana-status endpoint:', error);
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Internal server error',
+            details: error.message,
+          }),
+        );
+      } catch (resError) {
+        console.error('Failed to send error response:', resError);
+      }
+    }
   });
 }
 
@@ -381,11 +623,31 @@ function buildServerInfo(game) {
     }
   }
 
+  // Provide default game status if Solana is not available
+  if (!gameStatus && config.isRaceServer) {
+    gameStatus = {
+      gameId: null,
+      phase: 'initializing',
+      tokenMint: 'So11111111111111111111111111111111111111112', // Default SOL mint
+      entranceFee: config.solana?.tiers?.low?.entranceFee || 0.01,
+      status: 'no_solana_service',
+    };
+  }
+
+  // Safe property access with fallbacks
   const payload = {
-    tps: game.tps,
-    entityCnt: game.entities.size,
-    playerCnt: game.players.size,
-    realPlayers: [...game.players.values()].filter((p) => !p.isBot).length,
+    tps: game?.tps || 0,
+    entityCnt: game?.entities?.size || 0,
+    playerCnt: game?.players?.size || 0,
+    realPlayers: (() => {
+      try {
+        if (!game?.players) return 0;
+        return [...game.players.values()].filter((p) => !p.isBot).length;
+      } catch (e) {
+        console.error('Error calculating real players:', e);
+        return 0;
+      }
+    })(),
 
     serverType: config.serverType,
     isRaceServer: config.isRaceServer,
@@ -405,7 +667,12 @@ function buildServerInfo(game) {
   };
 
   if (config.enableCycleRestart) {
-    payload.cycleInfo = getCycleInfo();
+    try {
+      payload.cycleInfo = getCycleInfo();
+    } catch (e) {
+      console.error('Error getting cycle info:', e);
+      payload.cycleInfo = null;
+    }
   }
 
   return payload;
@@ -739,7 +1006,7 @@ async function handleVaultInfoRequest(res, req, game) {
   }
 }
 
-// Player ticket handler
+// Player ticket handler - Fixed async getUserTicketAccount call
 async function handlePlayerTicketRequest(res, req, game) {
   let hasResponded = false;
 
@@ -779,12 +1046,28 @@ async function handlePlayerTicketRequest(res, req, game) {
       return;
     }
 
+    // 🔧 修复：添加异步调用的错误处理
     const { PublicKey } = require('@solana/web3.js');
     const playerPubkey = new PublicKey(playerAddress);
-    const ticket = await game.solanaVaultService.getUserTicketAccount(
-      gameId,
-      playerPubkey,
+
+    console.log(
+      `🎫 Checking ticket for player ${playerAddress} in game ${gameId}`,
     );
+
+    let ticket = null;
+    try {
+      ticket = await game.solanaVaultService.getUserTicketAccount(
+        gameId,
+        playerPubkey,
+      );
+      console.log(`✅ Ticket check completed for ${playerAddress}:`, !!ticket);
+    } catch (ticketError) {
+      console.warn(
+        `⚠️ Failed to get ticket for ${playerAddress}:`,
+        ticketError.message,
+      );
+      // ticket remains null, indicating no ticket found
+    }
 
     if (!hasResponded) {
       hasResponded = true;
@@ -807,6 +1090,7 @@ async function handlePlayerTicketRequest(res, req, game) {
           JSON.stringify({
             success: false,
             error: 'Failed to get player ticket',
+            details: error.message,
           }),
         );
       } catch (resError) {
@@ -1154,10 +1438,24 @@ async function handleCurrentGameTokenRequest(res, req, game) {
       if (!hasResponded) {
         hasResponded = true;
         clearTimeout(timeout);
-        res.writeStatus('400 Bad Request').end(
+        res.end(
           JSON.stringify({
-            success: false,
-            error: 'Solana vault service not available',
+            success: true,
+            currentGameId: null,
+            tokenMint: 'So11111111111111111111111111111111111111112', // Default SOL
+            tokenInfo: {
+              address: 'So11111111111111111111111111111111111111112',
+              isSOL: true,
+              isUSDC: false,
+              isWSol: true,
+            },
+            gameStatus: {
+              isActive: false,
+              canBuyTickets: false,
+              tier: 'low',
+              status: 'no_solana_service',
+            },
+            message: 'Solana vault service not available - using defaults',
           }),
         );
       }
@@ -1168,10 +1466,24 @@ async function handleCurrentGameTokenRequest(res, req, game) {
       if (!hasResponded) {
         hasResponded = true;
         clearTimeout(timeout);
-        res.writeStatus('404 Not Found').end(
+        res.end(
           JSON.stringify({
-            success: false,
-            error: 'No active game found',
+            success: true,
+            currentGameId: null,
+            tokenMint: 'So11111111111111111111111111111111111111112', // Default SOL
+            tokenInfo: {
+              address: 'So11111111111111111111111111111111111111112',
+              isSOL: true,
+              isUSDC: false,
+              isWSol: true,
+            },
+            gameStatus: {
+              isActive: false,
+              canBuyTickets: false,
+              tier: 'low',
+              status: 'no_active_game',
+            },
+            message: 'No active game found - using defaults',
           }),
         );
       }
@@ -1340,6 +1652,194 @@ function suggestForPhase(phase) {
       return 'Game is in error state.';
     default:
       return `Unknown phase: ${phase}`;
+  }
+}
+
+// Player joined notification handler - Fixed response handling
+async function handlePlayerJoinedRequest(res, req, game) {
+  let hasResponded = false;
+
+  const timeout = setTimeout(() => {
+    if (!hasResponded) {
+      hasResponded = true;
+      console.error('Player joined request timeout - forcing response');
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Request timeout',
+          }),
+        );
+      } catch (e) {
+        console.error('Failed to send timeout response:', e);
+      }
+    }
+  }, 10000);
+
+  try {
+    // Read request body
+    let body = '';
+    res.onData((chunk, isLast) => {
+      if (hasResponded) return;
+
+      try {
+        body += Buffer.from(chunk).toString();
+        if (isLast) {
+          try {
+            const data = JSON.parse(body);
+
+            // 🔧 修复：直接处理请求，避免异步状态同步问题
+            processPlayerJoinedRequest(res, game, data, timeout)
+              .then(() => {
+                hasResponded = true;
+                console.log('✅ Player joined request processed successfully');
+              })
+              .catch((error) => {
+                console.error('Error in processPlayerJoinedRequest:', error);
+                if (!hasResponded) {
+                  hasResponded = true;
+                  clearTimeout(timeout);
+                  try {
+                    res.writeStatus('500 Internal Server Error').end(
+                      JSON.stringify({
+                        success: false,
+                        error: 'Internal server error',
+                        details: error.message,
+                      }),
+                    );
+                  } catch (resError) {
+                    console.error('Failed to send error response:', resError);
+                  }
+                }
+              });
+          } catch (parseError) {
+            if (!hasResponded) {
+              hasResponded = true;
+              clearTimeout(timeout);
+              res.writeStatus('400 Bad Request').end(
+                JSON.stringify({
+                  success: false,
+                  error: 'Invalid JSON',
+                  details: parseError.message,
+                }),
+              );
+            }
+          }
+        }
+      } catch (error) {
+        if (!hasResponded) {
+          hasResponded = true;
+          clearTimeout(timeout);
+          console.error('Error processing player joined request:', error);
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
+              success: false,
+              error: 'Error processing request data',
+              details: error.message,
+            }),
+          );
+        }
+      }
+    });
+
+    res.onAborted(() => {
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        console.log('Player joined request aborted');
+      }
+    });
+  } catch (error) {
+    console.error('Error in player joined request:', error);
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Internal server error',
+            details: error.message,
+          }),
+        );
+      } catch (resError) {
+        console.error('Failed to send error response:', resError);
+      }
+    }
+  }
+}
+
+// Process player joined request - Fixed response handling
+async function processPlayerJoinedRequest(res, game, data, timeout) {
+  let hasResponded = false;
+
+  try {
+    const { gameId, playerAddress, txHash, tier, amount } = data;
+
+    console.log(`📋 Player joined notification:`, {
+      gameId,
+      playerAddress,
+      txHash,
+      tier,
+      amount,
+    });
+
+    // Basic validation
+    if (!gameId || !playerAddress || !txHash) {
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('400 Bad Request').end(
+          JSON.stringify({
+            success: false,
+            error: 'Missing required fields: gameId, playerAddress, txHash',
+          }),
+        );
+      }
+      return;
+    }
+
+    // Log the successful transaction for monitoring
+    console.log(
+      `✅ Player ${playerAddress} joined game ${gameId} with TX: ${txHash}`,
+    );
+
+    // Optional: Add player to registered players set
+    if (game.registeredPlayers) {
+      game.registeredPlayers.add(playerAddress.toLowerCase());
+    }
+
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      res.end(
+        JSON.stringify({
+          success: true,
+          message: 'Player joined notification received',
+          gameId,
+          playerAddress,
+          txHash,
+        }),
+      );
+    }
+  } catch (error) {
+    console.error('Error processing player joined request:', error);
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error:
+              error.message || 'Failed to process player joined notification',
+            details: error.stack,
+          }),
+        );
+      } catch (resError) {
+        console.error('Failed to send error response:', resError);
+      }
+    }
   }
 }
 

@@ -15,10 +15,10 @@ Swordbattle.io is a multiplayer Web3-enabled .io game built with a Node.js backe
 - **`api/`**: NestJS REST API for user accounts and blockchain integration
 
 ### Key Technologies
-- **Frontend**: React, TypeScript, Phaser 3, Redux Toolkit, Web3 (RainbowKit/Wagmi)
+- **Frontend**: React, TypeScript, Phaser 3, Redux Toolkit, Solana Web3 (wallet-adapter)
 - **Backend**: Node.js, uWebSockets.js, Protocol Buffers, SAT.js (collision detection)
 - **API**: NestJS, TypeORM, PostgreSQL
-- **Blockchain**: Viem, Ethereum-compatible chains
+- **Blockchain**: Solana Web3.js, Anchor framework, Viem for EVM chains
 
 ## Development Commands
 
@@ -62,8 +62,14 @@ yarn docker:dev:race
 
 ## Game Architecture
 
+### Authoritative Server Design
+- **Server Authority**: `server/src/game/Game.js` maintains authoritative game state
+- **Client Prediction**: Client-side movement prediction with server reconciliation
+- **Delta Updates**: Only changed entity data transmitted via Protocol Buffers
+- **Spatial Optimization**: SpatialHash and dynamic Quadtree for collision detection
+
 ### Server-Side Game Loop
-- **Game Loop**: `server/src/game/Game.js` - Main game state management
+- **Game Loop**: `server/src/game/Game.js` - Main game state management at 20 TPS
 - **Entities**: `server/src/game/entities/` - Game objects (Player, Coin, Chest, etc.)
 - **Collision Detection**: Uses SAT.js for polygon collision detection
 - **Spatial Partitioning**: SpatialHash for efficient entity queries
@@ -74,34 +80,54 @@ yarn docker:dev:race
 - **GameState**: `client/src/game/GameState.ts` - Client-side game state management
 - **Entity System**: `client/src/game/entities/` - Client-side entity representations
 - **HUD**: `client/src/game/hud/` - UI overlays and game interface
+- **State Interpolation**: Smooth movement between server updates
 
 ### Protocol Buffers
 - Schema: `client/src/game/network/schema.proto` and `server/src/network/protocol/schema.proto`
 - Rebuild with: `yarn workspace @swordbattle/client run build-protocol`
+- Supports: Player input, entity updates, map data, wallet addresses for Web3
 
 ## Web3 Integration
 
 ### Blockchain Components
 - **Client**: `client/src/blockchain.ts` - Web3 wallet connection and contract interaction
-- **Server**: `server/src/blockchain/` - Server-side blockchain validation
+- **Server**: `server/src/blockchain/` - Server-side blockchain validation and rewards
 - **API**: `api/src/blockchain/` - Blockchain service and database integration
 
+### Solana Integration
+- **Vault System**: `solana/vault-sdk/` - Custom Solana program for game rewards
+- **Wallet Adapters**: Phantom, Solflare wallet support
+- **Token Support**: SOL, USDC, wrapped SOL payments
+- **Race Mode**: Blockchain-verified competitive game mode
+
 ### Smart Contracts
-- **DeploySword**: Main game contract for Web3 features
-- **ERC20**: Token support for rewards
+- **Solana Vault Program**: Custom game rewards and payment system
+- **EVM Support**: Legacy support for Ethereum-compatible chains
 - ABIs stored in `/abis/` directories
 
 ## Testing and Quality
 
-### No Automated Tests
-- Client has placeholder test command
-- Server and API have no test suites
-- Manual testing required
+### Testing Status
+- **No Automated Tests**: Client, server, and API lack comprehensive test suites
+- **Manual Testing Required**: All features must be tested manually
+- **Test Commands**: Placeholder commands exist but don't run actual tests
 
-### Code Quality
-- **Linting**: ESLint configured for client and API
-- **Formatting**: Prettier for consistent code style
-- **Type Checking**: TypeScript in client and API (server is pure JS)
+### Code Quality Tools
+- **Linting**: ESLint configured for client and API (server has no linting)
+- **Formatting**: Prettier with lint-staged for consistent code style
+- **Type Checking**: TypeScript in client and API (server is pure JavaScript)
+
+### Quality Commands
+```bash
+# Format all code (works)
+yarn fmt
+
+# Lint client code
+yarn workspace @swordbattle/client run lint  # Note: may not exist
+
+# Lint API code
+yarn workspace @swordbattle/api run lint
+```
 
 ## Database
 
@@ -114,9 +140,10 @@ yarn docker:dev:race
 
 ### Required Environment Variables
 - Database connection strings
-- Blockchain RPC endpoints
+- Blockchain RPC endpoints (Solana mainnet/devnet)
 - API keys for external services
 - JWT secrets for authentication
+- Recaptcha keys for bot protection
 
 ### Branch Strategy
 - **`web3-main`**: Main development branch (Web3 features)
@@ -126,15 +153,17 @@ yarn docker:dev:race
 ## Performance Considerations
 
 ### Server Optimization
-- Spatial hashing for entity queries
-- Object pooling for entities
-- Efficient WebSocket message handling
-- Profiling tools available (`dev:devtool:server`)
+- **Spatial Hashing**: Entity queries optimized with SpatialHash
+- **Object Pooling**: Entity reuse to reduce garbage collection
+- **Dynamic Quadtree**: Rebuild frequency based on player count
+- **Viewport Culling**: Only send entities within player view
+- **Profiling Tools**: `yarn dev:devtool:server` and `yarn dev:autocannon:server`
 
 ### Client Optimization
-- Phaser 3 object pooling
-- Efficient entity rendering
-- Minimal DOM manipulation during gameplay
+- **Phaser 3 Object Pooling**: Efficient entity rendering
+- **Asset Loading**: Dynamic skin loading with fallbacks
+- **Frame Rate Adaptation**: Particle effects disabled at low FPS
+- **Minimal DOM Updates**: Game state changes don't affect DOM during gameplay
 
 ## Debugging
 
@@ -143,14 +172,47 @@ yarn docker:dev:race
 # Debug mode with inspector
 yarn dev:mon:server
 
-# Production debugging
+# Production debugging with inspector
 yarn dev:devtool:server
 
-# Load testing
+# Load testing with autocannon
 yarn dev:autocannon:server
 ```
 
 ### Client Debugging
 - React DevTools for UI components
-- Phaser debug mode available
+- Browser DevTools for Phaser debugging
 - Source maps generated in development
+- Redux DevTools for state management
+
+## Entity System Architecture
+
+### Component-Based Design
+- **Base Entity**: Both client and server extend base entity classes
+- **Components**: Health, Viewport, LevelSystem, EvolutionSystem, Inputs
+- **Effects System**: SpeedEffect, BurningEffect, SlippingEffect
+- **Evolution System**: Berserker, Knight, Rook, Samurai, Stalker, Tank, Vampire
+
+### Data Flow
+```
+Input → Controls → Network → Server Game Logic → Collision Detection → 
+State Updates → Network → Client State → Interpolation → Rendering
+```
+
+## Common Development Patterns
+
+### Adding New Entities
+1. Create server entity in `server/src/game/entities/`
+2. Add corresponding client entity in `client/src/game/entities/`
+3. Update Protocol Buffer schema if needed
+4. Rebuild protocol with `yarn workspace @swordbattle/client run build-protocol`
+
+### Blockchain Integration
+1. Server-side validation in `server/src/blockchain/`
+2. Client-side wallet interaction in `client/src/blockchain.ts`
+3. API-side database integration in `api/src/blockchain/`
+
+### Performance Debugging
+- Use `yarn dev:devtool:server` for server performance analysis
+- Monitor spatial hash performance in game console logs
+- Check client FPS and adjust particle effects accordingly

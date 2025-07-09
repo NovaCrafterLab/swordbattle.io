@@ -162,16 +162,36 @@ export const useGameState = (serverUrl?: string) => {
   const serverPlayerCount = serverInfo?.playerCnt || 0;
 
   /**
-   * 获取服务器信息 - 优化为减少重复调用
+   * 获取服务器信息 - 优化为减少重复调用，修复连接问题
    */
   const fetchServerInfo = useCallback(async () => {
-    if (!serverUrl) return;
+    if (!serverUrl) {
+      console.warn('⚠️ No serverUrl provided to fetchServerInfo');
+      return;
+    }
 
     try {
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch(`${serverUrl}/serverinfo`);
+      // 🔧 修复：确保URL格式正确
+      const cleanServerUrl = serverUrl.replace(/\/$/, ''); // 移除末尾斜杠
+      const finalUrl = cleanServerUrl.startsWith('http')
+        ? `${cleanServerUrl}/serverinfo`
+        : `http://${cleanServerUrl}/serverinfo`;
+
+      console.log('🔗 Fetching server info from:', finalUrl);
+
+      const response = await fetch(finalUrl, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        // 添加超时处理
+        signal: AbortSignal.timeout(10000), // 10秒超时
+      });
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
@@ -188,6 +208,7 @@ export const useGameState = (serverUrl?: string) => {
         gameId: info.gameStatus?.gameId,
         phase: info.gameStatus?.phase,
         timestamp: info.timestamp,
+        url: finalUrl,
       });
 
       // 只在信息真正变化时更新状态
@@ -198,8 +219,18 @@ export const useGameState = (serverUrl?: string) => {
         return info;
       });
     } catch (err) {
-      logger.error('Failed to fetch server info:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      const error = err as Error;
+      const errorMessage =
+        error.name === 'TimeoutError'
+          ? `Server connection timeout (${serverUrl})`
+          : error.message;
+
+      logger.error('Failed to fetch server info:', {
+        serverUrl,
+        error: errorMessage,
+        errorType: error.name,
+      });
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -286,10 +317,27 @@ export const useGameState = (serverUrl?: string) => {
     const initialFetch = async () => {
       if (mounted) {
         try {
-          const response = await fetch(`${serverUrl}/serverinfo`);
+          // 🔧 修复：确保URL格式正确
+          const cleanServerUrl = serverUrl.replace(/\/$/, '');
+          const finalUrl = cleanServerUrl.startsWith('http')
+            ? `${cleanServerUrl}/serverinfo`
+            : `http://${cleanServerUrl}/serverinfo`;
+
+          console.log('🔗 Initial fetch from:', finalUrl);
+
+          const response = await fetch(finalUrl, {
+            method: 'GET',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            signal: AbortSignal.timeout(10000),
+          });
+
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
+
           const info: ServerInfo = await response.json();
           if (mounted) {
             setServerInfo(info);
@@ -297,7 +345,18 @@ export const useGameState = (serverUrl?: string) => {
           }
         } catch (err) {
           if (mounted) {
-            setError(err instanceof Error ? err.message : 'Unknown error');
+            const error = err as Error;
+            const errorMessage =
+              error.name === 'TimeoutError'
+                ? `Server connection timeout (${serverUrl})`
+                : error.message;
+            setError(errorMessage);
+
+            logger.error('Initial fetch failed:', {
+              serverUrl,
+              error: errorMessage,
+              errorType: error.name,
+            });
           }
         }
       }

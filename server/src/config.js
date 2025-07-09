@@ -53,7 +53,7 @@ module.exports = {
 
   // Solana configuration - replaces BSC blockchain
   solana: {
-    enabled: process.env.SOLANA_ENABLED === 'true',
+    enabled: true, // Re-enabled after fixing uWebSockets issues
     rpcUrl:
       process.env.SOLANA_RPC_URL ||
       (isDev

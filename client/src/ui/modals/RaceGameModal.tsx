@@ -5,11 +5,12 @@ import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import Modal from './Modal';
 import { useGameState } from '../../hooks/useGameState';
 import { usePlayerData } from '../../hooks/usePlayerData';
+import { useSolanaVault } from '../../hooks/useSolanaVault';
+import { useWalletCheck } from '../../hooks/useWalletCheck';
 import {
   useCurrentGameToken,
   useTierPricing,
   useDynamicTokenBalance,
-  useBlockchain,
 } from '../../hooks/useBlockchain';
 import './RaceGameModal.scss';
 
@@ -158,7 +159,8 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
   const address = publicKey?.toString();
   const gameState = useGameState(serverUrl);
   const playerData = usePlayerData();
-  const blockchain = useBlockchain();
+  const solanaVault = useSolanaVault();
+  const { walletStatus, showInstallPrompt } = useWalletCheck();
 
   // 🔍 Debug: Log props and game state
   console.log('🔍 RaceGameModal Debug:', {
@@ -169,6 +171,8 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     error: gameState.error,
     serverInfo: gameState.serverInfo,
     isLoading: gameState.isLoading,
+    txStatus: solanaVault.txStatus,
+    currentTxHash: solanaVault.currentTxHash,
   });
 
   // 🚀 Dynamic token and tier information
@@ -339,10 +343,23 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
   }, [gameState.gameId]); // 🎯 只依赖 gameId，移除函数依赖
 
   /**
-   * 连接钱包
+   * 连接钱包 - 首先检查是否安装了钱包插件
    */
   const handleConnectWallet = async () => {
     try {
+      // 检查是否已安装钱包插件
+      if (!walletStatus.isInstalled) {
+        console.log(
+          '🔒 No Solana wallet detected, showing installation prompt',
+        );
+        showInstallPrompt('phantom'); // 默认推荐 Phantom 钱包
+        return;
+      }
+
+      console.log(
+        '✅ Solana wallet detected, opening wallet modal:',
+        walletStatus.detectedWallets,
+      );
       openWalletModal(true);
     } catch (error) {
       console.error('Failed to connect wallet:', error);
@@ -373,9 +390,11 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
   };
 
   /**
-   * 加入游戏 - 使用动态token和分层定价
+   * 加入游戏 - 使用动态token和分层定价，直接使用solanaVault进行交易
    */
   const handleJoinGame = async () => {
+    console.log('🎮 Starting handleJoinGame...');
+
     if (!address) {
       console.error('No wallet address available');
       return;
@@ -391,6 +410,13 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       return;
     }
 
+    console.log('✅ Initial checks passed:', {
+      address,
+      gameId: gameState.gameId,
+      gameToken: gameToken.data,
+      currentTier,
+    });
+
     try {
       setIsJoining(true);
       setTxStep('joining');
@@ -398,23 +424,159 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       // Use dynamic tier and player level (default level 1 for now)
       const playerLevel = 1; // TODO: Get from player profile
 
-      // Call blockchain.joinGame with the new Solana implementation
-      const txResult = await blockchain.joinGame(
-        gameState.gameId,
+      console.log('💰 Calculating tier pricing...');
+
+      // Get tier pricing to determine the correct amount
+      const tierConfigs = {
+        low: { entranceFee: BigInt(Math.floor(0.01 * LAMPORTS_PER_SOL)) },
+        medium: { entranceFee: BigInt(Math.floor(0.05 * LAMPORTS_PER_SOL)) },
+        high: { entranceFee: BigInt(Math.floor(0.1 * LAMPORTS_PER_SOL)) },
+      };
+
+      const config = tierConfigs[currentTier as keyof typeof tierConfigs];
+      if (!config) {
+        throw new Error(`Invalid tier: ${currentTier}`);
+      }
+
+      console.log('🎯 Tier configuration:', {
+        tier: currentTier,
+        entranceFee: config.entranceFee.toString(),
+        entranceFeeSOL: Number(config.entranceFee) / LAMPORTS_PER_SOL,
+      });
+
+      // Get current game token info to determine token mint
+      const serverUrl =
+        localStorage.getItem('selectedServer') || 'localhost:8000';
+      const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+
+      // 🔧 修复：确保URL格式正确
+      const cleanServerUrl = serverUrl.replace(/\/$/, '');
+      const finalServerUrl = cleanServerUrl.startsWith('http')
+        ? cleanServerUrl
+        : `${protocol}://${cleanServerUrl}`;
+
+      console.log(
+        '🌐 Fetching server info from:',
+        `${finalServerUrl}/serverinfo`,
+      );
+
+      let tokenMint;
+
+      try {
+        // Fetch game token info
+        const response = await fetch(`${finalServerUrl}/serverinfo`, {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          signal: AbortSignal.timeout(10000), // 10秒超时
+        });
+
+        console.log('📡 Server info response status:', response.status);
+
+        if (response.ok) {
+          const serverInfo = await response.json();
+          console.log('📋 Server info received:', serverInfo);
+
+          if (serverInfo.gameStatus?.tokenMint) {
+            const { PublicKey } = await import('@solana/web3.js');
+            tokenMint = new PublicKey(serverInfo.gameStatus.tokenMint);
+            console.log(
+              '🪙 Using server-provided token mint:',
+              tokenMint.toString(),
+            );
+          } else {
+            // Default to SOL if no token mint specified
+            const { PublicKey } = await import('@solana/web3.js');
+            tokenMint = new PublicKey(
+              'So11111111111111111111111111111111111111112',
+            );
+            console.log(
+              '🪙 Using default SOL token mint:',
+              tokenMint.toString(),
+            );
+          }
+        } else {
+          console.warn(
+            '⚠️ Failed to fetch server info, using default SOL token mint',
+          );
+          const { PublicKey } = await import('@solana/web3.js');
+          tokenMint = new PublicKey(
+            'So11111111111111111111111111111111111111112',
+          );
+        }
+      } catch (error) {
+        console.warn(
+          '⚠️ Server info fetch error, using default SOL token mint:',
+          error,
+        );
+        const { PublicKey } = await import('@solana/web3.js');
+        tokenMint = new PublicKey(
+          'So11111111111111111111111111111111111111112',
+        );
+      }
+
+      // Check if we have all required information
+      // Ensure we have a valid game ID from server before proceeding
+      if (!gameState.gameId) {
+        throw new Error(
+          'Game ID not available. Please wait for server connection or refresh.',
+        );
+      }
+
+      const actualGameId = gameState.gameId;
+      console.log('🎮 Using confirmed game ID from server:', actualGameId);
+
+      if (!gameToken.data) {
+        throw new Error(
+          'Game token information not available. Please refresh and try again.',
+        );
+      }
+
+      console.log('🚀 About to call solanaVault.buyTicket with:', {
+        gameId: actualGameId,
+        amount: config.entranceFee.toString(),
+        tokenMint: tokenMint.toString(),
+        tier: currentTier,
+        expectedAmount: config.entranceFee.toString(),
+      });
+
+      // Use direct Solana vault implementation
+      const txResult = await solanaVault.buyTicket(
+        actualGameId,
+        config.entranceFee,
+        tokenMint,
         currentTier,
-        playerLevel,
+        config.entranceFee, // expected amount for validation
       );
 
       console.log('🎯 Successfully joined game with Solana:', {
-        gameId: gameState.gameId,
+        gameId: actualGameId,
         tier: currentTier,
         level: playerLevel,
         tokenSymbol: gameToken.data.tokenSymbol,
-        entranceFee: Number(entryFeeAmount) / LAMPORTS_PER_SOL,
-        txHash: txResult.txHash,
+        entranceFee: Number(config.entranceFee) / LAMPORTS_PER_SOL,
+        txHash: txResult,
       });
+
+      // 🔧 修复：确保交易完全完成后再进入游戏
+      console.log('✅ Transaction completed successfully, entering game...');
+
+      // 刷新游戏数据以确保服务器识别玩家
+      await gameState.refreshGameData();
+
+      // 等待一小段时间确保状态同步
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // 现在可以安全地进入游戏
+      onJoinGame(address);
+      onClose();
     } catch (error) {
-      console.error('Failed to join game:', error);
+      console.error('❌ handleJoinGame failed:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      console.error('❌ Error details:', errorMessage);
       setTxStep('idle');
     } finally {
       setIsJoining(false);
@@ -438,28 +600,41 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             setTxStep('idle');
           });
       } else if (txStep === 'joining') {
-        // 加入游戏完成
+        // 加入游戏中 - 只刷新数据，不自动进入游戏
         gameState.refreshGameData();
         setTxStep('waiting');
 
-        // 进入游戏
-        setTimeout(() => {
-          onJoinGame(address);
-          onClose();
-        }, 1000);
+        // 🔧 修复：移除自动游戏进入逻辑，等待交易完成
+        console.log('⏳ Transaction in progress, waiting for completion...');
       }
     }
-  }, [txStep, onJoinGame, onClose, address]); // 🎯 只保留必要的依赖
+  }, [txStep, playerData, dynamicBalance, gameState]); // 🎯 修复依赖
 
   /**
    * 获取按钮状态和文本 - 优化设计
    */
   const getActionButton = () => {
     if (!isConnected) {
+      // 检查是否已安装钱包插件
+      if (!walletStatus.isInstalled) {
+        return (
+          <button className="race-btn warning" onClick={handleConnectWallet}>
+            <WalletIcon />
+            Install Solana Wallet
+          </button>
+        );
+      }
+
+      // 如果已安装钱包，显示检测到的钱包信息
+      const walletInfo =
+        walletStatus.detectedWallets.length > 0
+          ? ` (${walletStatus.detectedWallets.join(', ')} detected)`
+          : '';
+
       return (
         <button className="race-btn primary" onClick={handleConnectWallet}>
           <WalletIcon />
-          Connect Wallet
+          Connect Wallet{walletInfo}
         </button>
       );
     }
@@ -518,8 +693,71 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       );
     }
 
+    // Check if transaction is in progress
+    const isTransactionInProgress =
+      solanaVault.txStatus !== 'idle' || isJoining;
+
     const isDisabled =
-      isJoining || gameState.gameId === null || gameState.gameId === undefined;
+      isJoining ||
+      gameState.gameId === null ||
+      gameState.gameId === undefined ||
+      isTransactionInProgress;
+
+    // Show different button states based on transaction status
+    if (solanaVault.txStatus === 'signing') {
+      return (
+        <button className="race-btn warning" disabled>
+          <WalletIcon />
+          Confirm in Wallet
+        </button>
+      );
+    }
+
+    if (
+      solanaVault.txStatus === 'sending' ||
+      solanaVault.txStatus === 'confirming'
+    ) {
+      return (
+        <button className="race-btn warning" disabled>
+          <ZapIcon />
+          Transaction Processing...
+        </button>
+      );
+    }
+
+    if (solanaVault.txStatus === 'verifying') {
+      return (
+        <button className="race-btn warning" disabled>
+          <ZapIcon />
+          Verifying Ticket...
+        </button>
+      );
+    }
+
+    if (solanaVault.txStatus === 'completed') {
+      return (
+        <button
+          className="race-btn success"
+          onClick={() => {
+            onJoinGame(address);
+            onClose();
+          }}
+        >
+          <ZapIcon />
+          Enter Game (Purchased)
+        </button>
+      );
+    }
+
+    // Show loading state when game ID is not available
+    if (gameState.gameId === null || gameState.gameId === undefined) {
+      return (
+        <button className="race-btn disabled" disabled>
+          <ClockIcon />
+          Waiting for Game ID...
+        </button>
+      );
+    }
 
     return (
       <button
@@ -660,6 +898,29 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
           </div>
         )}
 
+        {/* Wallet Detection Status - Show when not connected */}
+        {!isConnected && (
+          <div className="wallet-detection-status">
+            <div className="detection-header">
+              <WalletIcon />
+              <span className="detection-title">Wallet Detection</span>
+            </div>
+
+            <div className="detection-info">
+              {walletStatus.isInstalled ? (
+                <div className="detection-success">
+                  ✅ Detected: {walletStatus.detectedWallets.join(', ')}
+                </div>
+              ) : (
+                <div className="detection-warning">
+                  ⚠️ No Solana wallet detected. Install Phantom or Solflare to
+                  continue.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Wallet Section - Simplified Design */}
         {isConnected && (
           <div className="wallet-section">
@@ -727,14 +988,75 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
           </div>
         )}
 
-        {/* Transaction Status */}
-        {txStep !== 'idle' && (
+        {/* Transaction Status - Enhanced with detailed wallet interaction states */}
+        {(txStep !== 'idle' || solanaVault.txStatus !== 'idle') && (
           <div className="tx-status">
-            {txStep === 'approving' &&
-              `⏳ Approving ${gameToken.data?.tokenSymbol || 'token'}...`}
-            {txStep === 'joining' && `⏳ Joining ${currentTier} tier game...`}
-            {txStep === 'waiting' &&
-              '✅ Transaction confirmed! Entering game...'}
+            <div className="tx-step-indicator">
+              {solanaVault.txStatus === 'building' && (
+                <div className="tx-step active">🔧 Building transaction...</div>
+              )}
+              {solanaVault.txStatus === 'signing' && (
+                <div className="tx-step active">
+                  💳 Please confirm transaction in your wallet...
+                </div>
+              )}
+              {solanaVault.txStatus === 'sending' && (
+                <div className="tx-step active">
+                  📡 Sending transaction to blockchain...
+                </div>
+              )}
+              {solanaVault.txStatus === 'confirming' && (
+                <div className="tx-step active">
+                  ⏳ Waiting for blockchain confirmation...
+                  {solanaVault.currentTxHash && (
+                    <div className="tx-hash">
+                      TX: {solanaVault.currentTxHash.slice(0, 8)}...
+                    </div>
+                  )}
+                </div>
+              )}
+              {solanaVault.txStatus === 'verifying' && (
+                <div className="tx-step active">
+                  🔍 Verifying ticket creation...
+                </div>
+              )}
+              {solanaVault.txStatus === 'completed' && (
+                <div className="tx-step completed">
+                  ✅ Transaction completed successfully!
+                </div>
+              )}
+
+              {/* Fallback to old states for backward compatibility */}
+              {solanaVault.txStatus === 'idle' && txStep === 'approving' && (
+                <div className="tx-step active">
+                  ⏳ Approving {gameToken.data?.tokenSymbol || 'token'}...
+                </div>
+              )}
+              {solanaVault.txStatus === 'idle' && txStep === 'joining' && (
+                <div className="tx-step active">
+                  ⏳ Joining {currentTier} tier game...
+                </div>
+              )}
+              {solanaVault.txStatus === 'idle' && txStep === 'waiting' && (
+                <div className="tx-step active">
+                  ✅ Transaction confirmed! Entering game...
+                </div>
+              )}
+            </div>
+
+            {/* Show transaction hash if available */}
+            {solanaVault.currentTxHash && (
+              <div className="tx-hash-info">
+                <a
+                  href={`https://solscan.io/tx/${solanaVault.currentTxHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="tx-hash-link"
+                >
+                  View on Solscan
+                </a>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -742,6 +1064,33 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       {/* Actions */}
       <div className="race-actions">
         {getActionButton()}
+
+        {/* Test wallet button - for debugging */}
+        {isConnected && (
+          <button
+            className="race-btn secondary"
+            onClick={async () => {
+              try {
+                const testResult = await solanaVault.testWalletConnection();
+                if (testResult) {
+                  alert(
+                    '✅ Wallet test successful! Plugin should have appeared.',
+                  );
+                } else {
+                  alert('❌ Wallet test failed! Check console for details.');
+                }
+              } catch (error) {
+                console.error('Wallet test error:', error);
+                const errorMessage =
+                  error instanceof Error ? error.message : String(error);
+                alert('❌ Wallet test error: ' + errorMessage);
+              }
+            }}
+          >
+            Test Wallet
+          </button>
+        )}
+
         <button className="race-btn secondary" onClick={onClose}>
           Cancel
         </button>

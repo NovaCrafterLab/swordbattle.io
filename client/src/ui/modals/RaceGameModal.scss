@@ -260,6 +260,48 @@
         }
       }
 
+      // Wallet Detection Status - Show when not connected
+      .wallet-detection-status {
+        background: rgba(59, 130, 246, 0.05);
+        border: 1px solid rgba(59, 130, 246, 0.15);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+
+        .detection-header {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          margin-bottom: 1rem;
+
+          .detection-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: white;
+          }
+        }
+
+        .detection-info {
+          .detection-success {
+            color: #10b981;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+          }
+
+          .detection-warning {
+            color: #f59e0b;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+          }
+        }
+      }
+
       // Game Status - Minimal Design
       .game-status {
         display: flex;
@@ -342,16 +384,57 @@
         margin-bottom: 1rem;
       }
 
-      // Transaction Status
+      // Transaction Status - Enhanced with detailed wallet interaction states
       .tx-status {
-        padding: 1rem 1.5rem;
-        background: rgba(251, 191, 36, 0.1);
-        border: 1px solid rgba(251, 191, 36, 0.2);
-        border-radius: 0.5rem;
-        color: #fbbf24;
-        text-align: center;
-        font-weight: 500;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        padding: 16px;
         margin-bottom: 1rem;
+        backdrop-filter: blur(10px);
+
+        .tx-step-indicator {
+          .tx-step {
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+
+            &.active {
+              color: #fbbf24;
+              font-weight: 500;
+            }
+
+            &.completed {
+              color: #10b981;
+              font-weight: 500;
+            }
+
+            .tx-hash {
+              font-size: 12px;
+              color: rgba(255, 255, 255, 0.7);
+              font-family: 'SF Mono', Consolas, monospace;
+              margin-left: 8px;
+            }
+          }
+        }
+
+        .tx-hash-info {
+          margin-top: 12px;
+          padding-top: 12px;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+
+          .tx-hash-link {
+            color: #60a5fa;
+            text-decoration: none;
+            font-size: 13px;
+
+            &:hover {
+              text-decoration: underline;
+            }
+          }
+        }
       }
     }
 
