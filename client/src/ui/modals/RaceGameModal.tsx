@@ -12,6 +12,135 @@ import {
 } from '../../hooks/useBlockchain';
 import './RaceGameModal.scss';
 
+// Icons (you can replace these with your preferred icon library)
+const TrophyIcon = () => (
+  <svg
+    className="w-6 h-6"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+    />
+  </svg>
+);
+
+const UsersIcon = () => (
+  <svg
+    className="w-6 h-6"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
+    />
+  </svg>
+);
+
+const ClockIcon = () => (
+  <svg
+    className="w-6 h-6"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+    />
+  </svg>
+);
+
+const ZapIcon = () => (
+  <svg
+    className="w-6 h-6"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M13 10V3L4 14h7v7l9-11h-7z"
+    />
+  </svg>
+);
+
+const WalletIcon = () => (
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+    />
+  </svg>
+);
+
+const XIcon = () => (
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M6 18L18 6M6 6l12 12"
+    />
+  </svg>
+);
+
+const RefreshIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0V9a8 8 0 1115.356 2M15 15v4h5"
+    />
+  </svg>
+);
+
+const WarningIcon = () => (
+  <svg
+    className="w-4 h-4"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+    />
+  </svg>
+);
+
 interface RaceGameModalProps {
   serverUrl: string;
   onClose: () => void;
@@ -334,132 +463,133 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
   }, [txStep, onJoinGame, onClose, address]); // 🎯 只保留必要的依赖
 
   /**
-   * 获取按钮状态和文本
+   * 获取按钮状态和文本 - 优化设计
    */
   const getActionButton = () => {
-    // 添加调试信息
     if (!isConnected) {
       return (
-        <button
-          className="race-btn race-btn-primary"
-          onClick={handleConnectWallet}
-        >
+        <button className="race-btn primary" onClick={handleConnectWallet}>
+          <WalletIcon />
           Connect Wallet
         </button>
       );
     }
 
-    // 简化状态判断：只检查服务器是否为比赛服务器且区块链已启用
     if (!gameState.isRaceServer) {
       return (
-        <button className="race-btn race-btn-disabled" disabled>
+        <button className="race-btn disabled" disabled>
           {gameState.error ? 'CONNECTION ERROR' : 'CONNECTING...'}
         </button>
       );
     }
 
-    // 如果玩家已加入游戏
     if (gameState.isPlayerJoined) {
       return (
         <button
-          className="race-btn race-btn-success"
+          className="race-btn success"
           onClick={() => {
             onJoinGame(address);
             onClose();
           }}
         >
+          <ZapIcon />
           Enter Game (Joined)
         </button>
       );
     }
 
-    // 检查余额
     if (!hasSufficientBalance) {
       return (
-        <button className="race-btn race-btn-disabled" disabled>
+        <button className="race-btn disabled" disabled>
+          <WarningIcon />
           Insufficient {gameToken.data?.tokenSymbol || 'Token'} Balance
         </button>
       );
     }
 
-    // 检查授权 (only for non-SOL tokens)
     if (needsApproval && !gameToken.data?.isSOL) {
       return (
         <button
-          className="race-btn race-btn-warning"
+          className="race-btn warning"
           onClick={handleApproval}
           disabled={isApproving}
         >
-          {isApproving
-            ? 'Approving...'
-            : `Approve ${(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)} ${gameToken.data?.tokenSymbol || 'Tokens'}`}
+          {isApproving ? (
+            'Approving...'
+          ) : (
+            <>
+              <ZapIcon />
+              Approve {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(
+                4,
+              )}{' '}
+              {gameToken.data?.tokenSymbol || 'Tokens'}
+            </>
+          )}
         </button>
       );
     }
 
-    // 修复：简化禁用逻辑，移除 blockchain 依赖
     const isDisabled =
       isJoining || gameState.gameId === null || gameState.gameId === undefined;
 
     return (
       <button
-        className="race-btn race-btn-primary"
+        className="race-btn primary"
         onClick={handleJoinGame}
         disabled={isDisabled}
       >
-        {isJoining ? 'Joining...' : `Join Game`}
+        {isJoining ? (
+          'Joining...'
+        ) : (
+          <>
+            <ZapIcon />
+            Join Race
+          </>
+        )}
       </button>
     );
   };
 
   const modalContent = (
     <div className="race-game-modal">
+      {/* Header - Clean and Modern */}
       <div className="race-header">
-        <h2>🏆 Race Game</h2>
-        <div className="race-server-info">
-          <span className="server-url">{new URL(serverUrl).hostname}</span>
-          {gameState.isRaceServer && <span className="race-badge">RACE</span>}
-          {gameState.isRaceServer && gameToken.data && (
-            <div className="game-tier-info">
-              <span
-                className="level-badge"
-                style={{
-                  backgroundColor: getLevelDisplayColor(currentTier),
-                  color: 'white',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  fontSize: '0.75em',
-                  fontWeight: 'bold',
-                  textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-                  border: `1px solid ${getLevelDisplayColor(currentTier)}dd`,
-                }}
-              >
+        <button className="close-button" onClick={onClose}>
+          <XIcon />
+        </button>
+
+        <div className="header-content">
+          <div className="icon-container">
+            <ZapIcon />
+          </div>
+          <div className="title-section">
+            <h2>🏆 Race Game</h2>
+            <p className="subtitle">
+              Join high-speed blockchain racing with dynamic rewards
+            </p>
+          </div>
+        </div>
+
+        <div className="header-badges">
+          <div className="badge race-badge">RACE</div>
+          {gameToken.data && (
+            <>
+              <div className="badge tier-badge">
                 {getLevelDisplayName(currentTier)} TIER
-              </span>
-              <span
-                className="token-badge"
-                style={{
-                  backgroundColor: '#2d3748',
-                  color: '#90cdf4',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  fontSize: '0.7em',
-                  fontWeight: 'bold',
-                  border: '1px solid #4a5568',
-                  marginLeft: '6px',
-                }}
-              >
+              </div>
+              <div className="badge token-badge">
                 {gameToken.data.tokenSymbol}
-              </span>
-            </div>
+              </div>
+            </>
           )}
         </div>
       </div>
 
+      {/* Content */}
       <div className="race-content">
-        {/* 游戏状态 */}
+        {/* Game Status */}
         <div className="game-status">
-          <div className="status-indicator">
+          <div className="status-info">
             <span
               className={`status-dot ${gameState.getGameStatusColor()}`}
             ></span>
@@ -470,418 +600,139 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {gameState.gameId !== null && gameState.gameId !== undefined && (
-              <div
-                className="game-id"
-                style={{
-                  backgroundColor: '#2d3748',
-                  color: '#90cdf4',
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  fontSize: '0.85em',
-                  fontWeight: 'bold',
-                  border: '1px solid #4a5568',
-                }}
-              >
-                Game #{gameState.gameId}
-                {gameToken.data && (
-                  <span
-                    style={{
-                      fontSize: '0.8em',
-                      color: '#a0aec0',
-                      marginLeft: '4px',
-                      fontWeight: 'normal',
-                    }}
-                  >
-                    (
-                    {gameToken.data.retrievalMethod ===
-                    'on-chain-dynamic-enhanced'
-                      ? '🔗 Enhanced'
-                      : gameToken.data.retrievalMethod === 'on-chain-dynamic'
-                        ? '🔗 On-chain'
-                        : '⚙️ Config'}
-                    )
-                  </span>
-                )}
-              </div>
-            )}
-            <button
-              onClick={() => {
-                // Debounce refresh button clicks to prevent spam
-                const now = Date.now();
-                if (now - lastRefreshTime < 2000) return; // 2 second debounce
-                setLastRefreshTime(now);
+          <button
+            onClick={() => {
+              const now = Date.now();
+              if (now - lastRefreshTime < 2000) return;
+              setLastRefreshTime(now);
 
-                // 🔧 修复：直接调用方法，不使用回调函数
-                Promise.allSettled([
-                  gameState.refreshGameData(),
-                  gameToken.refetch(),
-                  tierPricing.refetch(),
-                  ...(isConnected && address
-                    ? [playerData.refreshPlayerData(), dynamicBalance.refetch()]
-                    : []),
-                ]).catch((error) => {
-                  console.warn('Manual refresh failed:', error);
-                });
-              }}
-              className="race-btn race-btn-secondary"
-              style={{ fontSize: '12px', padding: '4px 8px' }}
-            >
-              🔄 Refresh All
-            </button>
-          </div>
+              Promise.allSettled([
+                gameState.refreshGameData(),
+                gameToken.refetch(),
+                tierPricing.refetch(),
+                ...(isConnected && address
+                  ? [playerData.refreshPlayerData(), dynamicBalance.refetch()]
+                  : []),
+              ]).catch((error) => {
+                console.warn('Manual refresh failed:', error);
+              });
+            }}
+            className="refresh-button"
+          >
+            <RefreshIcon />
+            Refresh
+          </button>
         </div>
 
-        {/* 游戏信息 - 使用动态token和tier信息 */}
+        {/* Stats Grid - Clean 4-column layout */}
         {gameState.isRaceServer && gameToken.data && (
-          <div className="game-info">
-            <div className="info-grid">
-              <div className="info-item">
-                <label>🎯 Game ID</label>
-                <span
-                  style={{
-                    fontWeight: 'bold',
-                    color: '#90cdf4',
-                    fontSize: '1.1em',
-                  }}
-                >
-                  #{gameState.gameId || 'Loading...'}
-                </span>
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-icon prize">
+                <TrophyIcon />
               </div>
-              <div className="info-item tier-highlight">
-                <label>⚡ Game Tier</label>
-                <div className="tier-display">
-                  <span
-                    className="tier-name"
-                    style={{
-                      color: getLevelDisplayColor(currentTier),
-                      fontWeight: 'bold',
-                      fontSize: '1.1em',
-                      textShadow: '0 1px 2px rgba(0,0,0,0.3)',
-                    }}
-                  >
-                    {tierPricing.data?.tierName ||
-                      getLevelDisplayName(currentTier)}
-                  </span>
-                  <span
-                    className="tier-level"
-                    style={{
-                      fontSize: '0.8em',
-                      marginLeft: '6px',
-                      color: '#9ca3af',
-                      fontWeight: 'normal',
-                    }}
-                  >
-                    ({currentTier})
-                  </span>
-                </div>
-                <div
-                  className="tier-level-range"
-                  style={{
-                    fontSize: '0.75em',
-                    color: '#6b7280',
-                    marginTop: '2px',
-                  }}
-                >
-                  Level{' '}
-                  {tierPricing.data
-                    ? `${tierPricing.data.minLevel}-${tierPricing.data.maxLevel}`
-                    : '---'}
-                </div>
-              </div>
-              <div className="info-item">
-                <label>💰 Payment Token</label>
-                <span style={{ fontWeight: 'bold' }}>
-                  {gameToken.data.tokenSymbol}
-                  <span
-                    style={{
-                      fontSize: '0.8em',
-                      color: '#888',
-                      marginLeft: '4px',
-                    }}
-                  >
-                    (
-                    {gameToken.data.retrievalMethod?.includes('enhanced')
-                      ? '🔗 Enhanced'
-                      : gameToken.data.retrievalMethod?.includes('on-chain')
-                        ? '🔗 On-chain'
-                        : '⚙️ Config'}
-                    )
-                  </span>
-                </span>
-              </div>
-              <div className="info-item entry-fee-highlight">
-                <label>🎫 Entry Fee</label>
-                <div className="fee-display">
-                  <span
-                    className="fee-amount"
-                    style={{
-                      fontWeight: 'bold',
-                      color: '#fbbf24',
-                      fontSize: '1.15em',
-                      textShadow: '0 1px 2px rgba(0,0,0,0.3)',
-                    }}
-                  >
-                    {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}
-                  </span>
-                  <span
-                    className="fee-token"
-                    style={{
-                      fontWeight: 'bold',
-                      color: '#e5e7eb',
-                      fontSize: '0.9em',
-                      marginLeft: '4px',
-                    }}
-                  >
-                    {gameToken.data.tokenSymbol}
-                  </span>
-                </div>
-                <div
-                  className="fee-tier-info"
-                  style={{
-                    fontSize: '0.75em',
-                    color: '#9ca3af',
-                    marginTop: '2px',
-                    fontStyle: 'italic',
-                  }}
-                >
-                  {getLevelDisplayName(currentTier)} tier pricing
-                </div>
-              </div>
-              <div className="info-item">
-                <label>🏆 Kill Reward</label>
-                <span
-                  style={{
-                    fontWeight: 'bold',
-                    color: '#10b981',
-                  }}
-                >
-                  {tierPricing.data
-                    ? (
-                        Number(tierPricing.data.killReward) / LAMPORTS_PER_SOL
-                      ).toFixed(4)
-                    : '---'}{' '}
-                  {gameToken.data.tokenSymbol}
-                </span>
-              </div>
-              <div className="info-item">
-                <label>📊 Level Range</label>
-                <span>
-                  {tierPricing.data
-                    ? `${tierPricing.data.minLevel}-${tierPricing.data.maxLevel}`
-                    : '---'}
-                </span>
-              </div>
-              <div className="info-item">
-                <label>👥 Players</label>
-                <span>
-                  <span style={{ color: '#10b981', fontWeight: 'bold' }}>
-                    {gameState.gameState.registeredCount}
-                  </span>
-                  {' joined • '}
-                  <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>
-                    {gameState.gameState.playerCount}
-                  </span>
-                  {' active'}
-                </span>
-              </div>
-              <div className="info-item">
-                <label>🪙 Token Mint</label>
-                <span
-                  style={{
-                    fontSize: '0.8em',
-                    fontFamily: 'monospace',
-                    backgroundColor: '#2d3748',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    color: '#e2e8f0',
-                  }}
-                >
-                  {gameToken.data.tokenMint.slice(0, 8)}...
-                  {gameToken.data.tokenMint.slice(-4)}
-                </span>
+              <div className="stat-label">Prize Pool</div>
+              <div className="stat-value">
+                {(
+                  (Number(entryFeeAmount) *
+                    gameState.gameState.registeredCount) /
+                  LAMPORTS_PER_SOL
+                ).toFixed(4)}{' '}
+                {gameToken.data.tokenSymbol}
               </div>
             </div>
-            {tierPricing.data && (
-              <div
-                className="tier-description"
-                style={{
-                  fontSize: '0.85em',
-                  color: '#666',
-                  marginTop: '12px',
-                  padding: '8px',
-                  backgroundColor: '#f8f9fa',
-                  borderRadius: '6px',
-                  fontStyle: 'italic',
-                  border: '1px solid #e9ecef',
-                }}
-              >
-                💡 {tierPricing.data.description}
+
+            <div className="stat-card">
+              <div className="stat-icon users">
+                <UsersIcon />
               </div>
-            )}
+              <div className="stat-label">Players</div>
+              <div className="stat-value">
+                {gameState.gameState.registeredCount}/
+                {gameState.gameState.playerCount}
+              </div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-icon time">
+                <ClockIcon />
+              </div>
+              <div className="stat-label">Entry Fee</div>
+              <div className="stat-value">
+                {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}{' '}
+                {gameToken.data.tokenSymbol}
+              </div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-icon level">
+                <ZapIcon />
+              </div>
+              <div className="stat-label">Game ID</div>
+              <div className="stat-value">
+                #{gameState.gameId || 'Loading...'}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* 玩家钱包信息 - 使用动态token balance */}
+        {/* Wallet Section - Simplified Design */}
         {isConnected && (
-          <div className="wallet-info">
-            <div
-              className="wallet-header"
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '8px',
-              }}
-            >
-              <span style={{ fontWeight: 'bold' }}>
-                🔑 Wallet: {address?.slice(0, 6)}...{address?.slice(-4)}
+          <div className="wallet-section">
+            <div className="wallet-header">
+              <WalletIcon />
+              <span className="wallet-title">Your Wallet</span>
+              <span className="wallet-address">
+                {address?.slice(0, 6)}...{address?.slice(-4)}
               </span>
-              {gameToken.data && (
-                <span
-                  style={{
-                    fontSize: '0.8em',
-                    color: '#888',
-                    padding: '2px 6px',
-                    backgroundColor: '#f1f5f9',
-                    borderRadius: '4px',
-                  }}
-                >
-                  {gameToken.data.tokenSymbol} Game
-                </span>
-              )}
             </div>
-            <div
-              className="balance-info"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr',
-                gap: '6px',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '8px',
-                  backgroundColor: '#f8fafc',
-                  borderRadius: '6px',
-                  border: '1px solid #e2e8f0',
-                }}
-              >
-                <span style={{ fontWeight: 'bold' }}>
-                  💰 {gameToken.data?.tokenSymbol || 'Token'} Balance:
-                </span>
+
+            <div className="balance-grid">
+              <div className="balance-item">
+                <span className="balance-label">Balance</span>
                 <span
-                  style={{
-                    fontWeight: 'bold',
-                    color: hasSufficientBalance ? '#10b981' : '#ef4444',
-                    fontSize: '1.05em',
-                    transition: 'color 0.2s ease',
-                  }}
+                  className={`balance-value ${hasSufficientBalance ? 'sufficient' : 'insufficient'}`}
                 >
-                  {dynamicBalance.isLoading ? (
-                    <span style={{ opacity: 0.7 }}>⏳ Loading...</span>
-                  ) : (
-                    <span>
-                      {(
-                        Number(dynamicBalance.data || BigInt(0)) /
-                        LAMPORTS_PER_SOL
-                      ).toFixed(4)}{' '}
-                      {gameToken.data?.tokenSymbol || ''}
-                    </span>
-                  )}
+                  {dynamicBalance.isLoading
+                    ? 'Loading...'
+                    : `${(Number(dynamicBalance.data || BigInt(0)) / LAMPORTS_PER_SOL).toFixed(4)} ${gameToken.data?.tokenSymbol || ''}`}
                 </span>
               </div>
-              {gameToken.data && (
-                <div
-                  style={{
-                    fontSize: '0.8em',
-                    color: '#64748b',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <span>🪙 Token Mint:</span>
-                  <span
-                    style={{
-                      fontFamily: 'monospace',
-                      backgroundColor: '#e2e8f0',
-                      padding: '2px 4px',
-                      borderRadius: '3px',
-                    }}
-                  >
-                    {gameToken.data.tokenMint.slice(0, 8)}...
-                    {gameToken.data.tokenMint.slice(-4)}
-                  </span>
-                </div>
-              )}
-              {!hasSufficientBalance && gameToken.data && (
-                <div
-                  style={{
-                    fontSize: '0.8em',
-                    color: '#dc2626',
-                    backgroundColor: '#fef2f2',
-                    padding: '6px',
-                    borderRadius: '4px',
-                    border: '1px solid #fecaca',
-                  }}
-                >
-                  ⚠️ Insufficient balance! Need at least{' '}
+
+              <div className="balance-item">
+                <span className="balance-label">Required</span>
+                <span className="balance-value">
                   {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}{' '}
-                  {gameToken.data.tokenSymbol}
-                </div>
-              )}
-            </div>
-            {gameToken.isLoading && (
-              <div
-                className="loading-hint"
-                style={{
-                  fontSize: '12px',
-                  color: '#888',
-                  marginTop: '6px',
-                  padding: '4px',
-                  backgroundColor: '#f0f9ff',
-                  borderRadius: '4px',
-                  border: '1px solid #bae6fd',
-                  opacity: 0.8,
-                  transition: 'opacity 0.3s ease',
-                }}
-              >
-                🎯 Loading game token information...
+                  {gameToken.data?.tokenSymbol || ''}
+                </span>
               </div>
-            )}
-            {(gameToken.isLoading || tierPricing.isLoading) && (
-              <div
-                className="loading-hint"
-                style={{
-                  fontSize: '12px',
-                  color: '#888',
-                  marginTop: '4px',
-                  padding: '4px',
-                  backgroundColor: '#f0f9ff',
-                  borderRadius: '4px',
-                  border: '1px solid #bae6fd',
-                  opacity: 0.8,
-                  transition: 'opacity 0.3s ease',
-                }}
-              >
-                💡 Fetching dynamic pricing and balance...
+            </div>
+
+            {!hasSufficientBalance && gameToken.data && (
+              <div className="insufficient-warning">
+                <WarningIcon />
+                Insufficient balance! Need at least{' '}
+                {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}{' '}
+                {gameToken.data.tokenSymbol}
               </div>
             )}
           </div>
         )}
 
-        {/* 错误信息 - 包含动态token获取错误 */}
+        {/* Loading States */}
+        {(gameToken.isLoading || tierPricing.isLoading) && (
+          <div className="loading-state">
+            🎯 Loading game token information and pricing...
+          </div>
+        )}
+
+        {/* Error States */}
         {(gameState.error ||
           playerData.error ||
           gameToken.error ||
           tierPricing.error ||
           dynamicBalance.error) && (
-          <div className="error-message">
+          <div className="error-state">
             {String(
               gameState.error ||
                 playerData.error ||
@@ -892,7 +743,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
           </div>
         )}
 
-        {/* 交易状态 - 更新为支持动态token */}
+        {/* Transaction Status */}
         {txStep !== 'idle' && (
           <div className="tx-status">
             {txStep === 'approving' &&
@@ -904,9 +755,10 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
         )}
       </div>
 
+      {/* Actions */}
       <div className="race-actions">
         {getActionButton()}
-        <button className="race-btn race-btn-secondary" onClick={onClose}>
+        <button className="race-btn secondary" onClick={onClose}>
           Cancel
         </button>
       </div>
