@@ -210,26 +210,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     dynamicBalance.data && dynamicBalance.data >= entryFeeAmount;
   const needsApproval = !gameToken.data?.isSOL && !hasSufficientBalance; // Only for non-SOL tokens
 
-  // 🔧 修复：移除不稳定的回调依赖，直接使用原始方法
-  // 这些函数现在是稳定的，不会因为对象引用变化而重新创建
-  const refreshGameData = useCallback(() => {
-    return gameState.refreshGameData();
-  }, []); // 移除 gameState 依赖
-
-  const refreshTokenData = useCallback(() => {
-    return Promise.allSettled([gameToken.refetch(), tierPricing.refetch()]);
-  }, []); // 移除 gameToken, tierPricing 依赖
-
-  const refreshWalletData = useCallback(() => {
-    if (isConnected && address) {
-      return Promise.allSettled([
-        playerData.refreshPlayerData(),
-        dynamicBalance.refetch(),
-      ]);
-    }
-    return Promise.resolve();
-  }, []); // 移除所有依赖，函数内部已经有条件检查
-
   // 🔧 修复：固定一次挂载执行，移除回调依赖
   useEffect(() => {
     let mounted = true;
@@ -555,7 +535,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       {/* Header - Clean and Modern */}
       <div className="race-header">
         <div className="header-content">
-          <div className="icon-container">
+          <div className="">
             <ZapIcon />
           </div>
           <div className="title-section">
@@ -615,7 +595,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             }}
             className="refresh-button"
           >
-            <RefreshIcon />
             Refresh
           </button>
         </div>
@@ -761,13 +740,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     </div>
   );
 
-  return (
-    <Modal
-      child={modalContent}
-      close={onClose}
-      className="race-game-modal-wrapper"
-    />
-  );
+  return <Modal child={modalContent} className="race-game-modal-wrapper" />;
 };
 
 export default RaceGameModal;

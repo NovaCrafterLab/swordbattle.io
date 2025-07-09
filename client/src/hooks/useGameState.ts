@@ -116,11 +116,32 @@ export const useGameState = (serverUrl?: string) => {
   const { data: gamePlayers, refetch: refetchPlayers } =
     blockchain.useGamePlayers(currentGameId || 0);
 
-  // 检查玩家是否已加入
-  const isPlayerJoined =
-    address && gamePlayers && Array.isArray(gamePlayers)
+  // 检查玩家是否已加入 - 使用 useMemo 优化性能
+  const isPlayerJoined = useMemo(() => {
+    return address && gamePlayers && Array.isArray(gamePlayers)
       ? gamePlayers.includes(address)
       : false;
+  }, [address, gamePlayers]);
+
+  // —— 用 useMemo 提取最细粒度的标量依赖 ——
+
+  // 2) 服务器状态：只要 phase 即可
+  const serverPhase = serverInfo?.gameStatus?.phase;
+
+  // 3) 玩家列表长度
+  const registeredCount = useMemo(() => {
+    return Array.isArray(gamePlayers) ? gamePlayers.length : 0;
+  }, [gamePlayers]);
+
+  // 4) 入场费 - 转换为 BigInt
+  const entryFeeBigInt = useMemo(() => {
+    return typeof entryFee === 'bigint'
+      ? entryFee
+      : BigInt(String(entryFee || 0));
+  }, [entryFee]);
+
+  // 5) 服务器玩家数量
+  const serverPlayerCount = serverInfo?.playerCnt || 0;
 
   /**
    * 获取服务器信息 - 优化为减少重复调用
@@ -153,54 +174,6 @@ export const useGameState = (serverUrl?: string) => {
       setIsLoading(false);
     }
   }, [serverUrl]);
-
-  /**
-   * 更新游戏状态
-   */
-  const updateGameState = useCallback(() => {
-    // 只有当有有效的gameId时才更新状态
-    if (!currentGameId || currentGameId <= 0) return;
-
-    const playersArray = Array.isArray(gamePlayers) ? gamePlayers : [];
-    const entryFeeBigInt =
-      typeof entryFee === 'bigint' ? entryFee : BigInt(String(entryFee || 0));
-
-    // 简化状态逻辑：主要依赖服务器数据
-    const phase: GamePhase = (() => {
-      if (serverInfo?.gameStatus?.phase) {
-        return serverInfo.gameStatus.phase;
-      }
-      // 如果服务器连通且是比赛服务器，默认为等待状态
-      if (serverInfo?.isRaceServer && serverInfo?.blockchainEnabled) {
-        return 'waiting';
-      }
-      return 'initializing';
-    })();
-
-    const newGameState: GameState = {
-      gameId: currentGameId,
-      phase,
-      playerCount: serverInfo?.playerCnt || 0,
-      registeredCount: playersArray.length,
-      entryFee: entryFeeBigInt,
-      totalPrize: entryFeeBigInt * BigInt(playersArray.length),
-      isPlayerJoined,
-      canJoin: !isPlayerJoined && phase === 'waiting',
-      timeRemaining: 0, // TODO: 计算剩余时间
-      lastUpdated: Date.now(),
-    };
-
-    // 只在gameId真正变化时记录日志
-    setGameState((prev) => {
-      if (prev.gameId !== newGameState.gameId) {
-        logger.debug('🎮 GameId changed:', {
-          from: prev.gameId,
-          to: newGameState.gameId,
-        });
-      }
-      return newGameState;
-    });
-  }, [currentGameId, serverInfo, gamePlayers, isPlayerJoined, entryFee]);
 
   /**
    * 刷新游戏数据 - 添加防抖机制防止频繁调用
@@ -330,12 +303,79 @@ export const useGameState = (serverUrl?: string) => {
         },
       );
     }
-  }, [serverUrl, refetchGameInfo, refetchPlayers]); // 添加refetch依赖但确保它们是稳定的
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 移除unstable refetch依赖
 
-  // 更新游戏状态 - 使用稳定的依赖项，避免过度更新
+  // —— Effect A：单纯同步 gameId ——
   useEffect(() => {
-    updateGameState();
-  }, [currentGameId, serverInfo, gamePlayers, isPlayerJoined, entryFee]); // 直接依赖数据而不是函数
+    if (!currentGameId) return;
+    setGameState((prev) => {
+      // 只更新 gameId，保留其它字段不变
+      if (prev.gameId === currentGameId) return prev;
+      logger.debug('🎮 GameId changed:', {
+        from: prev.gameId,
+        to: currentGameId,
+      });
+      return { ...prev, gameId: currentGameId };
+    });
+  }, [currentGameId]);
+
+  // —— Effect B：监听业务字段变化，带"值比较"守卫 ——
+  useEffect(() => {
+    if (!currentGameId) return; // 还没拿到 ID，就不更新
+
+    // 1) 决定 phase：优先用链上/服务端的 phase，否则如果是 race server 则默认 waiting
+    const phase: GamePhase = serverPhase
+      ? serverPhase
+      : isRaceServer
+        ? 'waiting'
+        : 'initializing';
+
+    // 2) 计算 canJoin
+    const canJoin = phase === 'waiting' && !isPlayerJoined;
+
+    // 3) 计算 totalPrize
+    const totalPrize = entryFeeBigInt * BigInt(registeredCount);
+
+    // 4) 构造下一版 state
+    const nextState: GameState = {
+      gameId: currentGameId,
+      phase,
+      playerCount: serverPlayerCount,
+      registeredCount,
+      entryFee: entryFeeBigInt,
+      totalPrize,
+      isPlayerJoined,
+      canJoin,
+      timeRemaining: 0, // 先保留原样 / TODO
+      lastUpdated: Date.now(),
+    };
+
+    // 5) 只有当关键字段真的变了，才 setState
+    setGameState((prev) => {
+      const noChange =
+        prev.phase === nextState.phase &&
+        prev.registeredCount === nextState.registeredCount &&
+        prev.entryFee === nextState.entryFee &&
+        prev.totalPrize === nextState.totalPrize &&
+        prev.isPlayerJoined === nextState.isPlayerJoined &&
+        prev.canJoin === nextState.canJoin &&
+        prev.playerCount === nextState.playerCount;
+
+      if (noChange) {
+        return prev; // 同一个引用，不会触发重新渲染
+      }
+      return nextState;
+    });
+  }, [
+    currentGameId,
+    serverPhase,
+    isRaceServer,
+    registeredCount,
+    entryFeeBigInt,
+    isPlayerJoined,
+    serverPlayerCount,
+  ]);
 
   return {
     gameState,
