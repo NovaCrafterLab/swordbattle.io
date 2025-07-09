@@ -151,16 +151,93 @@ function registerPublicRoutes(app, game) {
   // Ping
   app.options('/ping', setCors);
   app.get('/ping', (res) => {
-    setCors(res);
-    res.writeHeader('Content-Type', 'text/plain').end('pong');
+    let hasResponded = false;
+
+    // 超时保护
+    const timeout = setTimeout(() => {
+      if (!hasResponded) {
+        hasResponded = true;
+        console.error('Ping request timeout - forcing response');
+        try {
+          res.writeStatus('500 Internal Server Error').end('timeout');
+        } catch (e) {
+          console.error('Failed to send timeout response:', e);
+        }
+      }
+    }, 5000); // 5秒超时
+
+    try {
+      setCors(res);
+
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeHeader('Content-Type', 'text/plain').end('pong');
+      }
+    } catch (error) {
+      console.error('Error in ping request:', error);
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        try {
+          res.writeStatus('500 Internal Server Error').end('error');
+        } catch (resError) {
+          console.error('Failed to send error response:', resError);
+        }
+      }
+    }
   });
 
   // Server info
   app.get('/serverinfo', (res) => {
-    setCors(res);
-    res
-      .writeHeader('Content-Type', 'application/json')
-      .end(JSON.stringify(buildServerInfo(game)));
+    let hasResponded = false;
+
+    // 超时保护
+    const timeout = setTimeout(() => {
+      if (!hasResponded) {
+        hasResponded = true;
+        console.error('Serverinfo request timeout - forcing response');
+        try {
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
+              error: 'Request timeout',
+            }),
+          );
+        } catch (e) {
+          console.error('Failed to send timeout response:', e);
+        }
+      }
+    }, 5000); // 5秒超时
+
+    try {
+      setCors(res);
+
+      const serverInfo = buildServerInfo(game);
+
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res
+          .writeHeader('Content-Type', 'application/json')
+          .end(JSON.stringify(serverInfo));
+      }
+    } catch (error) {
+      console.error('Error in serverinfo request:', error);
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        try {
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
+              error: 'Internal server error',
+              details: error.message,
+            }),
+          );
+        } catch (resError) {
+          console.error('Failed to send error response:', resError);
+        }
+      }
+    }
   });
 
   // Vault API endpoints for Solana integration
@@ -334,6 +411,26 @@ function buildServerInfo(game) {
 }
 
 async function handleEndGameRequest(res, game) {
+  let hasResponded = false;
+
+  // 超时保护
+  const timeout = setTimeout(() => {
+    if (!hasResponded) {
+      hasResponded = true;
+      console.error('End game request timeout - forcing response');
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Request timeout',
+          }),
+        );
+      } catch (e) {
+        console.error('Failed to send timeout response:', e);
+      }
+    }
+  }, 10000); // 10秒超时
+
   try {
     const phase = game.gamePhase;
     const gameId = game.solanaGameId ? Number(game.solanaGameId) : null;
@@ -343,48 +440,88 @@ async function handleEndGameRequest(res, game) {
     if (phase === 'active' || phase === 'waiting') {
       game.endSolanaGame('admin_manual').catch(console.error);
 
-      res.writeStatus('200 OK').end(
-        JSON.stringify({
-          success: true,
-          message: 'Game end command sent',
-          gameId,
-          currentPhase: phase,
-          note: 'Game ending process started asynchronously',
-        }),
-      );
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('200 OK').end(
+          JSON.stringify({
+            success: true,
+            message: 'Game end command sent',
+            gameId,
+            currentPhase: phase,
+            note: 'Game ending process started asynchronously',
+          }),
+        );
+      }
     } else {
-      res.writeStatus('400 Bad Request').end(
-        JSON.stringify({
-          success: false,
-          error: `Cannot end game in phase: ${phase}`,
-          gameId,
-          suggestion: suggestForPhase(phase),
-        }),
-      );
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('400 Bad Request').end(
+          JSON.stringify({
+            success: false,
+            error: `Cannot end game in phase: ${phase}`,
+            gameId,
+            suggestion: suggestForPhase(phase),
+          }),
+        );
+      }
     }
   } catch (err) {
     console.error('Admin endgame error:', err);
-    res.writeStatus('500 Internal Server Error').end(
-      JSON.stringify({
-        success: false,
-        error: 'Internal server error',
-        details: err.message,
-      }),
-    );
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Internal server error',
+            details: err.message,
+          }),
+        );
+      } catch (resError) {
+        console.error('Failed to send error response:', resError);
+      }
+    }
   }
 }
 
 async function handleRestartRequest(res, req, game) {
+  let hasResponded = false;
+
+  // 超时保护
+  const timeout = setTimeout(() => {
+    if (!hasResponded) {
+      hasResponded = true;
+      console.error('Restart request timeout - forcing response');
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Request timeout',
+          }),
+        );
+      } catch (e) {
+        console.error('Failed to send timeout response:', e);
+      }
+    }
+  }, 10000); // 10秒超时
+
   try {
     if (
       req.getHeader('authorization') !== `Bearer ${config.moderationSecret}`
     ) {
-      res.writeStatus('401 Unauthorized').end(
-        JSON.stringify({
-          success: false,
-          error: 'Unauthorized',
-        }),
-      );
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('401 Unauthorized').end(
+          JSON.stringify({
+            success: false,
+            error: 'Unauthorized',
+          }),
+        );
+      }
       return;
     }
 
@@ -412,124 +549,232 @@ async function handleRestartRequest(res, req, game) {
       }
     }, 2000);
 
-    res.writeStatus('200 OK').end(
-      JSON.stringify({
-        success: true,
-        message: 'Game restarted successfully',
-      }),
-    );
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      res.writeStatus('200 OK').end(
+        JSON.stringify({
+          success: true,
+          message: 'Game restarted successfully',
+        }),
+      );
+    }
   } catch (err) {
     console.error('Admin restart error:', err);
-    res.writeStatus('500 Internal Server Error').end(
-      JSON.stringify({
-        success: false,
-        error: 'Internal server error',
-      }),
-    );
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Internal server error',
+          }),
+        );
+      } catch (resError) {
+        console.error('Failed to send error response:', resError);
+      }
+    }
   }
 }
 
 // Solana service status handler
 async function handleSolanaStatusRequest(res, game) {
+  let hasResponded = false;
+
+  // 超时保护
+  const timeout = setTimeout(() => {
+    if (!hasResponded) {
+      hasResponded = true;
+      console.error('Solana status request timeout - forcing response');
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Request timeout',
+          }),
+        );
+      } catch (e) {
+        console.error('Failed to send timeout response:', e);
+      }
+    }
+  }, 10000); // 10秒超时
+
   try {
     if (!game.solanaVaultService) {
-      res.writeStatus('400 Bad Request').end(
-        JSON.stringify({
-          success: false,
-          error: 'Solana vault service not available',
-        }),
-      );
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('400 Bad Request').end(
+          JSON.stringify({
+            success: false,
+            error: 'Solana vault service not available',
+          }),
+        );
+      }
       return;
     }
 
     const status = game.solanaVaultService.getStatus();
     const isConnected = await game.solanaVaultService.isConnected();
 
-    res.end(
-      JSON.stringify({
-        success: true,
-        connected: isConnected,
-        solanaStatus: status,
-      }),
-    );
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      res.end(
+        JSON.stringify({
+          success: true,
+          connected: isConnected,
+          solanaStatus: status,
+        }),
+      );
+    }
   } catch (error) {
     console.error('Error in Solana status request:', error);
-    res.writeStatus('500 Internal Server Error').end(
-      JSON.stringify({
-        success: false,
-        error: 'Internal server error',
-      }),
-    );
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Internal server error',
+          }),
+        );
+      } catch (resError) {
+        console.error('Failed to send error response:', resError);
+      }
+    }
   }
 }
 
 // Vault info handler with dynamic token information
 async function handleVaultInfoRequest(res, req, game) {
+  let hasResponded = false;
+
+  // 超时保护
+  const timeout = setTimeout(() => {
+    if (!hasResponded) {
+      hasResponded = true;
+      console.error('Vault info request timeout - forcing response');
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Request timeout',
+          }),
+        );
+      } catch (e) {
+        console.error('Failed to send timeout response:', e);
+      }
+    }
+  }, 10000); // 10秒超时
+
   try {
     const gameId = parseInt(req.getParameter(0));
 
     if (!game.solanaVaultService) {
-      res.writeStatus('400 Bad Request').end(
-        JSON.stringify({
-          success: false,
-          error: 'Solana vault service not available',
-        }),
-      );
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('400 Bad Request').end(
+          JSON.stringify({
+            success: false,
+            error: 'Solana vault service not available',
+          }),
+        );
+      }
       return;
     }
 
     // Get comprehensive game info including token details
     const gameInfo = await game.solanaVaultService.vaultSDK.getGameInfo(gameId);
 
-    res.end(
-      JSON.stringify({
-        success: true,
-        gameId: gameId,
-        vault: gameInfo.vault,
-        tokenMint: gameInfo.tokenMint.toString(),
-        tokenInfo: {
-          address: gameInfo.tokenMint.toString(),
-          isSOL:
-            gameInfo.tokenMint.toString() ===
-            'So11111111111111111111111111111112',
-          isUSDC:
-            gameInfo.tokenMint.toString() ===
-            'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
-        },
-        gameStatus: {
-          isActive: gameInfo.isActive,
-          canBuyTickets: gameInfo.canBuyTickets,
-          finalized: gameInfo.vault.finalized,
-          withdrawEnabled: gameInfo.vault.withdrawEnabled,
-        },
-        dynamicTokenRetrieval: true,
-      }),
-    );
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      res.end(
+        JSON.stringify({
+          success: true,
+          gameId: gameId,
+          vault: gameInfo.vault,
+          tokenMint: gameInfo.tokenMint.toString(),
+          tokenInfo: {
+            address: gameInfo.tokenMint.toString(),
+            isSOL:
+              gameInfo.tokenMint.toString() ===
+              'So11111111111111111111111111111112',
+            isUSDC:
+              gameInfo.tokenMint.toString() ===
+              'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
+          },
+          gameStatus: {
+            isActive: gameInfo.isActive,
+            canBuyTickets: gameInfo.canBuyTickets,
+            finalized: gameInfo.vault.finalized,
+            withdrawEnabled: gameInfo.vault.withdrawEnabled,
+          },
+          dynamicTokenRetrieval: true,
+        }),
+      );
+    }
   } catch (error) {
     console.error('Error in vault info request:', error);
-    res.writeStatus('500 Internal Server Error').end(
-      JSON.stringify({
-        success: false,
-        error: 'Failed to get vault info',
-        details: error.message,
-      }),
-    );
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Failed to get vault info',
+            details: error.message,
+          }),
+        );
+      } catch (resError) {
+        console.error('Failed to send error response:', resError);
+      }
+    }
   }
 }
 
 // Player ticket handler
 async function handlePlayerTicketRequest(res, req, game) {
+  let hasResponded = false;
+
+  // 超时保护
+  const timeout = setTimeout(() => {
+    if (!hasResponded) {
+      hasResponded = true;
+      console.error('Player ticket request timeout - forcing response');
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Request timeout',
+          }),
+        );
+      } catch (e) {
+        console.error('Failed to send timeout response:', e);
+      }
+    }
+  }, 10000); // 10秒超时
+
   try {
     const gameId = parseInt(req.getParameter(0));
     const playerAddress = req.getParameter(1);
 
     if (!game.solanaVaultService) {
-      res.writeStatus('400 Bad Request').end(
-        JSON.stringify({
-          success: false,
-          error: 'Solana vault service not available',
-        }),
-      );
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('400 Bad Request').end(
+          JSON.stringify({
+            success: false,
+            error: 'Solana vault service not available',
+          }),
+        );
+      }
       return;
     }
 
@@ -540,50 +785,112 @@ async function handlePlayerTicketRequest(res, req, game) {
       playerPubkey,
     );
 
-    res.end(
-      JSON.stringify({
-        success: true,
-        ticket: ticket,
-        hasTicket: !!ticket,
-      }),
-    );
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      res.end(
+        JSON.stringify({
+          success: true,
+          ticket: ticket,
+          hasTicket: !!ticket,
+        }),
+      );
+    }
   } catch (error) {
     console.error('Error in player ticket request:', error);
-    res.writeStatus('500 Internal Server Error').end(
-      JSON.stringify({
-        success: false,
-        error: 'Failed to get player ticket',
-      }),
-    );
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Failed to get player ticket',
+          }),
+        );
+      } catch (resError) {
+        console.error('Failed to send error response:', resError);
+      }
+    }
   }
 }
 
-// Buy ticket handler
+// Buy ticket handler - 修复请求处理器响应问题
 async function handleBuyTicketRequest(res, req, game) {
+  let hasResponded = false;
+
+  // 超时保护
+  const timeout = setTimeout(() => {
+    if (!hasResponded) {
+      hasResponded = true;
+      console.error('Buy ticket request timeout - forcing response');
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Request timeout',
+          }),
+        );
+      } catch (e) {
+        console.error('Failed to send timeout response:', e);
+      }
+    }
+  }, 15000); // 15秒超时
+
   try {
     if (!game.solanaVaultService) {
-      res.writeStatus('400 Bad Request').end(
-        JSON.stringify({
-          success: false,
-          error: 'Solana vault service not available',
-        }),
-      );
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('400 Bad Request').end(
+          JSON.stringify({
+            success: false,
+            error: 'Solana vault service not available',
+          }),
+        );
+      }
       return;
     }
 
     // Read request body
     let body = '';
     res.onData((chunk, isLast) => {
-      body += Buffer.from(chunk).toString();
-      if (isLast) {
-        try {
-          const data = JSON.parse(body);
-          processBuyTicketRequest(res, game, data);
-        } catch (parseError) {
-          res.writeStatus('400 Bad Request').end(
+      if (hasResponded) return;
+
+      try {
+        body += Buffer.from(chunk).toString();
+        if (isLast) {
+          try {
+            const data = JSON.parse(body);
+            processBuyTicketRequest(
+              res,
+              game,
+              data,
+              { hasResponded: false },
+              timeout,
+            );
+          } catch (parseError) {
+            if (!hasResponded) {
+              hasResponded = true;
+              clearTimeout(timeout);
+              res.writeStatus('400 Bad Request').end(
+                JSON.stringify({
+                  success: false,
+                  error: 'Invalid JSON',
+                }),
+              );
+            }
+          }
+        }
+      } catch (error) {
+        if (!hasResponded) {
+          hasResponded = true;
+          clearTimeout(timeout);
+          console.error('Error processing request data:', error);
+          res.writeStatus('500 Internal Server Error').end(
             JSON.stringify({
               success: false,
-              error: 'Invalid JSON',
+              error: 'Error processing request data',
             }),
           );
         }
@@ -591,21 +898,39 @@ async function handleBuyTicketRequest(res, req, game) {
     });
 
     res.onAborted(() => {
-      console.log('Buy ticket request aborted');
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        console.log('Buy ticket request aborted');
+      }
     });
   } catch (error) {
     console.error('Error in buy ticket request:', error);
-    res.writeStatus('500 Internal Server Error').end(
-      JSON.stringify({
-        success: false,
-        error: 'Internal server error',
-      }),
-    );
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Internal server error',
+          }),
+        );
+      } catch (resError) {
+        console.error('Failed to send error response:', resError);
+      }
+    }
   }
 }
 
-// Process buy ticket request with security validation
-async function processBuyTicketRequest(res, game, data) {
+// Process buy ticket request with security validation - 强化响应处理
+async function processBuyTicketRequest(
+  res,
+  game,
+  data,
+  responseState,
+  timeout,
+) {
   try {
     const {
       gameId,
@@ -617,24 +942,32 @@ async function processBuyTicketRequest(res, game, data) {
 
     // Basic input validation
     if (!gameId || !amount || !walletAddress) {
-      res.writeStatus('400 Bad Request').end(
-        JSON.stringify({
-          success: false,
-          error: 'Missing required fields: gameId, amount, walletAddress',
-        }),
-      );
+      if (!responseState.hasResponded) {
+        responseState.hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('400 Bad Request').end(
+          JSON.stringify({
+            success: false,
+            error: 'Missing required fields: gameId, amount, walletAddress',
+          }),
+        );
+      }
       return;
     }
 
     // Security validation using TierValidationMiddleware
     const rateLimit = TierValidationMiddleware.checkRateLimit(walletAddress);
     if (!rateLimit.isAllowed) {
-      res.writeStatus('429 Too Many Requests').end(
-        JSON.stringify({
-          success: false,
-          error: rateLimit.error,
-        }),
-      );
+      if (!responseState.hasResponded) {
+        responseState.hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('429 Too Many Requests').end(
+          JSON.stringify({
+            success: false,
+            error: rateLimit.error,
+          }),
+        );
+      }
       return;
     }
 
@@ -655,12 +988,16 @@ async function processBuyTicketRequest(res, game, data) {
         error: validation.error,
       });
 
-      res.writeStatus('400 Bad Request').end(
-        JSON.stringify({
-          success: false,
-          error: validation.error,
-        }),
-      );
+      if (!responseState.hasResponded) {
+        responseState.hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('400 Bad Request').end(
+          JSON.stringify({
+            success: false,
+            error: validation.error,
+          }),
+        );
+      }
       return;
     }
 
@@ -669,12 +1006,16 @@ async function processBuyTicketRequest(res, game, data) {
       !game.solanaGameId ||
       game.solanaGameId.toString() !== gameId.toString()
     ) {
-      res.writeStatus('400 Bad Request').end(
-        JSON.stringify({
-          success: false,
-          error: `Invalid game ID. Current active game: ${game.solanaGameId || 'none'}`,
-        }),
-      );
+      if (!responseState.hasResponded) {
+        responseState.hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('400 Bad Request').end(
+          JSON.stringify({
+            success: false,
+            error: `Invalid game ID. Current active game: ${game.solanaGameId || 'none'}`,
+          }),
+        );
+      }
       return;
     }
 
@@ -742,18 +1083,22 @@ async function processBuyTicketRequest(res, game, data) {
       `✅ Secure ticket purchased for ${walletAddress} in game ${gameId} (tier: ${tier}) - TX: ${txHash}`,
     );
 
-    res.end(
-      JSON.stringify({
-        success: true,
-        txHash: txHash,
-        gameId: gameId,
-        tier: tier,
-        amount: amount,
-        expectedAmount: expectedAmount,
-        walletAddress: walletAddress,
-        tierConfig: validation.tierConfig,
-      }),
-    );
+    if (!responseState.hasResponded) {
+      responseState.hasResponded = true;
+      clearTimeout(timeout);
+      res.end(
+        JSON.stringify({
+          success: true,
+          txHash: txHash,
+          gameId: gameId,
+          tier: tier,
+          amount: amount,
+          expectedAmount: expectedAmount,
+          walletAddress: walletAddress,
+          tierConfig: validation.tierConfig,
+        }),
+      );
+    }
   } catch (error) {
     console.error('Error processing buy ticket request:', error);
 
@@ -764,35 +1109,71 @@ async function processBuyTicketRequest(res, game, data) {
       error: error.message,
     });
 
-    res.writeStatus('500 Internal Server Error').end(
-      JSON.stringify({
-        success: false,
-        error: error.message || 'Failed to buy ticket',
-      }),
-    );
+    if (!responseState.hasResponded) {
+      responseState.hasResponded = true;
+      clearTimeout(timeout);
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: error.message || 'Failed to buy ticket',
+          }),
+        );
+      } catch (resError) {
+        console.error('Failed to send error response:', resError);
+      }
+    }
   }
 }
 
-// Current game token info handler
+// Current game token info handler - 强化错误处理
 async function handleCurrentGameTokenRequest(res, req, game) {
+  let hasResponded = false;
+
+  // 超时保护
+  const timeout = setTimeout(() => {
+    if (!hasResponded) {
+      hasResponded = true;
+      console.error('Token request timeout - forcing response');
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Request timeout',
+          }),
+        );
+      } catch (e) {
+        console.error('Failed to send timeout response:', e);
+      }
+    }
+  }, 10000); // 10秒超时
+
   try {
     if (!game.solanaVaultService) {
-      res.writeStatus('400 Bad Request').end(
-        JSON.stringify({
-          success: false,
-          error: 'Solana vault service not available',
-        }),
-      );
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('400 Bad Request').end(
+          JSON.stringify({
+            success: false,
+            error: 'Solana vault service not available',
+          }),
+        );
+      }
       return;
     }
 
     if (!game.solanaGameId) {
-      res.writeStatus('404 Not Found').end(
-        JSON.stringify({
-          success: false,
-          error: 'No active game found',
-        }),
-      );
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('404 Not Found').end(
+          JSON.stringify({
+            success: false,
+            error: 'No active game found',
+          }),
+        );
+      }
       return;
     }
 
@@ -800,8 +1181,10 @@ async function handleCurrentGameTokenRequest(res, req, game) {
       // Use our new convenient methods for getting comprehensive token info
       const tokenInfo = await game.getCurrentGameTokenInfo();
 
-      if (tokenInfo) {
+      if (tokenInfo && !hasResponded) {
         // Success - got token info using new methods
+        hasResponded = true;
+        clearTimeout(timeout);
         res.end(
           JSON.stringify({
             success: true,
@@ -827,10 +1210,15 @@ async function handleCurrentGameTokenRequest(res, req, game) {
             serverFallback: config.solana.tokenMint,
           }),
         );
-      } else {
+        return;
+      }
+
+      if (!hasResponded) {
         throw new Error('Failed to get token info using enhanced methods');
       }
     } catch (error) {
+      if (hasResponded) return;
+
       // Fallback to direct VaultSDK methods if our enhanced methods fail
       Logger.server.warn(
         'Enhanced token methods failed, trying direct VaultSDK',
@@ -850,31 +1238,37 @@ async function handleCurrentGameTokenRequest(res, req, game) {
           parseInt(game.solanaGameId),
         );
 
-        res.end(
-          JSON.stringify({
-            success: true,
-            currentGameId: game.solanaGameId,
-            tokenMint: tokenMint.toString(),
-            tokenInfo: {
-              address: tokenMint.toString(),
-              isSOL:
-                tokenMint.toString() === 'So11111111111111111111111111111112',
-              isUSDC:
-                tokenMint.toString() ===
-                'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
-              isWSol:
-                tokenMint.toString() === 'So11111111111111111111111111111112',
-            },
-            gameStatus: {
-              isActive: gameInfo.isActive,
-              canBuyTickets: gameInfo.canBuyTickets,
-              tier: game.gameTier || 'low',
-            },
-            retrievalMethod: 'on-chain-dynamic-direct',
-            serverFallback: config.solana.tokenMint,
-          }),
-        );
+        if (!hasResponded) {
+          hasResponded = true;
+          clearTimeout(timeout);
+          res.end(
+            JSON.stringify({
+              success: true,
+              currentGameId: game.solanaGameId,
+              tokenMint: tokenMint.toString(),
+              tokenInfo: {
+                address: tokenMint.toString(),
+                isSOL:
+                  tokenMint.toString() === 'So11111111111111111111111111111112',
+                isUSDC:
+                  tokenMint.toString() ===
+                  'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
+                isWSol:
+                  tokenMint.toString() === 'So11111111111111111111111111111112',
+              },
+              gameStatus: {
+                isActive: gameInfo.isActive,
+                canBuyTickets: gameInfo.canBuyTickets,
+                tier: game.gameTier || 'low',
+              },
+              retrievalMethod: 'on-chain-dynamic-direct',
+              serverFallback: config.solana.tokenMint,
+            }),
+          );
+        }
       } catch (directError) {
+        if (hasResponded) return;
+
         // Final fallback to server configuration
         Logger.server.warn('All on-chain methods failed, using server config', {
           gameId: game.solanaGameId,
@@ -882,42 +1276,54 @@ async function handleCurrentGameTokenRequest(res, req, game) {
           directError: directError.message,
         });
 
-        res.end(
-          JSON.stringify({
-            success: true,
-            currentGameId: game.solanaGameId,
-            tokenMint: config.solana.tokenMint,
-            tokenInfo: {
-              address: config.solana.tokenMint,
-              isSOL:
-                config.solana.tokenMint ===
-                'So11111111111111111111111111111112',
-              isUSDC:
-                config.solana.tokenMint ===
-                'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
-              isWSol:
-                config.solana.tokenMint ===
-                'So11111111111111111111111111111112',
-            },
-            gameStatus: {
-              tier: game.gameTier || 'low',
-            },
-            retrievalMethod: 'server-config-fallback',
-            enhancedError: error.message,
-            directError: directError.message,
-          }),
-        );
+        if (!hasResponded) {
+          hasResponded = true;
+          clearTimeout(timeout);
+          res.end(
+            JSON.stringify({
+              success: true,
+              currentGameId: game.solanaGameId,
+              tokenMint: config.solana.tokenMint,
+              tokenInfo: {
+                address: config.solana.tokenMint,
+                isSOL:
+                  config.solana.tokenMint ===
+                  'So11111111111111111111111111111112',
+                isUSDC:
+                  config.solana.tokenMint ===
+                  'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
+                isWSol:
+                  config.solana.tokenMint ===
+                  'So11111111111111111111111111111112',
+              },
+              gameStatus: {
+                tier: game.gameTier || 'low',
+              },
+              retrievalMethod: 'server-config-fallback',
+              enhancedError: error.message,
+              directError: directError.message,
+            }),
+          );
+        }
       }
     }
   } catch (error) {
     console.error('Error in current game token request:', error);
-    res.writeStatus('500 Internal Server Error').end(
-      JSON.stringify({
-        success: false,
-        error: 'Failed to get current game token info',
-        details: error.message,
-      }),
-    );
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Failed to get current game token info',
+            details: error.message,
+          }),
+        );
+      } catch (resError) {
+        console.error('Failed to send error response:', resError);
+      }
+    }
   }
 }
 

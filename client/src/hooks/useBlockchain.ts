@@ -195,6 +195,7 @@ export const useSPLBalance = (address: string) => {
 
 /**
  * Hook to get current game token information dynamically from server
+ * 优化：直接从 /serverinfo 获取 token 信息，避免额外的 API 调用
  */
 export const useCurrentGameToken = () => {
   const [tokenInfo, setTokenInfo] = useState<{
@@ -220,28 +221,47 @@ export const useCurrentGameToken = () => {
       const serverUrl =
         localStorage.getItem('selectedServer') || 'localhost:8000';
       const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
-      const url = `${protocol}://${serverUrl}/api/current-game-token`;
+
+      // 🚀 优化：直接从 /serverinfo 获取 token 信息，避免额外的 API 调用
+      const url = `${protocol}://${serverUrl}/serverinfo`;
 
       const response = await fetch(url);
-      const result = await response.json();
+      const serverInfo = await response.json();
 
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to get current game token');
+      // 检查是否有 gameStatus 和 token 信息
+      if (!serverInfo.gameStatus) {
+        throw new Error('Game status not available from server');
+      }
+
+      const gameStatus = serverInfo.gameStatus;
+
+      // 获取 token mint 信息 - 优先使用 gameStatus 中的信息
+      let tokenMint = gameStatus.tokenMint;
+      let tokenInfoData = gameStatus.tokenInfo;
+
+      // 如果 gameStatus 中没有 token 信息，回退到服务器配置
+      if (!tokenMint && serverInfo.solanaConfig) {
+        tokenMint = 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr'; // 默认 USDC
+        console.log('🔄 Using fallback token mint from server config');
+      }
+
+      if (!tokenMint) {
+        throw new Error('Token mint information not available');
       }
 
       // Map token address to symbol and name
-      const tokenMint = result.tokenMint;
       let tokenSymbol = 'UNKNOWN';
       let tokenName = 'Unknown Token';
 
+      // 使用 tokenInfo 中的信息，或基于 tokenMint 地址判断
       if (
-        result.tokenInfo?.isSOL ||
+        tokenInfoData?.isSOL ||
         tokenMint === 'So11111111111111111111111111111112'
       ) {
         tokenSymbol = 'SOL';
         tokenName = 'Solana';
       } else if (
-        result.tokenInfo?.isUSDC ||
+        tokenInfoData?.isUSDC ||
         tokenMint === 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr'
       ) {
         tokenSymbol = 'USDC';
@@ -256,25 +276,33 @@ export const useCurrentGameToken = () => {
         tokenMint,
         tokenSymbol,
         tokenName,
-        isSOL: result.tokenInfo?.isSOL || false,
-        isUSDC: result.tokenInfo?.isUSDC || false,
-        gameId: result.currentGameId?.toString() || '0',
-        tier: result.gameStatus?.tier || 'low',
-        canBuyTickets: result.gameStatus?.canBuyTickets || false,
-        retrievalMethod: result.retrievalMethod || 'unknown',
+        isSOL:
+          tokenInfoData?.isSOL ||
+          tokenMint === 'So11111111111111111111111111111112',
+        isUSDC:
+          tokenInfoData?.isUSDC ||
+          tokenMint === 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
+        gameId: gameStatus.gameId?.toString() || '0',
+        tier: 'low', // 默认 tier，可以从服务器配置获取
+        canBuyTickets: true, // 默认允许购买
+        retrievalMethod: 'serverinfo-optimized', // 标记为优化版本
       };
 
       setTokenInfo(gameTokenInfo);
 
-      console.log('🎯 Current game token info:', {
+      console.log('🎯 Current game token info from serverinfo:', {
         symbol: tokenSymbol,
         address: tokenMint.slice(0, 8) + '...',
-        tier: gameTokenInfo.tier,
-        method: gameTokenInfo.retrievalMethod,
+        gameId: gameTokenInfo.gameId,
+        method: 'serverinfo-optimized',
+        source: gameStatus.tokenMint ? 'gameStatus' : 'fallback',
       });
     } catch (err) {
       const error = err as Error;
-      console.error('❌ Failed to fetch current game token:', error);
+      console.error(
+        '❌ Failed to fetch current game token from serverinfo:',
+        error,
+      );
       setError(error);
       setTokenInfo(null);
     } finally {

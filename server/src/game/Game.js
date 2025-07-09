@@ -2237,7 +2237,7 @@ class Game {
         gameId: this.solanaGameId,
         error: error.message,
       });
-      return null;
+      return null; // 修复：确保在错误时返回null
     }
   }
 
@@ -2295,6 +2295,28 @@ class Game {
       return null;
     }
 
+    // 获取 token mint 信息 - 优先使用配置中的 token mint
+    let tokenMint = null;
+    let tokenInfo = null;
+
+    try {
+      // 直接使用配置中的 token mint，这是最可靠的方式
+      tokenMint = config.solana.tokenMint;
+
+      if (tokenMint) {
+        tokenInfo = {
+          address: tokenMint,
+          isSOL: tokenMint === 'So11111111111111111111111111111112',
+          isUSDC: tokenMint === 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
+          isWSol: tokenMint === 'So11111111111111111111111111111112',
+        };
+      }
+    } catch (error) {
+      Logger.server.warn('Failed to get token info for serverinfo', {
+        error: error.message,
+      });
+    }
+
     return {
       gameId: this.solanaGameId ? Number(this.solanaGameId) : null,
       phase: this.gamePhase,
@@ -2308,6 +2330,9 @@ class Game {
         0,
       ),
       gameCreationInProgress: this.isGameCreationInProgress,
+      // 添加 token 信息到 gameStatus 中
+      tokenMint: tokenMint,
+      tokenInfo: tokenInfo,
     };
   }
 }

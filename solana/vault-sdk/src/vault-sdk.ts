@@ -2,6 +2,7 @@ import * as anchor from '@coral-xyz/anchor';
 import { PublicKey, SystemProgram } from '@solana/web3.js';
 import {
   TOKEN_PROGRAM_ID,
+  NATIVE_MINT,
   getAssociatedTokenAddress,
   getOrCreateAssociatedTokenAccount,
 } from '@solana/spl-token';
@@ -49,6 +50,13 @@ export class VaultSDK {
     );
 
     this.program = new Program<Vault>(IDL as Vault, provider);
+  }
+
+  /**
+   * Check if a token mint is native SOL
+   */
+  private isNativeSOL(tokenMint: PublicKey): boolean {
+    return tokenMint.equals(NATIVE_MINT);
   }
 
   /**
@@ -118,16 +126,31 @@ export class VaultSDK {
       .rpc();
 
     // Create vault token account after initialization
-    try {
-      await getOrCreateAssociatedTokenAccount(
-        this.connection,
-        this.wallet,
-        params.tokenMint,
-        vault,
-        true, // allowOwnerOffCurve
+    // 🚀 Special handling for native SOL vs SPL tokens
+    if (this.isNativeSOL(params.tokenMint)) {
+      console.log(
+        '🔑 Using native SOL - skipping Associated Token Account creation',
       );
-    } catch (error) {
-      console.warn('Vault token account might already exist:', error);
+      // For native SOL, we don't need to create an Associated Token Account
+      // The vault will handle SOL directly through lamports
+    } else {
+      console.log('🪙 Using SPL token - creating Associated Token Account');
+      try {
+        await getOrCreateAssociatedTokenAccount(
+          this.connection,
+          this.wallet,
+          params.tokenMint,
+          vault,
+          true, // allowOwnerOffCurve
+        );
+        console.log('✅ Associated Token Account created successfully');
+      } catch (error) {
+        console.warn('⚠️ Failed to create Associated Token Account:', error);
+        // For SPL tokens, this is a critical error
+        throw new Error(
+          `Failed to create token account for SPL token: ${error}`,
+        );
+      }
     }
 
     return tx;
@@ -147,11 +170,25 @@ export class VaultSDK {
 
     // Get vault token account with actual mint
     const vaultAccount = await this.program.account.gameVault.fetch(vault);
-    const vaultToken = await getAssociatedTokenAddress(
-      vaultAccount.tokenMint as PublicKey,
-      vault,
-      true,
-    );
+
+    // 🚀 Handle token accounts differently for native SOL vs SPL tokens
+    let vaultToken: PublicKey;
+    if (this.isNativeSOL(vaultAccount.tokenMint as PublicKey)) {
+      console.log(
+        '🔑 Using native SOL for ticket purchase - vault is SOL account',
+      );
+      // For native SOL, the vault itself can receive SOL lamports
+      vaultToken = vault; // Use vault PDA directly for SOL
+    } else {
+      console.log(
+        '🪙 Using SPL token for ticket purchase - getting associated token account',
+      );
+      vaultToken = await getAssociatedTokenAddress(
+        vaultAccount.tokenMint as PublicKey,
+        vault,
+        true,
+      );
+    }
 
     // Server-side price validation for security
     if (params.tier && params.expectedAmount) {
@@ -191,11 +228,25 @@ export class VaultSDK {
 
     // Get vault token account with actual mint
     const vaultAccount = await this.program.account.gameVault.fetch(vault);
-    const vaultToken = await getAssociatedTokenAddress(
-      vaultAccount.tokenMint as PublicKey,
-      vault,
-      true,
-    );
+
+    // 🚀 Handle token accounts differently for native SOL vs SPL tokens
+    let vaultToken: PublicKey;
+    if (this.isNativeSOL(vaultAccount.tokenMint as PublicKey)) {
+      console.log(
+        '🔑 Using native SOL for reward claim - vault is SOL account',
+      );
+      // For native SOL, the vault itself can send SOL lamports
+      vaultToken = vault; // Use vault PDA directly for SOL
+    } else {
+      console.log(
+        '🪙 Using SPL token for reward claim - getting associated token account',
+      );
+      vaultToken = await getAssociatedTokenAddress(
+        vaultAccount.tokenMint as PublicKey,
+        vault,
+        true,
+      );
+    }
 
     const tx = await this.program.methods
       .claimReward()
@@ -243,11 +294,25 @@ export class VaultSDK {
 
     // Get vault token account with actual mint
     const vaultAccount = await this.program.account.gameVault.fetch(vault);
-    const vaultToken = await getAssociatedTokenAddress(
-      vaultAccount.tokenMint as PublicKey,
-      vault,
-      true,
-    );
+
+    // 🚀 Handle token accounts differently for native SOL vs SPL tokens
+    let vaultToken: PublicKey;
+    if (this.isNativeSOL(vaultAccount.tokenMint as PublicKey)) {
+      console.log(
+        '🔑 Using native SOL for admin withdraw - vault is SOL account',
+      );
+      // For native SOL, the vault itself holds the SOL lamports
+      vaultToken = vault; // Use vault PDA directly for SOL
+    } else {
+      console.log(
+        '🪙 Using SPL token for admin withdraw - getting associated token account',
+      );
+      vaultToken = await getAssociatedTokenAddress(
+        vaultAccount.tokenMint as PublicKey,
+        vault,
+        true,
+      );
+    }
 
     const tx = await this.program.methods
       .adminWithdraw(new anchor.BN(params.amount))
@@ -324,16 +389,31 @@ export class VaultSDK {
       .rpc();
 
     // Create vault token account after initialization
-    try {
-      await getOrCreateAssociatedTokenAccount(
-        this.connection,
-        this.wallet,
-        params.tokenMint,
-        vault,
-        true, // allowOwnerOffCurve
+    // 🚀 Special handling for native SOL vs SPL tokens
+    if (this.isNativeSOL(params.tokenMint)) {
+      console.log(
+        '🔑 Using native SOL - skipping Associated Token Account creation',
       );
-    } catch (error) {
-      console.warn('Vault token account might already exist:', error);
+      // For native SOL, we don't need to create an Associated Token Account
+      // The vault will handle SOL directly through lamports
+    } else {
+      console.log('🪙 Using SPL token - creating Associated Token Account');
+      try {
+        await getOrCreateAssociatedTokenAccount(
+          this.connection,
+          this.wallet,
+          params.tokenMint,
+          vault,
+          true, // allowOwnerOffCurve
+        );
+        console.log('✅ Associated Token Account created successfully');
+      } catch (error) {
+        console.warn('⚠️ Failed to create Associated Token Account:', error);
+        // For SPL tokens, this is a critical error
+        throw new Error(
+          `Failed to create token account for SPL token: ${error}`,
+        );
+      }
     }
 
     return tx;
@@ -449,14 +529,37 @@ export class VaultSDK {
     const userTicket = this.getUserTicketPda(gameId, this.wallet.publicKey);
     const rewardMap = this.getRewardMapPda(gameId);
 
+    // Get the actual token mint from the vault account
+    let vaultToken: PublicKey;
+    try {
+      const vaultAccount = await this.program.account.gameVault.fetch(vault);
+
+      // 🚀 Handle token accounts differently for native SOL vs SPL tokens
+      if (this.isNativeSOL(vaultAccount.tokenMint as PublicKey)) {
+        console.log(
+          '🔑 Using native SOL for vault info - vault is SOL account',
+        );
+        // For native SOL, the vault itself is the token account
+        vaultToken = vault;
+      } else {
+        console.log(
+          '🪙 Using SPL token for vault info - getting associated token account',
+        );
+        vaultToken = await getAssociatedTokenAddress(
+          vaultAccount.tokenMint as PublicKey,
+          vault,
+          true,
+        );
+      }
+    } catch (error) {
+      // Fallback to vault PDA if account doesn't exist yet
+      vaultToken = vault;
+    }
+
     return {
       vault,
       vaultSigner,
-      vaultToken: await getAssociatedTokenAddress(
-        new PublicKey('11111111111111111111111111111111'), // Placeholder
-        vault,
-        true,
-      ),
+      vaultToken,
       userTicket,
       rewardMap,
     };

@@ -218,3 +218,12 @@ test-ledger
 .yarn
 abis/id.json
 deploy-wallet
+
+# Claude Code Kit - Generated Files
+claude-code-kit/
+.claude/
+.mcp.json
+.mcp.json.tmp
+database.sqlite
+*.sqlite
+.mcp.json.backup.20250707_165530

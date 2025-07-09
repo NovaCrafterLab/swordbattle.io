@@ -275,7 +275,7 @@ export const useGameState = (serverUrl?: string) => {
     }
   };
 
-  // 定期刷新数据
+  // 定期刷新数据 - 修复无限循环
   useEffect(() => {
     if (!serverUrl) return;
 
@@ -288,9 +288,9 @@ export const useGameState = (serverUrl?: string) => {
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [fetchServerInfo]);
+  }, [serverUrl]); // 移除fetchServerInfo依赖，防止无限循环
 
-  // 在 modal 首次打开时立即刷新所有数据
+  // 在 modal 首次打开时立即刷新所有数据 - 修复无限循环
   useEffect(() => {
     if (serverUrl) {
       logger.info('🎯 Initial data fetch for modal...');
@@ -299,7 +299,7 @@ export const useGameState = (serverUrl?: string) => {
       refetchGameInfo?.();
       refetchPlayers?.();
     }
-  }, [serverUrl, fetchServerInfo, refetchGameInfo, refetchPlayers]); // 添加所有必要依赖
+  }, [serverUrl]); // 只依赖serverUrl，移除函数依赖防止无限循环
 
   // 更新游戏状态 - 只在关键数据变化时触发
   useEffect(() => {

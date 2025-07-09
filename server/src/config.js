@@ -64,7 +64,8 @@ module.exports = {
       process.env.VAULT_PROGRAM_ID ||
       'AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV', // Vault program ID
     tokenMint:
-      process.env.SOLANA_TOKEN_MINT || 'So11111111111111111111111111111112', // Token mint for rewards (default: SOL)
+      process.env.SOLANA_TOKEN_MINT ||
+      'So11111111111111111111111111111111111111112', // Token mint for rewards (default: SOL)
     killReward: parseFloat(process.env.KILL_REWARD || '0.001'), // Token reward per kill (deprecated - use tiers)
     environment: {
       isDev,
