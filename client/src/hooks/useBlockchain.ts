@@ -3,6 +3,7 @@ import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
+import { useSolanaVault } from './useSolanaVault';
 
 // Separate custom hooks to avoid rules of hooks violations
 
@@ -659,6 +660,7 @@ export const useBlockchain = () => {
   // Solana hooks
   const { publicKey, connected } = useWallet();
   const { connection } = useConnection();
+  const solanaVault = useSolanaVault();
 
   // Return Solana wallet state
   const isConnected = connected;
@@ -762,10 +764,10 @@ export const useBlockchain = () => {
     [],
   );
 
-  // Game operations - buy ticket implementation with dynamic token and tier support
+  // Game operations - Direct Solana vault implementation using vault-sdk pattern
   const buyTicket = useCallback(
     async (gameId: number, tier: string = 'low', playerLevel: number = 1) => {
-      if (!isConnected || !address) {
+      if (!isConnected || !address || !publicKey) {
         throw new Error('Wallet not connected');
       }
 
@@ -775,57 +777,72 @@ export const useBlockchain = () => {
         );
 
         // Get tier pricing to determine the correct amount
-        const tierPricing = await new Promise<any>((resolve, reject) => {
-          const tierConfigs = {
-            low: { entranceFee: BigInt(Math.floor(0.01 * LAMPORTS_PER_SOL)) },
-            medium: {
-              entranceFee: BigInt(Math.floor(0.05 * LAMPORTS_PER_SOL)),
-            },
-            high: { entranceFee: BigInt(Math.floor(0.1 * LAMPORTS_PER_SOL)) },
-          };
-          const config = tierConfigs[tier as keyof typeof tierConfigs];
-          if (config) resolve(config);
-          else reject(new Error(`Invalid tier: ${tier}`));
-        });
+        const tierConfigs = {
+          low: { entranceFee: BigInt(Math.floor(0.01 * LAMPORTS_PER_SOL)) },
+          medium: { entranceFee: BigInt(Math.floor(0.05 * LAMPORTS_PER_SOL)) },
+          high: { entranceFee: BigInt(Math.floor(0.1 * LAMPORTS_PER_SOL)) },
+        };
 
-        const amount = tierPricing.entranceFee.toString();
+        const config = tierConfigs[tier as keyof typeof tierConfigs];
+        if (!config) {
+          throw new Error(`Invalid tier: ${tier}`);
+        }
 
-        // Call server to handle ticket purchase with tier validation
+        // Get current game token info to determine token mint
         const serverUrl =
           localStorage.getItem('selectedServer') || 'localhost:8000';
         const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
-        const buyTicketUrl = `${protocol}://${serverUrl}/api/buy-ticket`;
 
-        const response = await fetch(buyTicketUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            gameId,
-            amount,
-            walletAddress: address,
-            tier,
-            playerLevel,
-          }),
-        });
+        // Fetch game token info
+        const response = await fetch(`${protocol}://${serverUrl}/serverinfo`);
+        const serverInfo = await response.json();
 
-        const result = await response.json();
+        let tokenMint: PublicKey;
+        let isSOL = false;
 
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to buy ticket');
+        if (serverInfo.gameStatus?.tokenMint) {
+          tokenMint = new PublicKey(serverInfo.gameStatus.tokenMint);
+          // Check if it's SOL using the existing logic
+          isSOL =
+            serverInfo.gameStatus.tokenInfo?.isSOL ||
+            tokenMint.equals(
+              new PublicKey('So11111111111111111111111111111111111111112'),
+            );
+        } else {
+          // Default to USDC if no token mint specified
+          tokenMint = new PublicKey(
+            'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
+          );
+          isSOL = false;
         }
 
-        console.log(
-          `✅ Secure ticket purchased successfully - Tier: ${tier}, TX: ${result.txHash}`,
+        // Check if vault is configured
+        if (!solanaVault.isVaultConfigured) {
+          throw new Error(
+            'Vault program not configured. Please set REACT_APP_VAULT_PROGRAM_ID environment variable.',
+          );
+        }
+
+        // Use direct Solana vault implementation
+        const result = await solanaVault.buyTicket(
+          gameId,
+          config.entranceFee,
+          tokenMint,
+          tier,
+          config.entranceFee, // expected amount for validation
         );
-        return result;
+
+        console.log(
+          `✅ Ticket purchased successfully via Solana - Tier: ${tier}, TX: ${result}`,
+        );
+
+        return { success: true, txHash: result, tier };
       } catch (error) {
         console.error(`❌ Failed to buy ticket:`, error);
         throw error;
       }
     },
-    [isConnected, address],
+    [isConnected, address, publicKey, solanaVault],
   );
 
   const joinGame = useCallback(

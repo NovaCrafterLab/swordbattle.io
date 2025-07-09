@@ -390,6 +390,7 @@ function buildServerInfo(game) {
     serverType: config.serverType,
     isRaceServer: config.isRaceServer,
     solanaEnabled: config.solana.enabled,
+    blockchainEnabled: config.solana.enabled,
 
     solanaConfig: config.solana.enabled
       ? {
@@ -1402,4 +1403,7 @@ function validateServerConfiguration() {
   console.log(`   API_ENDPOINT: ${config.apiEndpoint || 'NOT_SET'}`);
   console.log(`   RACE_SERVER: ${config.isRaceServer ? 'YES' : 'NO'}`);
   console.log(`   SOLANA_ENABLED: ${config.solana?.enabled ? 'YES' : 'NO'}`);
+  console.log(
+    `   SERVER RESTART CYCLE ${config.enableCycleRestart ? 'YES' : 'NO'} `,
+  );
 }

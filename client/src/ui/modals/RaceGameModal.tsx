@@ -9,6 +9,7 @@ import {
   useCurrentGameToken,
   useTierPricing,
   useDynamicTokenBalance,
+  useBlockchain,
 } from '../../hooks/useBlockchain';
 import './RaceGameModal.scss';
 
@@ -155,9 +156,20 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
   const { publicKey, connected: isConnected } = useWallet();
   const { setVisible: openWalletModal } = useWalletModal();
   const address = publicKey?.toString();
-  // 修复：移除 useBlockchain 调用，减少不必要的 hook 调用
   const gameState = useGameState(serverUrl);
   const playerData = usePlayerData();
+  const blockchain = useBlockchain();
+
+  // 🔍 Debug: Log props and game state
+  console.log('🔍 RaceGameModal Debug:', {
+    serverUrl,
+    isRaceServer: gameState.isRaceServer,
+    gameId: gameState.gameId,
+    phase: gameState.phase,
+    error: gameState.error,
+    serverInfo: gameState.serverInfo,
+    isLoading: gameState.isLoading,
+  });
 
   // 🚀 Dynamic token and tier information
   const gameToken = useCurrentGameToken();
@@ -385,24 +397,21 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
 
       // Use dynamic tier and player level (default level 1 for now)
       const playerLevel = 1; // TODO: Get from player profile
-      // 修复：移除 blockchain 调用，直接进入游戏
-      // const txResult = await blockchain.joinGame(
-      //   gameState.gameId,
-      //   currentTier,
-      //   playerLevel,
-      // );
-      console.log('Join game would be called here with:', {
+
+      // Call blockchain.joinGame with the new Solana implementation
+      const txResult = await blockchain.joinGame(
+        gameState.gameId,
+        currentTier,
+        playerLevel,
+      );
+
+      console.log('🎯 Successfully joined game with Solana:', {
         gameId: gameState.gameId,
         tier: currentTier,
         level: playerLevel,
-      });
-
-      console.log('🎯 Joined game with dynamic token and tier:', {
-        gameId: gameState.gameId,
-        tier: currentTier,
         tokenSymbol: gameToken.data.tokenSymbol,
         entranceFee: Number(entryFeeAmount) / LAMPORTS_PER_SOL,
-        // txHash: txResult.txHash, // 修复：移除 txResult 引用
+        txHash: txResult.txHash,
       });
     } catch (error) {
       console.error('Failed to join game:', error);

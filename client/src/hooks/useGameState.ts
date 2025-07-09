@@ -32,6 +32,7 @@ export interface ServerInfo {
   isRaceServer: boolean;
   environment: any;
   blockchainEnabled: boolean;
+  solanaEnabled: boolean;
   blockchainStatus: any;
   blockchainConfig?: {
     gameLevel: number;
@@ -89,8 +90,8 @@ export const useGameState = (serverUrl?: string) => {
 
   // 获取游戏信息 - 直接使用服务器返回的稳定gameId
   const currentGameId = useMemo(() => {
-    // 确保gameCounter是一个有效的数字
-    if (typeof gameCounter === 'number' && gameCounter > 0) {
+    // 确保gameCounter是一个有效的数字（包括0）
+    if (typeof gameCounter === 'number' && gameCounter >= 0) {
       return gameCounter;
     }
     return null;
@@ -125,8 +126,25 @@ export const useGameState = (serverUrl?: string) => {
 
   // —— 用 useMemo 提取最细粒度的标量依赖 ——
 
-  // 2) 服务器状态：只要 phase 即可
+  // 2) 服务器状态：phase 和 isRaceServer
   const serverPhase = serverInfo?.gameStatus?.phase;
+  const isRaceServer = useMemo(() => {
+    const result = !!(
+      serverInfo?.isRaceServer && serverInfo?.blockchainEnabled
+    );
+
+    // 🔍 Debug: Log race server detection
+    logger.debug('🔍 Race server detection:', {
+      isRaceServer: serverInfo?.isRaceServer,
+      blockchainEnabled: serverInfo?.blockchainEnabled,
+      solanaEnabled: serverInfo?.solanaEnabled,
+      serverType: serverInfo?.serverType,
+      result,
+      serverInfo: !!serverInfo,
+    });
+
+    return result;
+  }, [serverInfo?.isRaceServer, serverInfo?.blockchainEnabled]);
 
   // 3) 玩家列表长度
   const registeredCount = useMemo(() => {
@@ -159,6 +177,18 @@ export const useGameState = (serverUrl?: string) => {
       }
 
       const info: ServerInfo = await response.json();
+
+      // 🔍 Debug: Log server info for race server detection
+      logger.debug('🔍 Server info received:', {
+        isRaceServer: info.isRaceServer,
+        blockchainEnabled: info.blockchainEnabled,
+        solanaEnabled: info.solanaEnabled,
+        serverType: info.serverType,
+        gameStatus: info.gameStatus,
+        gameId: info.gameStatus?.gameId,
+        phase: info.gameStatus?.phase,
+        timestamp: info.timestamp,
+      });
 
       // 只在信息真正变化时更新状态
       setServerInfo((prev) => {
@@ -204,12 +234,6 @@ export const useGameState = (serverUrl?: string) => {
   }, [refetchGameInfo, refetchPlayers, fetchServerInfo]);
 
   /**
-   * 检查服务器是否为比赛服务器
-   */
-  const isRaceServer =
-    serverInfo?.isRaceServer && serverInfo?.blockchainEnabled;
-
-  /**
    * 获取游戏状态显示文本
    */
   const getGameStatusText = () => {
@@ -252,6 +276,9 @@ export const useGameState = (serverUrl?: string) => {
   // 定期刷新数据 - 修复无限循环和过度请求
   useEffect(() => {
     if (!serverUrl) return;
+
+    // 🔍 Debug: Log server URL
+    logger.debug('🔍 useGameState serverUrl:', serverUrl);
 
     let mounted = true;
 
@@ -308,7 +335,7 @@ export const useGameState = (serverUrl?: string) => {
 
   // —— Effect A：单纯同步 gameId ——
   useEffect(() => {
-    if (!currentGameId) return;
+    if (currentGameId === null) return;
     setGameState((prev) => {
       // 只更新 gameId，保留其它字段不变
       if (prev.gameId === currentGameId) return prev;
@@ -322,7 +349,7 @@ export const useGameState = (serverUrl?: string) => {
 
   // —— Effect B：监听业务字段变化，带"值比较"守卫 ——
   useEffect(() => {
-    if (!currentGameId) return; // 还没拿到 ID，就不更新
+    if (currentGameId === null) return; // 还没拿到 ID，就不更新
 
     // 1) 决定 phase：优先用链上/服务端的 phase，否则如果是 race server 则默认 waiting
     const phase: GamePhase = serverPhase
