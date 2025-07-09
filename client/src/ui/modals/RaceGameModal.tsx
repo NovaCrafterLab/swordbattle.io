@@ -81,14 +81,15 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     dynamicBalance.data && dynamicBalance.data >= entryFeeAmount;
   const needsApproval = !gameToken.data?.isSOL && !hasSufficientBalance; // Only for non-SOL tokens
 
-  // Stable refresh functions to prevent dependency issues
+  // 🔧 修复：移除不稳定的回调依赖，直接使用原始方法
+  // 这些函数现在是稳定的，不会因为对象引用变化而重新创建
   const refreshGameData = useCallback(() => {
     return gameState.refreshGameData();
-  }, [gameState]);
+  }, []); // 移除 gameState 依赖
 
   const refreshTokenData = useCallback(() => {
     return Promise.allSettled([gameToken.refetch(), tierPricing.refetch()]);
-  }, [gameToken, tierPricing]);
+  }, []); // 移除 gameToken, tierPricing 依赖
 
   const refreshWalletData = useCallback(() => {
     if (isConnected && address) {
@@ -98,9 +99,9 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       ]);
     }
     return Promise.resolve();
-  }, [isConnected, address, playerData, dynamicBalance]);
+  }, []); // 移除所有依赖，函数内部已经有条件检查
 
-  // Initial data refresh when component mounts - prevent cascading updates
+  // 🔧 修复：固定一次挂载执行，移除回调依赖
   useEffect(() => {
     let mounted = true;
 
@@ -108,7 +109,12 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       if (!mounted) return;
 
       try {
-        await Promise.allSettled([refreshGameData(), refreshTokenData()]);
+        // 直接调用方法，不依赖回调函数
+        await Promise.allSettled([
+          gameState.refreshGameData(),
+          gameToken.refetch(),
+          tierPricing.refetch(),
+        ]);
       } catch (error) {
         console.warn('Initial refresh failed:', error);
       }
@@ -119,18 +125,33 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     return () => {
       mounted = false;
     };
-  }, [refreshGameData, refreshTokenData]);
+  }, []); // 🎯 空依赖数组，只在挂载时执行一次
 
-  // Monitor wallet connection state changes - optimize to prevent loops
+  // 🔧 修复：只在钱包连接状态变化时触发，移除函数依赖
+  const [prevConnectionState, setPrevConnectionState] = useState<{
+    isConnected: boolean;
+    address: string | null;
+  }>({ isConnected: false, address: null });
+
   useEffect(() => {
-    if (isConnected && address) {
+    // 只在连接状态从 false -> true 或地址首次出现时触发
+    if (
+      isConnected &&
+      address &&
+      (!prevConnectionState.isConnected ||
+        prevConnectionState.address !== address)
+    ) {
       let mounted = true;
 
       const refreshWalletDataInternal = async () => {
         if (!mounted) return;
 
         try {
-          await refreshWalletData();
+          // 直接调用方法，不依赖回调函数
+          await Promise.allSettled([
+            playerData.refreshPlayerData(),
+            dynamicBalance.refetch(),
+          ]);
         } catch (error) {
           console.warn('Wallet data refresh failed:', error);
         }
@@ -142,45 +163,59 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
         mounted = false;
       };
     }
-  }, [isConnected, address, refreshWalletData]);
 
-  // Auto-refresh mechanism - reduce frequency and add proper cleanup
+    // 更新前一次的连接状态
+    setPrevConnectionState({ isConnected, address: address || null });
+  }, [isConnected, address]); // 🎯 只依赖原始值，不依赖函数
+
+  // 🔧 修复：简化自动刷新，移除函数依赖
   useEffect(() => {
-    // 修复：简化条件，移除 blockchain 依赖
     if (txStep !== 'idle') {
       return; // Skip auto-refresh during transactions
     }
 
     const autoRefreshInterval = setInterval(() => {
-      // Additional check to ensure component is still active
-      if (txStep === 'idle') {
-        // Batch refresh operations to avoid rapid successive calls
-        Promise.allSettled([
-          refreshGameData(),
-          refreshTokenData(),
-          refreshWalletData(),
-        ]).catch((error) => {
-          console.warn('Auto-refresh failed:', error);
-        });
-      }
-    }, 60000); // 修复：增加到60秒减少过度请求
+      // 直接调用方法，不依赖回调函数
+      Promise.allSettled([
+        gameState.refreshGameData(),
+        gameToken.refetch(),
+        tierPricing.refetch(),
+        ...(isConnected && address
+          ? [playerData.refreshPlayerData(), dynamicBalance.refetch()]
+          : []),
+      ]).catch((error) => {
+        console.warn('Auto-refresh failed:', error);
+      });
+    }, 60000);
 
     return () => clearInterval(autoRefreshInterval);
-  }, [txStep, refreshGameData, refreshTokenData, refreshWalletData]); // 修复：移除 blockchain 依赖
+  }, [txStep]); // 🎯 只依赖 txStep，移除所有函数依赖
 
-  // Refresh data when gameId changes - use stable reference and debounce
+  // 🔧 修复：使用 ref 跟踪 gameId 变化，避免重复刷新
+  const [prevGameId, setPrevGameId] = useState<number | null>(null);
+
   useEffect(() => {
-    if (gameState.gameId !== null && gameState.gameId !== undefined) {
-      // Debounce rapid gameId changes
+    const currentGameId = gameState.gameId;
+
+    // 只在 gameId 从 null 变为有效值，或者值真正改变时才刷新
+    if (
+      currentGameId !== null &&
+      currentGameId !== undefined &&
+      currentGameId !== prevGameId
+    ) {
       const timeoutId = setTimeout(() => {
-        refreshTokenData().catch((error: any) => {
-          console.warn('GameId change refresh failed:', error);
-        });
+        // 直接调用方法，不依赖回调函数
+        Promise.allSettled([gameToken.refetch(), tierPricing.refetch()]).catch(
+          (error: any) => {
+            console.warn('GameId change refresh failed:', error);
+          },
+        );
       }, 500);
 
+      setPrevGameId(currentGameId);
       return () => clearTimeout(timeoutId);
     }
-  }, [gameState.gameId, refreshTokenData]);
+  }, [gameState.gameId]); // 🎯 只依赖 gameId，移除函数依赖
 
   /**
    * 连接钱包
@@ -268,13 +303,15 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     }
   };
 
-  // 监听交易状态
+  // 🔧 修复：简化交易状态监听，移除函数依赖
   useEffect(() => {
-    // 修复：移除 blockchain 状态检查，简化逻辑
     if (txStep !== 'idle') {
       if (txStep === 'approving') {
         // 授权完成，刷新数据
-        refreshWalletData()
+        Promise.allSettled([
+          playerData.refreshPlayerData(),
+          dynamicBalance.refetch(),
+        ])
           .then(() => {
             setTxStep('idle');
           })
@@ -284,7 +321,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
           });
       } else if (txStep === 'joining') {
         // 加入游戏完成
-        refreshGameData();
+        gameState.refreshGameData();
         setTxStep('waiting');
 
         // 进入游戏
@@ -294,14 +331,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
         }, 1000);
       }
     }
-  }, [
-    txStep,
-    refreshWalletData,
-    refreshGameData,
-    onJoinGame,
-    onClose,
-    address,
-  ]); // 修复：移除 blockchain 依赖
+  }, [txStep, onJoinGame, onClose, address]); // 🎯 只保留必要的依赖
 
   /**
    * 获取按钮状态和文本
@@ -483,11 +513,14 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                 if (now - lastRefreshTime < 2000) return; // 2 second debounce
                 setLastRefreshTime(now);
 
-                // Batch all refresh operations using stable functions
+                // 🔧 修复：直接调用方法，不使用回调函数
                 Promise.allSettled([
-                  refreshGameData(),
-                  refreshTokenData(),
-                  refreshWalletData(),
+                  gameState.refreshGameData(),
+                  gameToken.refetch(),
+                  tierPricing.refetch(),
+                  ...(isConnected && address
+                    ? [playerData.refreshPlayerData(), dynamicBalance.refetch()]
+                    : []),
                 ]).catch((error) => {
                   console.warn('Manual refresh failed:', error);
                 });
