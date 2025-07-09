@@ -1,18 +1,13 @@
+// 🔧 修复：移除冲突的包装器定位，让Modal组件处理定位
 .race-game-modal-wrapper {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(8px);
+  // 移除固定定位，让外层Modal组件处理
+  width: 100%;
+  min-width: 500px;
+  max-width: 42rem;
 
   .race-game-modal {
     position: relative;
     width: 100%;
-    max-width: 42rem;
     background: #1a1a1a;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 0.75rem;
@@ -41,24 +36,6 @@
       );
       padding: 2rem;
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-
-      .close-button {
-        position: absolute;
-        top: 1rem;
-        right: 1rem;
-        padding: 0.5rem;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.1);
-        border: none;
-        color: rgba(255, 255, 255, 0.7);
-        cursor: pointer;
-        transition: all 0.2s ease;
-
-        &:hover {
-          background: rgba(255, 255, 255, 0.2);
-          color: white;
-        }
-      }
 
       .header-content {
         display: flex;
@@ -237,7 +214,7 @@
 
         .balance-grid {
           display: grid;
-          grid-template-columns: 1fr 1fr;
+          grid-template-columns: 1fr;
           gap: 1rem;
 
           .balance-item {
@@ -464,10 +441,10 @@
 // 响应式设计 - 优化移动端体验
 @media (max-width: 768px) {
   .race-game-modal-wrapper {
-    padding: 0.5rem;
+    min-width: 90vw;
+    max-width: 90vw;
 
     .race-game-modal {
-      max-width: 100%;
       max-height: 90vh;
       overflow-y: auto;
 

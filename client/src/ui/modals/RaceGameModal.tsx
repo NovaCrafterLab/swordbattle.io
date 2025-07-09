@@ -554,10 +554,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     <div className="race-game-modal">
       {/* Header - Clean and Modern */}
       <div className="race-header">
-        <button className="close-button" onClick={onClose}>
-          <XIcon />
-        </button>
-
         <div className="header-content">
           <div className="icon-container">
             <ZapIcon />
