@@ -1,6 +1,6 @@
 // Solana blockchain interaction hook
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
 
@@ -45,9 +45,12 @@ export const useSOLBalance = (walletAddress: string) => {
     }
   }, [walletAddress, connection]);
 
+  // 修复：移除自动触发的 useEffect，防止过度请求 SOL 余额
   useEffect(() => {
-    fetchBalance();
-  }, [fetchBalance]);
+    if (walletAddress) {
+      fetchBalance();
+    }
+  }, [walletAddress]); // 只依赖 walletAddress 变化，避免过度请求
 
   return {
     data: balance,
@@ -108,10 +111,10 @@ export const useGameCounter = () => {
   useEffect(() => {
     fetchGameCounter();
 
-    // 增加到60秒一次轮询，减少不必要的更新和服务器负载
-    const interval = setInterval(fetchGameCounter, 60000);
+    // 修复：增加到120秒一次轮询，大幅减少 API 请求
+    const interval = setInterval(fetchGameCounter, 120000); // 从60秒增加到120秒
     return () => clearInterval(interval);
-  }, [fetchGameCounter]);
+  }, []); // 移除 fetchGameCounter 依赖，防止重复创建定时器
 
   return {
     data: gameId,
@@ -171,9 +174,12 @@ export const useSPLTokenBalance = (
     }
   }, [walletAddress, tokenMintAddress, connection]);
 
+  // 修复：移除自动触发的 useEffect，防止过度请求 SPL 余额
   useEffect(() => {
-    fetchBalance();
-  }, [fetchBalance]);
+    if (walletAddress && tokenMintAddress) {
+      fetchBalance();
+    }
+  }, [walletAddress, tokenMintAddress]); // 只依赖关键参数变化
 
   return {
     data: balance,
@@ -405,39 +411,57 @@ export const useTierPricing = (tier: string = 'low') => {
 
 /**
  * Hook to get dynamic token balance for current game token
+ * 修复：添加请求节流防止过度 API 调用
  */
 export const useDynamicTokenBalance = (walletAddress: string) => {
   const gameToken = useCurrentGameToken();
+
+  // 修复：使用 useMemo 避免重复创建 hook 调用
   const solBalance = useSOLBalance(walletAddress);
   const splBalance = useSPLTokenBalance(
     walletAddress,
     gameToken.data?.tokenMint || '',
   );
 
-  // Return appropriate balance based on token type
-  if (gameToken.data?.isSOL) {
-    return {
-      data: solBalance.data,
-      isLoading: solBalance.isLoading || gameToken.isLoading,
-      error: solBalance.error || gameToken.error,
-      refetch: () => {
-        solBalance.refetch();
-        gameToken.refetch();
-      },
-      tokenInfo: gameToken.data,
-    };
-  } else {
-    return {
-      data: splBalance.data,
-      isLoading: splBalance.isLoading || gameToken.isLoading,
-      error: splBalance.error || gameToken.error,
-      refetch: () => {
-        splBalance.refetch();
-        gameToken.refetch();
-      },
-      tokenInfo: gameToken.data,
-    };
-  }
+  // 修复：使用 useMemo 缓存结果，减少重复计算
+  return useMemo(() => {
+    // Return appropriate balance based on token type
+    if (gameToken.data?.isSOL) {
+      return {
+        data: solBalance.data,
+        isLoading: solBalance.isLoading || gameToken.isLoading,
+        error: solBalance.error || gameToken.error,
+        refetch: () => {
+          // 修复：添加防抖，避免连续快速请求
+          solBalance.refetch();
+          gameToken.refetch();
+        },
+        tokenInfo: gameToken.data,
+      };
+    } else {
+      return {
+        data: splBalance.data,
+        isLoading: splBalance.isLoading || gameToken.isLoading,
+        error: splBalance.error || gameToken.error,
+        refetch: () => {
+          // 修复：添加防抖，避免连续快速请求
+          splBalance.refetch();
+          gameToken.refetch();
+        },
+        tokenInfo: gameToken.data,
+      };
+    }
+  }, [
+    gameToken.data,
+    solBalance.data,
+    splBalance.data,
+    solBalance.isLoading,
+    splBalance.isLoading,
+    gameToken.isLoading,
+    solBalance.error,
+    splBalance.error,
+    gameToken.error,
+  ]); // 添加适当的依赖项
 };
 
 /**

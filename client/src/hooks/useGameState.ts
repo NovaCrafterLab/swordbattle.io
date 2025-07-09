@@ -305,12 +305,12 @@ export const useGameState = (serverUrl?: string) => {
 
     initialFetch();
 
-    // 减少到30秒一次，避免过于频繁的请求
+    // 修复：减少到90秒一次，避免过于频繁的请求和 429 错误
     const interval = setInterval(() => {
       if (mounted) {
         initialFetch();
       }
-    }, 30000);
+    }, 90000); // 从30秒增加到90秒
 
     return () => {
       mounted = false;
