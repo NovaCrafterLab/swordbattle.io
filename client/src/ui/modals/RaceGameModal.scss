@@ -111,46 +111,111 @@
       flex-direction: column;
       gap: 2rem;
 
-      // Game Status - Full Width at Top
+      // Game Status - Enhanced Server Status Display
       .game-status {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 1rem 1.5rem;
-        background: rgba(255, 255, 255, 0.03);
-        border-radius: 0.75rem;
-        border: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 1.25rem 1.75rem;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%);
+        border-radius: 1rem;
+        border: 1px solid rgba(16, 185, 129, 0.2);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
+        position: relative;
+        overflow: hidden;
+
+        // 添加动态背景效果
+        &::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.1), transparent);
+          animation: shimmer 3s infinite;
+        }
 
         .status-info {
           display: flex;
           align-items: center;
-          gap: 0.75rem;
+          gap: 1rem;
+          position: relative;
+          z-index: 1;
 
           .status-dot {
-            width: 0.75rem;
-            height: 0.75rem;
+            width: 1rem;
+            height: 1rem;
             border-radius: 50%;
+            position: relative;
+            box-shadow: 0 0 8px currentColor;
 
             &.green {
               background-color: #10b981;
+              animation: pulse-green 2s infinite;
             }
             &.blue {
               background-color: #3b82f6;
+              animation: pulse-blue 2s infinite;
             }
             &.yellow {
               background-color: #f59e0b;
+              animation: pulse-yellow 2s infinite;
             }
             &.red {
               background-color: #ef4444;
+              animation: pulse-red 2s infinite;
+            }
+
+            // 添加脉冲环效果
+            &::after {
+              content: '';
+              position: absolute;
+              top: -4px;
+              left: -4px;
+              right: -4px;
+              bottom: -4px;
+              border-radius: 50%;
+              border: 2px solid currentColor;
+              opacity: 0;
+              animation: ripple 2s infinite;
             }
           }
 
           .status-text {
-            font-size: 0.875rem;
+            font-size: 1rem;
             color: white;
+            font-weight: 600;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            letter-spacing: 0.025em;
+          }
+        }
+
+        // 服务器状态指示器
+        .server-indicator {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.5rem 1rem;
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 0.5rem;
+          backdrop-filter: blur(10px);
+          position: relative;
+          z-index: 1;
+
+          .indicator-icon {
+            width: 1.25rem;
+            height: 1.25rem;
+            color: #10b981;
+          }
+
+          .indicator-text {
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.9);
             font-weight: 500;
           }
         }
+      }
 
         .refresh-button {
           padding: 0.5rem 1rem;

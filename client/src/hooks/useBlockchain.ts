@@ -210,6 +210,7 @@ export const useCurrentGameToken = () => {
     tokenSymbol: string;
     tokenName: string;
     isSOL: boolean;
+    isWSol?: boolean; // 添加 WSOL 标识
     isUSDC: boolean;
     gameId: string;
     tier: string;
@@ -279,13 +280,14 @@ export const useCurrentGameToken = () => {
         tokenName = 'Custom Token';
       }
 
+      // 🔧 修复：WSOL 应该被当作 SPL Token 处理，不是原生 SOL
+      // WSOL (wrapped SOL) 有特殊的 token mint，但它仍然是 SPL Token
       const gameTokenInfo = {
         tokenMint,
         tokenSymbol,
         tokenName,
-        isSOL:
-          tokenInfoData?.isSOL ||
-          tokenMint === 'So11111111111111111111111111111111111111112',
+        isSOL: false, // 🔧 重要：即使是 WSOL 也应该作为 SPL Token 处理
+        isWSol: tokenMint === 'So11111111111111111111111111111111111111112', // 添加 WSOL 标识
         isUSDC:
           tokenInfoData?.isUSDC ||
           tokenMint === 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
@@ -426,8 +428,10 @@ export const useDynamicTokenBalance = (walletAddress: string) => {
 
   // 修复：使用 useMemo 缓存结果，减少重复计算
   return useMemo(() => {
-    // Return appropriate balance based on token type
-    if (gameToken.data?.isSOL) {
+    // 🔧 修复：所有 SPL Tokens (包括 WSOL) 都应该使用 SPL token balance
+    // 只有真正的原生 SOL 才使用 SOL balance
+    if (gameToken.data?.isSOL && !gameToken.data?.isWSol) {
+      // 只有原生 SOL (非 WSOL)
       return {
         data: solBalance.data,
         isLoading: solBalance.isLoading || gameToken.isLoading,
@@ -440,6 +444,7 @@ export const useDynamicTokenBalance = (walletAddress: string) => {
         tokenInfo: gameToken.data,
       };
     } else {
+      // SPL Tokens (包括 WSOL, USDC 等)
       return {
         data: splBalance.data,
         isLoading: splBalance.isLoading || gameToken.isLoading,

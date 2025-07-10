@@ -227,3 +227,5 @@ claude-code-kit/
 database.sqlite
 *.sqlite
 .mcp.json.backup.20250707_165530
+rules
+.claude/guide.md
