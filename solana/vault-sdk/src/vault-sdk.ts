@@ -134,8 +134,11 @@ export class VaultSDK {
       console.log('✅ Associated Token Account created successfully');
     } catch (error) {
       console.warn('⚠️ Failed to create Associated Token Account:', error);
-      // For SPL tokens (including WSOL), this is a critical error
-      throw new Error(`Failed to create token account for SPL token: ${error}`);
+      // 🔧 修复：对于WSOL，ATA创建失败不应阻止游戏创建
+      // 游戏仍可以继续，稍后在实际交易时再处理ATA创建
+      console.log(
+        '⚠️ Continuing game creation without pre-created ATA (will create on-demand)',
+      );
     }
 
     return tx;
@@ -166,6 +169,21 @@ export class VaultSDK {
     console.log(
       `🪙 Using SPL token ${(vaultAccount.tokenMint as PublicKey).toString()} for ticket purchase with vault ATA ${vaultToken.toString()}`,
     );
+
+    // 🔧 修复：确保vault ATA存在，如果不存在则创建
+    try {
+      await getOrCreateAssociatedTokenAccount(
+        this.connection,
+        this.wallet,
+        vaultAccount.tokenMint as PublicKey,
+        vault,
+        true, // allowOwnerOffCurve
+      );
+      console.log('✅ Vault ATA verified/created successfully');
+    } catch (error) {
+      console.warn('⚠️ Failed to create vault ATA:', error);
+      // 继续尝试交易，也许ATA已经存在但检查失败
+    }
 
     // Server-side price validation for security
     if (params.tier && params.expectedAmount) {
@@ -365,8 +383,11 @@ export class VaultSDK {
       console.log('✅ Associated Token Account created successfully');
     } catch (error) {
       console.warn('⚠️ Failed to create Associated Token Account:', error);
-      // For SPL tokens (including WSOL), this is a critical error
-      throw new Error(`Failed to create token account for SPL token: ${error}`);
+      // 🔧 修复：对于WSOL，ATA创建失败不应阻止游戏创建
+      // 游戏仍可以继续，稍后在实际交易时再处理ATA创建
+      console.log(
+        '⚠️ Continuing game creation without pre-created ATA (will create on-demand)',
+      );
     }
 
     return tx;
