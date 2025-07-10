@@ -63,70 +63,6 @@ const ClockIcon = () => (
   </svg>
 );
 
-const ZapIcon = () => (
-  <svg
-    className="w-6 h-6"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M13 10V3L4 14h7v7l9-11h-7z"
-    />
-  </svg>
-);
-
-const WalletIcon = () => (
-  <svg
-    className="w-5 h-5"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-    />
-  </svg>
-);
-
-const XIcon = () => (
-  <svg
-    className="w-5 h-5"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M6 18L18 6M6 6l12 12"
-    />
-  </svg>
-);
-
-const RefreshIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0V9a8 8 0 1115.356 2M15 15v4h5"
-    />
-  </svg>
-);
-
 const WarningIcon = () => (
   <svg
     className="w-4 h-4"
@@ -619,7 +555,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       if (!walletStatus.isInstalled) {
         return (
           <button className="race-btn warning" onClick={handleConnectWallet}>
-            <WalletIcon />
             Install Solana Wallet
           </button>
         );
@@ -633,7 +568,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
 
       return (
         <button className="race-btn primary" onClick={handleConnectWallet}>
-          <WalletIcon />
           Connect Wallet{walletInfo}
         </button>
       );
@@ -656,7 +590,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             onClose();
           }}
         >
-          <ZapIcon />
           Enter Game (Joined)
         </button>
       );
@@ -682,10 +615,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             'Approving...'
           ) : (
             <>
-              <ZapIcon />
-              Approve {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(
-                4,
-              )}{' '}
+              Approve {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}{' '}
               {gameToken.data?.tokenSymbol || 'Tokens'}
             </>
           )}
@@ -707,7 +637,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     if (solanaVault.txStatus === 'signing') {
       return (
         <button className="race-btn warning" disabled>
-          <WalletIcon />
           Confirm in Wallet
         </button>
       );
@@ -719,7 +648,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     ) {
       return (
         <button className="race-btn warning" disabled>
-          <ZapIcon />
           Transaction Processing...
         </button>
       );
@@ -728,7 +656,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     if (solanaVault.txStatus === 'verifying') {
       return (
         <button className="race-btn warning" disabled>
-          <ZapIcon />
           Verifying Ticket...
         </button>
       );
@@ -743,7 +670,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             onClose();
           }}
         >
-          <ZapIcon />
           Enter Game (Purchased)
         </button>
       );
@@ -765,14 +691,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
         onClick={handleJoinGame}
         disabled={isDisabled}
       >
-        {isJoining ? (
-          'Joining...'
-        ) : (
-          <>
-            <ZapIcon />
-            Join Race
-          </>
-        )}
+        {isJoining ? 'Joining...' : <>Join Race</>}
       </button>
     );
   };
@@ -782,9 +701,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       {/* Header - Clean and Modern */}
       <div className="race-header">
         <div className="header-content">
-          <div className="">
-            <ZapIcon />
-          </div>
           <div className="title-section">
             <h2>🏆 Race Game</h2>
             <p className="subtitle">
@@ -808,50 +724,48 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
         </div>
       </div>
 
-      {/* Content - Two Column Layout */}
+      {/* Content - Game Status Full Width + Two Column Layout */}
       <div className="race-content">
+        {/* Game Status - Full Width */}
+        <div className="game-status">
+          <div className="status-info">
+            <span
+              className={`status-dot ${gameState.getGameStatusColor()}`}
+            ></span>
+            <span className="status-text">
+              {gameState.isRaceServer
+                ? `Race Server Ready • ${gameState.gameState.registeredCount} players joined`
+                : gameState.error || 'Connecting to server...'}
+            </span>
+          </div>
+
+          <button
+            onClick={() => {
+              const now = Date.now();
+              if (now - lastRefreshTime < 2000) return;
+              setLastRefreshTime(now);
+
+              Promise.allSettled([
+                gameState.refreshGameData(),
+                gameToken.refetch(),
+                tierPricing.refetch(),
+                ...(isConnected && address
+                  ? [playerData.refreshPlayerData(), dynamicBalance.refetch()]
+                  : []),
+              ]).catch((error) => {
+                console.warn('Manual refresh failed:', error);
+              });
+            }}
+            className="refresh-button"
+          >
+            Refresh
+          </button>
+        </div>
+
+        {/* Two Column Grid */}
         <div className="race-content-grid">
           {/* Left Column - Race Information */}
           <div className="race-info-column">
-            {/* Game Status */}
-            <div className="game-status">
-              <div className="status-info">
-                <span
-                  className={`status-dot ${gameState.getGameStatusColor()}`}
-                ></span>
-                <span className="status-text">
-                  {gameState.isRaceServer
-                    ? `Race Server Ready • ${gameState.gameState.registeredCount} players joined`
-                    : gameState.error || 'Connecting to server...'}
-                </span>
-              </div>
-
-              <button
-                onClick={() => {
-                  const now = Date.now();
-                  if (now - lastRefreshTime < 2000) return;
-                  setLastRefreshTime(now);
-
-                  Promise.allSettled([
-                    gameState.refreshGameData(),
-                    gameToken.refetch(),
-                    tierPricing.refetch(),
-                    ...(isConnected && address
-                      ? [
-                          playerData.refreshPlayerData(),
-                          dynamicBalance.refetch(),
-                        ]
-                      : []),
-                  ]).catch((error) => {
-                    console.warn('Manual refresh failed:', error);
-                  });
-                }}
-                className="refresh-button"
-              >
-                Refresh
-              </button>
-            </div>
-
             {/* Stats Grid - Clean 2x2 layout */}
             {gameState.isRaceServer && gameToken.data && (
               <div className="stats-grid">
@@ -893,9 +807,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                 </div>
 
                 <div className="stat-card">
-                  <div className="stat-icon level">
-                    <ZapIcon />
-                  </div>
+                  <div className="stat-icon level">⚡</div>
                   <div className="stat-label">Game ID</div>
                   <div className="stat-value">
                     #{gameState.gameId || 'Loading...'}
@@ -986,7 +898,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             {!isConnected && (
               <div className="wallet-detection-status">
                 <div className="detection-header">
-                  <WalletIcon />
                   <span className="detection-title">Wallet Detection</span>
                 </div>
 
@@ -1009,7 +920,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             {isConnected && (
               <div className="wallet-section">
                 <div className="wallet-header">
-                  <WalletIcon />
                   <span className="wallet-title">Your Wallet</span>
                   <span className="wallet-address">
                     {address?.slice(0, 6)}...{address?.slice(-4)}
@@ -1021,6 +931,11 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                     <span className="balance-label">Balance</span>
                     <span
                       className={`balance-value ${hasSufficientBalance ? 'sufficient' : 'insufficient'}`}
+                      title={
+                        dynamicBalance.isLoading
+                          ? 'Loading...'
+                          : `${(Number(dynamicBalance.data || BigInt(0)) / LAMPORTS_PER_SOL).toFixed(6)} ${gameToken.data?.tokenSymbol || ''}`
+                      }
                     >
                       {dynamicBalance.isLoading
                         ? 'Loading...'
@@ -1030,7 +945,10 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
 
                   <div className="balance-item">
                     <span className="balance-label">Required</span>
-                    <span className="balance-value">
+                    <span
+                      className="balance-value"
+                      title={`${(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(6)} ${gameToken.data?.tokenSymbol || ''}`}
+                    >
                       {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}{' '}
                       {gameToken.data?.tokenSymbol || ''}
                     </span>

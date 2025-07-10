@@ -2,8 +2,8 @@
 .race-game-modal-wrapper {
   // 移除固定定位，让外层Modal组件处理
   width: 100%;
-  min-width: 500px;
-  max-width: 42rem;
+  min-width: 650px;
+  max-width: 50rem;
 
   .race-game-modal {
     position: relative;
@@ -104,16 +104,78 @@
       }
     }
 
-    // Content Section - Two-Column Grid Layout
+    // Content Section - Game Status Full Width + Two-Column Grid Layout
     .race-content {
       padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+
+      // Game Status - Full Width at Top
+      .game-status {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 0.75rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+
+        .status-info {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+
+          .status-dot {
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 50%;
+
+            &.green {
+              background-color: #10b981;
+            }
+            &.blue {
+              background-color: #3b82f6;
+            }
+            &.yellow {
+              background-color: #f59e0b;
+            }
+            &.red {
+              background-color: #ef4444;
+            }
+          }
+
+          .status-text {
+            font-size: 0.875rem;
+            color: white;
+            font-weight: 500;
+          }
+        }
+
+        .refresh-button {
+          padding: 0.5rem 1rem;
+          background: rgba(255, 255, 255, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 0.5rem;
+          color: rgba(255, 255, 255, 0.8);
+          font-size: 0.75rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+          }
+        }
+      }
 
       // Two-column grid container
       .race-content-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1.2fr 1fr;
         gap: 2rem;
         align-items: start;
+        min-height: 300px;
 
         // Left Column - Race Information
         .race-info-column {
@@ -127,6 +189,7 @@
           display: flex;
           flex-direction: column;
           gap: 1.5rem;
+          min-width: 0; // 防止内容溢出
         }
       }
 
@@ -201,34 +264,38 @@
         border: 1px solid rgba(16, 185, 129, 0.15);
         border-radius: 0.75rem;
         padding: 1.5rem;
-        margin-bottom: 2rem;
+        min-width: 0; // 防止内容溢出
 
         .wallet-header {
           display: flex;
           align-items: center;
           gap: 0.75rem;
           margin-bottom: 1rem;
+          flex-wrap: wrap; // 允许换行
 
           .wallet-icon {
             width: 1.25rem;
             height: 1.25rem;
             color: #10b981;
+            flex-shrink: 0;
           }
 
           .wallet-title {
             font-size: 1rem;
             font-weight: 600;
             color: white;
+            flex-shrink: 0;
           }
 
           .wallet-address {
-            margin-left: auto;
             font-family: 'SF Mono', Consolas, monospace;
             font-size: 0.75rem;
             color: rgba(255, 255, 255, 0.5);
             background: rgba(255, 255, 255, 0.05);
             padding: 0.25rem 0.5rem;
             border-radius: 0.25rem;
+            word-break: break-all; // 允许地址换行
+            min-width: 0; // 防止溢出
           }
         }
 
@@ -245,15 +312,21 @@
             background: rgba(255, 255, 255, 0.03);
             border-radius: 0.5rem;
             border: 1px solid rgba(255, 255, 255, 0.08);
+            min-width: 0; // 防止溢出
 
             .balance-label {
               font-size: 0.875rem;
               color: rgba(255, 255, 255, 0.7);
+              flex-shrink: 0;
             }
 
             .balance-value {
               font-family: 'SF Mono', Consolas, monospace;
               font-weight: 600;
+              font-size: 0.8rem;
+              text-align: right;
+              word-break: break-all; // 允许长数字换行
+              min-width: 0;
 
               &.sufficient {
                 color: #10b981;
@@ -286,7 +359,7 @@
         border: 1px solid rgba(59, 130, 246, 0.15);
         border-radius: 0.75rem;
         padding: 1.5rem;
-        margin-bottom: 2rem;
+        min-width: 0; // 防止溢出
 
         .detection-header {
           display: flex;
@@ -307,8 +380,9 @@
             font-size: 0.875rem;
             font-weight: 500;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 0.5rem;
+            word-break: break-word; // 允许长文本换行
           }
 
           .detection-warning {
@@ -316,67 +390,10 @@
             font-size: 0.875rem;
             font-weight: 500;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 0.5rem;
-          }
-        }
-      }
-
-      // Game Status - Minimal Design
-      .game-status {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1rem 1.5rem;
-        background: rgba(255, 255, 255, 0.03);
-        border-radius: 0.75rem;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        margin-bottom: 2rem;
-
-        .status-info {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-
-          .status-dot {
-            width: 0.75rem;
-            height: 0.75rem;
-            border-radius: 50%;
-
-            &.green {
-              background-color: #10b981;
-            }
-            &.blue {
-              background-color: #3b82f6;
-            }
-            &.yellow {
-              background-color: #f59e0b;
-            }
-            &.red {
-              background-color: #ef4444;
-            }
-          }
-
-          .status-text {
-            font-size: 0.875rem;
-            color: white;
-            font-weight: 500;
-          }
-        }
-
-        .refresh-button {
-          padding: 0.5rem 1rem;
-          background: rgba(255, 255, 255, 0.1);
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          border-radius: 0.5rem;
-          color: rgba(255, 255, 255, 0.8);
-          font-size: 0.75rem;
-          cursor: pointer;
-          transition: all 0.2s ease;
-
-          &:hover {
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
+            word-break: break-word; // 允许长文本换行
+            line-height: 1.4;
           }
         }
       }
@@ -464,6 +481,8 @@
       border-top: 1px solid rgba(255, 255, 255, 0.08);
       display: flex;
       gap: 1rem;
+      align-items: center;
+      flex-wrap: wrap;
 
       .race-btn {
         display: inline-flex;
@@ -542,10 +561,37 @@
 }
 
 // 响应式设计 - 优化移动端体验
-@media (max-width: 768px) {
+@media (max-width: 1200px) {
+  .race-game-modal-wrapper {
+    min-width: 85vw;
+    max-width: 85vw;
+  }
+}
+
+@media (max-width: 1024px) {
   .race-game-modal-wrapper {
     min-width: 90vw;
     max-width: 90vw;
+
+    .race-game-modal {
+      max-height: 90vh;
+      overflow-y: auto;
+
+      .race-content {
+        // Stack columns vertically on smaller screens
+        .race-content-grid {
+          grid-template-columns: 1fr;
+          gap: 1.5rem;
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .race-game-modal-wrapper {
+    min-width: 95vw;
+    max-width: 95vw;
 
     .race-game-modal {
       max-height: 90vh;
@@ -572,12 +618,27 @@
       .race-content {
         padding: 1.5rem;
 
+        // Stack columns vertically on mobile
+        .race-content-grid {
+          grid-template-columns: 1fr;
+          gap: 1.5rem;
+        }
+
         .stats-grid {
           grid-template-columns: repeat(2, 1fr);
           gap: 0.75rem;
 
           .stat-card {
             padding: 1rem 0.75rem;
+
+            .stat-icon {
+              width: 1.5rem;
+              height: 1.5rem;
+            }
+
+            .stat-value {
+              font-size: 1rem;
+            }
           }
         }
 
@@ -604,8 +665,10 @@
 @media (max-width: 480px) {
   .race-game-modal-wrapper {
     .race-game-modal {
-      .stats-grid {
-        grid-template-columns: 1fr;
+      .race-content {
+        .stats-grid {
+          grid-template-columns: 1fr;
+        }
       }
 
       .race-header {
