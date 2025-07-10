@@ -310,10 +310,10 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
   };
 
   /**
-   * 加入游戏 - 使用动态token和分层定价，直接使用solanaVault进行交易
+   * 加入游戏 - 使用新的安全前端交易流程
    */
   const handleJoinGame = async () => {
-    console.log('🎮 Starting handleJoinGame...');
+    console.log('🎮 Starting secure handleJoinGame...');
 
     if (!address) {
       console.error('No wallet address available');
@@ -341,9 +341,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       setIsJoining(true);
       setTxStep('joining');
 
-      // Use dynamic tier and player level (default level 1 for now)
-      const playerLevel = 1; // TODO: Get from player profile
-
       console.log('💰 Calculating tier pricing...');
 
       // Get tier pricing to determine the correct amount
@@ -364,97 +361,28 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
         entranceFeeSOL: Number(config.entranceFee) / LAMPORTS_PER_SOL,
       });
 
-      // Get current game token info to determine token mint
-      const serverUrl =
-        localStorage.getItem('selectedServer') || 'localhost:8000';
-      const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
-
-      // 🔧 修复：确保URL格式正确
-      const cleanServerUrl = serverUrl.replace(/\/$/, '');
-      const finalServerUrl = cleanServerUrl.startsWith('http')
-        ? cleanServerUrl
-        : `${protocol}://${cleanServerUrl}`;
-
-      console.log(
-        '🌐 Fetching server info from:',
-        `${finalServerUrl}/serverinfo`,
-      );
-
+      // Get token mint from game token data
       let tokenMint;
-
       try {
-        // Fetch game token info
-        const response = await fetch(`${finalServerUrl}/serverinfo`, {
-          method: 'GET',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          signal: AbortSignal.timeout(10000), // 10秒超时
-        });
-
-        console.log('📡 Server info response status:', response.status);
-
-        if (response.ok) {
-          const serverInfo = await response.json();
-          console.log('📋 Server info received:', serverInfo);
-
-          if (serverInfo.gameStatus?.tokenMint) {
-            const { PublicKey } = await import('@solana/web3.js');
-            tokenMint = new PublicKey(serverInfo.gameStatus.tokenMint);
-            console.log(
-              '🪙 Using server-provided token mint:',
-              tokenMint.toString(),
-            );
-          } else {
-            // Default to SOL if no token mint specified
-            const { PublicKey } = await import('@solana/web3.js');
-            tokenMint = new PublicKey(
-              'So11111111111111111111111111111111111111112',
-            );
-            console.log(
-              '🪙 Using default SOL token mint:',
-              tokenMint.toString(),
-            );
-          }
-        } else {
-          console.warn(
-            '⚠️ Failed to fetch server info, using default SOL token mint',
-          );
-          const { PublicKey } = await import('@solana/web3.js');
-          tokenMint = new PublicKey(
-            'So11111111111111111111111111111111111111112',
-          );
-        }
-      } catch (error) {
-        console.warn(
-          '⚠️ Server info fetch error, using default SOL token mint:',
-          error,
-        );
         const { PublicKey } = await import('@solana/web3.js');
-        tokenMint = new PublicKey(
-          'So11111111111111111111111111111111111111112',
-        );
+
+        // Use token mint from environment or default to test token
+        const tokenMintAddress =
+          process.env.REACT_APP_TOKEN_MINT ||
+          'Hk4BerAoKbemG277HShrk8DSHiMEUKbm6D23RKhLDLKq'; // Test SBTT token
+
+        tokenMint = new PublicKey(tokenMintAddress);
+        console.log('🪙 Using token mint:', tokenMint.toString());
+      } catch (error) {
+        console.error('❌ Failed to create token mint PublicKey:', error);
+        throw new Error('Invalid token mint configuration');
       }
 
-      // Check if we have all required information
       // Ensure we have a valid game ID from server before proceeding
-      if (!gameState.gameId) {
-        throw new Error(
-          'Game ID not available. Please wait for server connection or refresh.',
-        );
-      }
-
       const actualGameId = gameState.gameId;
       console.log('🎮 Using confirmed game ID from server:', actualGameId);
 
-      if (!gameToken.data) {
-        throw new Error(
-          'Game token information not available. Please refresh and try again.',
-        );
-      }
-
-      console.log('🚀 About to call solanaVault.buyTicket with:', {
+      console.log('🚀 About to call secure solanaVault.buyTicket with:', {
         gameId: actualGameId,
         amount: config.entranceFee.toString(),
         tokenMint: tokenMint.toString(),
@@ -462,7 +390,8 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
         expectedAmount: config.entranceFee.toString(),
       });
 
-      // Use direct Solana vault implementation
+      // 🔒 Use new secure frontend transaction flow
+      // This will trigger wallet popup and handle all security validation
       const txResult = await solanaVault.buyTicket(
         actualGameId,
         config.entranceFee,
@@ -471,25 +400,26 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
         config.entranceFee, // expected amount for validation
       );
 
-      console.log('🎯 Successfully joined game with Solana:', {
+      console.log('🎯 Successfully joined game with secure transaction:', {
         gameId: actualGameId,
         tier: currentTier,
-        level: playerLevel,
         tokenSymbol: gameToken.data.tokenSymbol,
         entranceFee: Number(config.entranceFee) / LAMPORTS_PER_SOL,
         txHash: txResult,
       });
 
-      // 🔧 修复：确保交易完全完成后再进入游戏
-      console.log('✅ Transaction completed successfully, entering game...');
+      // 🔧 Wait for transaction completion and state sync
+      console.log(
+        '✅ Transaction completed successfully, preparing to enter game...',
+      );
 
-      // 刷新游戏数据以确保服务器识别玩家
+      // Refresh game data to ensure server recognizes player
       await gameState.refreshGameData();
 
-      // 等待一小段时间确保状态同步
+      // Wait a moment for state synchronization
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // 现在可以安全地进入游戏
+      // Now safe to enter the game
       onJoinGame(address);
       onClose();
     } catch (error) {
@@ -503,8 +433,9 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     }
   };
 
-  // 🔧 修复：简化交易状态监听，移除函数依赖
+  // 🔧 修复：简化交易状态监听，适配新的安全交易流程
   useEffect(() => {
+    // Handle legacy txStep states for backward compatibility
     if (txStep !== 'idle') {
       if (txStep === 'approving') {
         // 授权完成，刷新数据
@@ -520,15 +451,24 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             setTxStep('idle');
           });
       } else if (txStep === 'joining') {
-        // 加入游戏中 - 只刷新数据，不自动进入游戏
-        gameState.refreshGameData();
-        setTxStep('waiting');
-
-        // 🔧 修复：移除自动游戏进入逻辑，等待交易完成
-        console.log('⏳ Transaction in progress, waiting for completion...');
+        // 加入游戏中 - 等待新的安全交易流程完成
+        console.log('⏳ Secure transaction in progress...');
+        // txStep will be reset in handleJoinGame when transaction completes
       }
     }
-  }, [txStep, playerData, dynamicBalance, gameState]); // 🎯 修复依赖
+
+    // Handle new secure transaction status
+    if (solanaVault.txStatus === 'completed') {
+      // Transaction completed successfully, refresh data
+      Promise.allSettled([
+        gameState.refreshGameData(),
+        playerData.refreshPlayerData(),
+        dynamicBalance.refetch(),
+      ]).catch((error: any) => {
+        console.warn('Error refreshing data after transaction:', error);
+      });
+    }
+  }, [txStep, solanaVault.txStatus, playerData, dynamicBalance, gameState]); // 🎯 修复依赖
 
   /**
    * 获取按钮状态和文本 - 优化设计
@@ -1014,14 +954,31 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
               playerData.error ||
               gameToken.error ||
               tierPricing.error ||
-              dynamicBalance.error) && (
+              dynamicBalance.error ||
+              solanaVault.error) && (
               <div className="error-state">
-                {String(
-                  gameState.error ||
-                    playerData.error ||
-                    gameToken.error ||
-                    tierPricing.error ||
-                    dynamicBalance.error,
+                <div className="error-icon">⚠️</div>
+                <div className="error-message">
+                  {String(
+                    solanaVault.error?.message || // Prioritize vault errors (user-friendly)
+                      gameState.error ||
+                      playerData.error ||
+                      gameToken.error ||
+                      tierPricing.error ||
+                      dynamicBalance.error,
+                  )}
+                </div>
+                {solanaVault.error && (
+                  <button
+                    className="error-retry-btn"
+                    onClick={() => {
+                      // Clear vault error and allow user to retry
+                      solanaVault.error = null;
+                      setTxStep('idle');
+                    }}
+                  >
+                    Try Again
+                  </button>
                 )}
               </div>
             )}

@@ -216,6 +216,31 @@ class TierValidationMiddleware {
 
     return { isAllowed: true };
   }
+
+  /**
+   * Clear rate limit for a specific player (for testing/debugging)
+   */
+  static clearRateLimit(playerAddress) {
+    if (this.rateLimitCache) {
+      this.rateLimitCache.delete(playerAddress);
+      console.log(`🔄 Cleared rate limit for ${playerAddress}`);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Clear all rate limits (for testing/debugging)
+   */
+  static clearAllRateLimits() {
+    if (this.rateLimitCache) {
+      const count = this.rateLimitCache.size;
+      this.rateLimitCache.clear();
+      console.log(`🔄 Cleared all rate limits (${count} entries)`);
+      return count;
+    }
+    return 0;
+  }
 }
 
 module.exports = TierValidationMiddleware;

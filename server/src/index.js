@@ -353,7 +353,7 @@ function registerPublicRoutes(app, game) {
       }
     });
 
-    // Buy ticket endpoint - Fixed async error handling
+    // Legacy buy ticket endpoint - Fixed async error handling
     app.options('/api/buy-ticket', (res) => {
       res.onAborted(() => {
         console.warn('Buy-ticket OPTIONS request aborted by client');
@@ -386,6 +386,138 @@ function registerPublicRoutes(app, game) {
           console.error('Failed to send error response:', resError);
         }
       }
+    });
+
+    // 🔒 Secure frontend transaction building endpoint
+    app.options('/api/build-buy-ticket-transaction', (res) => {
+      res.onAborted(() => {
+        console.warn(
+          'Build-buy-ticket-transaction OPTIONS request aborted by client',
+        );
+      });
+      setCors(res);
+      res.end();
+    });
+    app.post('/api/build-buy-ticket-transaction', async (res, req) => {
+      // Register abort handler FIRST
+      res.onAborted(() => {
+        console.warn('Build buy ticket transaction request aborted by client');
+      });
+
+      setCors(res);
+      res.writeHeader('Content-Type', 'application/json');
+
+      try {
+        await handleBuildBuyTicketTransactionRequest(res, req, game);
+      } catch (error) {
+        console.error('Error in build-buy-ticket-transaction endpoint:', error);
+        try {
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
+              success: false,
+              error: 'Internal server error',
+              details: error.message,
+            }),
+          );
+        } catch (resError) {
+          console.error('Failed to send error response:', resError);
+        }
+      }
+    });
+
+    // 🔍 Secure frontend transaction verification endpoint
+    app.options('/api/verify-buy-ticket-transaction', (res) => {
+      res.onAborted(() => {
+        console.warn(
+          'Verify-buy-ticket-transaction OPTIONS request aborted by client',
+        );
+      });
+      setCors(res);
+      res.end();
+    });
+    app.post('/api/verify-buy-ticket-transaction', async (res, req) => {
+      // Register abort handler FIRST
+      res.onAborted(() => {
+        console.warn('Verify buy ticket transaction request aborted by client');
+      });
+
+      setCors(res);
+      res.writeHeader('Content-Type', 'application/json');
+
+      try {
+        await handleVerifyBuyTicketTransactionRequest(res, req, game);
+      } catch (error) {
+        console.error(
+          'Error in verify-buy-ticket-transaction endpoint:',
+          error,
+        );
+        try {
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
+              success: false,
+              error: 'Internal server error',
+              details: error.message,
+            }),
+          );
+        } catch (resError) {
+          console.error('Failed to send error response:', resError);
+        }
+      }
+    });
+
+    // Clear rate limit endpoint (for testing/debugging)
+    app.options('/api/clear-rate-limit', (res) => {
+      res.onAborted(() => {
+        console.warn('Clear-rate-limit OPTIONS request aborted by client');
+      });
+      setCors(res);
+      res.end();
+    });
+    app.post('/api/clear-rate-limit', async (res, req) => {
+      res.onAborted(() => {
+        console.warn('Clear rate limit request aborted by client');
+      });
+
+      setCors(res);
+      res.writeHeader('Content-Type', 'application/json');
+
+      let body = Buffer.alloc(0);
+      res.onData((chunk, isLast) => {
+        body = Buffer.concat([body, Buffer.from(chunk)]);
+        if (isLast) {
+          try {
+            const data = JSON.parse(body.toString());
+            const { walletAddress } = data;
+
+            if (!walletAddress) {
+              res.writeStatus('400 Bad Request').end(
+                JSON.stringify({
+                  success: false,
+                  error: 'Missing walletAddress',
+                }),
+              );
+              return;
+            }
+
+            const success =
+              TierValidationMiddleware.clearRateLimit(walletAddress);
+            res.writeStatus('200 OK').end(
+              JSON.stringify({
+                success: true,
+                message: `Rate limit cleared for ${walletAddress}`,
+                cleared: success,
+              }),
+            );
+          } catch (error) {
+            res.writeStatus('400 Bad Request').end(
+              JSON.stringify({
+                success: false,
+                error: 'Invalid JSON',
+              }),
+            );
+          }
+        }
+      });
     });
 
     // Player joined notification endpoint - Fixed async error handling
@@ -1911,4 +2043,434 @@ function validateServerConfiguration() {
   console.log(
     `   SERVER RESTART CYCLE ${config.enableCycleRestart ? 'YES' : 'NO'} `,
   );
+}
+
+// Build buy ticket transaction handler (for secure frontend flow)
+async function handleBuildBuyTicketTransactionRequest(res, req, game) {
+  let hasResponded = false;
+
+  const timeout = setTimeout(() => {
+    if (!hasResponded) {
+      hasResponded = true;
+      console.error('Build transaction request timeout');
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Request timeout',
+          }),
+        );
+      } catch (e) {
+        console.error('Failed to send timeout response:', e);
+      }
+    }
+  }, 15000);
+
+  try {
+    // Read request body
+    let body = '';
+    res.onData((chunk, isLast) => {
+      if (hasResponded) return;
+
+      try {
+        body += Buffer.from(chunk).toString();
+        if (isLast) {
+          try {
+            const data = JSON.parse(body);
+            processBuildBuyTicketTransaction(
+              res,
+              game,
+              data,
+              { hasResponded: false },
+              timeout,
+            );
+          } catch (parseError) {
+            if (!hasResponded) {
+              hasResponded = true;
+              clearTimeout(timeout);
+              res.writeStatus('400 Bad Request').end(
+                JSON.stringify({
+                  success: false,
+                  error: 'Invalid JSON',
+                }),
+              );
+            }
+          }
+        }
+      } catch (error) {
+        if (!hasResponded) {
+          hasResponded = true;
+          clearTimeout(timeout);
+          console.error('Error processing request data:', error);
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
+              success: false,
+              error: 'Error processing request data',
+            }),
+          );
+        }
+      }
+    });
+
+    res.onAborted(() => {
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        console.log('Build buy ticket transaction request aborted');
+      }
+    });
+  } catch (error) {
+    console.error('Error in build buy ticket transaction request:', error);
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Internal server error',
+          }),
+        );
+      } catch (resError) {
+        console.error('Failed to send error response:', resError);
+      }
+    }
+  }
+}
+
+// Process build buy ticket transaction with security validation
+async function processBuildBuyTicketTransaction(
+  res,
+  game,
+  data,
+  responseState,
+  timeout,
+) {
+  let hasResponded = responseState.hasResponded;
+
+  try {
+    const {
+      gameId,
+      amount,
+      walletAddress,
+      tokenMint,
+      tier = 'low',
+      expectedAmount,
+      signature,
+      playerLevel = 1,
+    } = data;
+
+    console.log('🔧 Building secure transaction for:', {
+      gameId,
+      amount,
+      walletAddress,
+      tier,
+    });
+
+    // Basic input validation
+    if (!gameId || !amount || !walletAddress || !tokenMint) {
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('400 Bad Request').end(
+          JSON.stringify({
+            success: false,
+            error:
+              'Missing required fields: gameId, amount, walletAddress, tokenMint',
+          }),
+        );
+      }
+      return;
+    }
+
+    // Security validation using TierValidationMiddleware
+    const rateLimit = TierValidationMiddleware.checkRateLimit(walletAddress);
+    if (!rateLimit.isAllowed) {
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('429 Too Many Requests').end(
+          JSON.stringify({
+            success: false,
+            error: rateLimit.error,
+          }),
+        );
+      }
+      return;
+    }
+
+    const validation = TierValidationMiddleware.validateTicketPurchase({
+      tier,
+      amount,
+      gameId,
+      playerAddress: walletAddress,
+      playerLevel,
+    });
+
+    if (!validation.isValid) {
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('400 Bad Request').end(
+          JSON.stringify({
+            success: false,
+            error: validation.error,
+          }),
+        );
+      }
+      return;
+    }
+
+    // Check if Solana vault service is available
+    if (!game.solanaVaultService) {
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('400 Bad Request').end(
+          JSON.stringify({
+            success: false,
+            error: 'Solana vault service not available',
+          }),
+        );
+      }
+      return;
+    }
+
+    console.log('🔧 Building transaction using vault SDK...');
+
+    // Get user token account
+    const { PublicKey, getAssociatedTokenAddress } = require('@solana/web3.js');
+    const userTokenAccount = await getAssociatedTokenAddress(
+      new PublicKey(tokenMint),
+      new PublicKey(walletAddress),
+    );
+
+    // Build the transaction using vault SDK
+    const buildResult =
+      await game.solanaVaultService.vaultSDK.buildBuyTicketTransaction({
+        gameId: parseInt(gameId),
+        amount: BigInt(amount),
+        userTokenAccount,
+        tier,
+        expectedAmount: BigInt(expectedAmount || amount),
+        walletAddress,
+      });
+
+    console.log('✅ Transaction built successfully');
+
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      res.writeStatus('200 OK').end(
+        JSON.stringify({
+          success: true,
+          transaction: buildResult.transaction,
+          message: 'Transaction built successfully, ready for signing',
+        }),
+      );
+    }
+  } catch (error) {
+    console.error('Error building transaction:', error);
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      res.writeStatus('500 Internal Server Error').end(
+        JSON.stringify({
+          success: false,
+          error: 'Failed to build transaction: ' + error.message,
+        }),
+      );
+    }
+  }
+}
+
+// Verify buy ticket transaction handler (for secure frontend flow)
+async function handleVerifyBuyTicketTransactionRequest(res, req, game) {
+  let hasResponded = false;
+
+  const timeout = setTimeout(() => {
+    if (!hasResponded) {
+      hasResponded = true;
+      console.error('Verify transaction request timeout');
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Request timeout',
+          }),
+        );
+      } catch (e) {
+        console.error('Failed to send timeout response:', e);
+      }
+    }
+  }, 15000);
+
+  try {
+    // Read request body
+    let body = '';
+    res.onData((chunk, isLast) => {
+      if (hasResponded) return;
+
+      try {
+        body += Buffer.from(chunk).toString();
+        if (isLast) {
+          try {
+            const data = JSON.parse(body);
+            processVerifyBuyTicketTransaction(
+              res,
+              game,
+              data,
+              { hasResponded: false },
+              timeout,
+            );
+          } catch (parseError) {
+            if (!hasResponded) {
+              hasResponded = true;
+              clearTimeout(timeout);
+              res.writeStatus('400 Bad Request').end(
+                JSON.stringify({
+                  success: false,
+                  error: 'Invalid JSON',
+                }),
+              );
+            }
+          }
+        }
+      } catch (error) {
+        if (!hasResponded) {
+          hasResponded = true;
+          clearTimeout(timeout);
+          console.error('Error processing request data:', error);
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
+              success: false,
+              error: 'Error processing request data',
+            }),
+          );
+        }
+      }
+    });
+
+    res.onAborted(() => {
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        console.log('Verify buy ticket transaction request aborted');
+      }
+    });
+  } catch (error) {
+    console.error('Error in verify buy ticket transaction request:', error);
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      try {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
+            success: false,
+            error: 'Internal server error',
+          }),
+        );
+      } catch (resError) {
+        console.error('Failed to send error response:', resError);
+      }
+    }
+  }
+}
+
+// Process verify buy ticket transaction
+async function processVerifyBuyTicketTransaction(
+  res,
+  game,
+  data,
+  responseState,
+  timeout,
+) {
+  let hasResponded = responseState.hasResponded;
+
+  try {
+    const {
+      gameId,
+      txSignature,
+      walletAddress,
+      amount,
+      tier,
+      originalSignature,
+    } = data;
+
+    console.log('🔍 Verifying transaction:', {
+      gameId,
+      txSignature,
+      walletAddress,
+      tier,
+    });
+
+    // Basic input validation
+    if (!gameId || !txSignature || !walletAddress) {
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('400 Bad Request').end(
+          JSON.stringify({
+            success: false,
+            error:
+              'Missing required fields: gameId, txSignature, walletAddress',
+          }),
+        );
+      }
+      return;
+    }
+
+    // Verify transaction on blockchain
+    if (!game.solanaVaultService) {
+      if (!hasResponded) {
+        hasResponded = true;
+        clearTimeout(timeout);
+        res.writeStatus('400 Bad Request').end(
+          JSON.stringify({
+            success: false,
+            error: 'Solana vault service not available',
+          }),
+        );
+      }
+      return;
+    }
+
+    console.log('🔍 Verifying transaction on blockchain...');
+
+    // Verify the transaction actually happened and is valid
+    const verificationResult =
+      await game.solanaVaultService.vaultSDK.verifyBuyTicketTransaction({
+        gameId: parseInt(gameId),
+        txSignature,
+        walletAddress,
+        amount: BigInt(amount || 0),
+        tier,
+      });
+
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      res.writeStatus('200 OK').end(
+        JSON.stringify({
+          success: verificationResult.success,
+          message: verificationResult.success
+            ? 'Transaction verified successfully'
+            : 'Transaction verification failed',
+          details: verificationResult.details,
+        }),
+      );
+    }
+  } catch (error) {
+    console.error('Error verifying transaction:', error);
+    if (!hasResponded) {
+      hasResponded = true;
+      clearTimeout(timeout);
+      res.writeStatus('500 Internal Server Error').end(
+        JSON.stringify({
+          success: false,
+          error: 'Failed to verify transaction: ' + error.message,
+        }),
+      );
+    }
+  }
 }

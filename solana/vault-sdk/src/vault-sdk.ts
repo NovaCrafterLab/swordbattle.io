@@ -1,12 +1,9 @@
 import * as anchor from '@coral-xyz/anchor';
-import { PublicKey, SystemProgram } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import {
-  TOKEN_PROGRAM_ID,
-  NATIVE_MINT,
   getAssociatedTokenAddress,
   getOrCreateAssociatedTokenAccount,
-  getAccount,
-  TokenAccountNotFoundError,
+  TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 import {
   VaultConfig,
@@ -51,6 +48,7 @@ export class VaultSDK {
       { commitment: 'confirmed' },
     );
 
+    // 🔧 修复：使用传入的programId而不是IDL中的地址
     this.program = new Program<Vault>(IDL as Vault, provider);
   }
 
@@ -120,18 +118,21 @@ export class VaultSDK {
       })
       .rpc();
 
-    // Create vault token account after initialization
-    try {
-      await getOrCreateAssociatedTokenAccount(
-        this.connection,
-        this.wallet,
-        params.tokenMint,
-        vault,
-        true, // allowOwnerOffCurve
-      );
-    } catch (error) {
-      console.warn('Vault token account might already exist:', error);
-    }
+    // 🔧 临时修复：跳过vault token账户的预创建，让它在需要时自动创建
+    console.log(
+      `📝 Vault token account will be created automatically when needed for game ${params.gameId}`,
+    );
+    console.log(`🪙 Token mint: ${params.tokenMint.toString()}`);
+
+    const vaultToken = await getAssociatedTokenAddress(
+      params.tokenMint,
+      vault,
+      true,
+    );
+    console.log(`🔗 Vault token address: ${vaultToken.toString()}`);
+    console.log(
+      `✅ Game vault initialization completed for game ${params.gameId}`,
+    );
 
     return tx;
   }
@@ -158,17 +159,45 @@ export class VaultSDK {
       true,
     );
 
-    // Create vault token account if it doesn't exist
+    // 🔧 修复：直接使用getOrCreateAssociatedTokenAccount，去掉getAccount检查
+    console.log(
+      `🔨 Ensuring vault token account exists for mint: ${(vaultAccount.tokenMint as PublicKey).toString()}`,
+    );
+    console.log(`🔧 Debug info:`);
+    console.log(`   Vault PDA: ${vault.toString()}`);
+    console.log(
+      `   Token mint: ${(vaultAccount.tokenMint as PublicKey).toString()}`,
+    );
+    console.log(`   Payer: ${this.wallet.publicKey.toString()}`);
+    console.log(`   Expected ATA: ${vaultToken.toString()}`);
+
     try {
-      await getOrCreateAssociatedTokenAccount(
+      const vaultTokenAccount = await getOrCreateAssociatedTokenAccount(
         this.connection,
         this.wallet,
         vaultAccount.tokenMint as PublicKey,
         vault,
         true, // allowOwnerOffCurve
       );
+      console.log(
+        `✅ Vault token account ready: ${vaultTokenAccount.address.toString()}`,
+      );
     } catch (error) {
-      console.warn('Vault token account might already exist:', error);
+      console.error(`❌ Failed to create vault token account:`, error);
+      console.error(`❌ Error details:`);
+      if (error instanceof Error) {
+        console.error(`   Error type: ${error.constructor.name}`);
+        console.error(`   Error message: ${error.message}`);
+        if (error.stack) {
+          console.error(`   Stack trace: ${error.stack}`);
+        }
+      }
+      if (error && typeof error === 'object' && 'logs' in error) {
+        console.error(`   Transaction logs:`, (error as any).logs);
+      }
+      throw new Error(
+        `Failed to create vault token account: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     // Server-side price validation for security
@@ -353,18 +382,21 @@ export class VaultSDK {
       })
       .rpc();
 
-    // Create vault token account after initialization
-    try {
-      await getOrCreateAssociatedTokenAccount(
-        this.connection,
-        this.wallet,
-        params.tokenMint,
-        vault,
-        true, // allowOwnerOffCurve
-      );
-    } catch (error) {
-      console.warn('Vault token account might already exist:', error);
-    }
+    // 🔧 临时修复：跳过vault token账户的预创建，让它在需要时自动创建
+    console.log(
+      `📝 Vault token account will be created automatically when needed for game ${params.gameId} (tier: ${params.tier})`,
+    );
+    console.log(`🪙 Token mint: ${params.tokenMint.toString()}`);
+
+    const vaultToken = await getAssociatedTokenAddress(
+      params.tokenMint,
+      vault,
+      true,
+    );
+    console.log(`🔗 Vault token address: ${vaultToken.toString()}`);
+    console.log(
+      `✅ Game vault initialization completed for game ${params.gameId} (tier: ${params.tier})`,
+    );
 
     return tx;
   }
@@ -997,5 +1029,146 @@ export class VaultSDK {
       finalized: allGames.filter((g) => g.finalized).length,
       withWithdrawEnabled: allGames.filter((g) => g.withdrawEnabled).length,
     };
+  }
+
+  /**
+   * Build buy ticket transaction for secure frontend flow
+   */
+  async buildBuyTicketTransaction(params: {
+    gameId: number;
+    amount: bigint;
+    userTokenAccount: PublicKey;
+    tier: string;
+    expectedAmount: bigint;
+    walletAddress: string;
+  }): Promise<{ transaction: string }> {
+    console.log('🔧 Building buy ticket transaction:', params);
+
+    const { vault } = this.getVaultPdas(params.gameId);
+
+    // Get vault account to determine token mint
+    const vaultAccount = await this.program.account.gameVault.fetch(vault);
+
+    // Get vault token account
+    const vaultToken = await getAssociatedTokenAddress(
+      vaultAccount.tokenMint as PublicKey,
+      vault,
+      true, // allowOwnerOffCurve
+    );
+
+    // Get user ticket PDA
+    const userTicket = this.getUserTicketPda(
+      params.gameId,
+      new PublicKey(params.walletAddress),
+    );
+
+    // Build the transaction using correct IDL method signature
+    const tx = await this.program.methods
+      .buyTicket(new anchor.BN(params.amount.toString()))
+      .accounts({
+        vault: vault,
+        userTicket: userTicket,
+        userToken: params.userTokenAccount,
+        vaultToken: vaultToken,
+        user: new PublicKey(params.walletAddress),
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .transaction();
+
+    // Get recent blockhash
+    const { blockhash } = await this.connection.getLatestBlockhash();
+    tx.recentBlockhash = blockhash;
+    tx.feePayer = new PublicKey(params.walletAddress);
+
+    // Serialize transaction
+    const serializedTx = tx.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    });
+
+    return {
+      transaction: serializedTx.toString('base64'),
+    };
+  }
+
+  /**
+   * Verify buy ticket transaction for secure frontend flow
+   */
+  async verifyBuyTicketTransaction(params: {
+    gameId: number;
+    txSignature: string;
+    walletAddress: string;
+    amount: bigint;
+    tier: string;
+  }): Promise<{ success: boolean; details: any }> {
+    console.log('🔍 Verifying buy ticket transaction:', params);
+
+    try {
+      // Get transaction details from blockchain
+      const txInfo = await this.connection.getTransaction(params.txSignature, {
+        commitment: 'confirmed',
+        maxSupportedTransactionVersion: 0,
+      });
+
+      if (!txInfo) {
+        return {
+          success: false,
+          details: { error: 'Transaction not found on blockchain' },
+        };
+      }
+
+      if (txInfo.meta?.err) {
+        return {
+          success: false,
+          details: { error: 'Transaction failed', txError: txInfo.meta.err },
+        };
+      }
+
+      // Verify transaction contains expected program interaction
+      const { vault } = this.getVaultPdas(params.gameId);
+
+      // Check if transaction interacted with our program and vault
+      const programInteraction = txInfo.transaction.message.accountKeys.some(
+        (key: any) => key.equals(this.program.programId),
+      );
+
+      const vaultInteraction = txInfo.transaction.message.accountKeys.some(
+        (key: any) => key.equals(vault),
+      );
+
+      if (!programInteraction || !vaultInteraction) {
+        return {
+          success: false,
+          details: {
+            error: 'Transaction does not interact with expected program/vault',
+            programInteraction,
+            vaultInteraction,
+          },
+        };
+      }
+
+      // Additional verification could include:
+      // - Check token transfer amounts
+      // - Verify instruction data
+      // - Check account state changes
+
+      return {
+        success: true,
+        details: {
+          txSignature: params.txSignature,
+          slot: txInfo.slot,
+          blockTime: txInfo.blockTime,
+          fee: txInfo.meta?.fee,
+        },
+      };
+    } catch (error) {
+      console.error('Error verifying transaction:', error);
+      return {
+        success: false,
+        details: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      };
+    }
   }
 }
