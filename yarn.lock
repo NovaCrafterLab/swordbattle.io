@@ -4604,7 +4604,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/codecs-core@npm:2.0.0-rc.1":
+"@solana/codecs-core@npm:2.0.0-rc.1, @solana/codecs-core@npm:2.2.0":
   version: 2.0.0-rc.1
   resolution: "@solana/codecs-core@npm:2.0.0-rc.1"
   dependencies:
@@ -4612,17 +4612,6 @@ __metadata:
   peerDependencies:
     typescript: ">=5"
   checksum: 10c0/3b1fd09727bf850d191292b14e1afb64cda4e57f898c06483f40d0402c4f07f1d4df555f028f664701e647834c74924818857443666d039f4e44c8c01f31f427
-  languageName: node
-  linkType: hard
-
-"@solana/codecs-core@npm:2.2.0":
-  version: 2.2.0
-  resolution: "@solana/codecs-core@npm:2.2.0"
-  dependencies:
-    "@solana/errors": "npm:2.2.0"
-  peerDependencies:
-    typescript: ">=5.3.3"
-  checksum: 10c0/83def86e6391fa9ce73c9285790a4f7595be2579974e162140b3d13406b3026cdcbba46a932f75e21bdd69e0908c00d18f1d5c4354ee095de8766cbc71237cba
   languageName: node
   linkType: hard
 
@@ -4652,7 +4641,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/codecs-numbers@npm:2.0.0-rc.1":
+"@solana/codecs-numbers@npm:2.0.0-rc.1, @solana/codecs-numbers@npm:2.2.0":
   version: 2.0.0-rc.1
   resolution: "@solana/codecs-numbers@npm:2.0.0-rc.1"
   dependencies:
@@ -4664,7 +4653,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/codecs-numbers@npm:2.2.0, @solana/codecs-numbers@npm:^2.1.0":
+"@solana/codecs-numbers@npm:^2.1.0":
   version: 2.2.0
   resolution: "@solana/codecs-numbers@npm:2.2.0"
   dependencies:
@@ -4734,7 +4723,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/errors@npm:2.0.0-rc.1":
+"@solana/errors@npm:2.0.0-rc.1, @solana/errors@npm:2.2.0":
   version: 2.0.0-rc.1
   resolution: "@solana/errors@npm:2.0.0-rc.1"
   dependencies:
@@ -4745,20 +4734,6 @@ __metadata:
   bin:
     errors: bin/cli.mjs
   checksum: 10c0/26b9edb43b4ba86b36aefb020a6e47706554ce57a95a357a55879c570ffd000417b1d9567b94120d114dfd38051e8362c18ee082b58cc34690c4c00f1040423c
-  languageName: node
-  linkType: hard
-
-"@solana/errors@npm:2.2.0":
-  version: 2.2.0
-  resolution: "@solana/errors@npm:2.2.0"
-  dependencies:
-    chalk: "npm:^5.4.1"
-    commander: "npm:^13.1.0"
-  peerDependencies:
-    typescript: ">=5.3.3"
-  bin:
-    errors: bin/cli.mjs
-  checksum: 10c0/6a61c8843ac105eeb68abaa81481cce9a9960f028902d335628c8353bb0746cf5e3ac8bb48f04912c805666b7d3e7a2f01bd2dd9225e38ad9cce821870499242
   languageName: node
   linkType: hard
 
@@ -6168,6 +6143,7 @@ __metadata:
     bfj: "npm:^7.0.2"
     bootstrap: "npm:^5.3.2"
     browserslist: "npm:^4.18.1"
+    buffer: "npm:^6.0.3"
     camelcase: "npm:^6.2.1"
     case-sensitive-paths-webpack-plugin: "npm:^2.4.0"
     chart.js: "npm:^4.4.1"
@@ -6193,6 +6169,7 @@ __metadata:
     postcss-loader: "npm:^6.2.1"
     postcss-normalize: "npm:^10.0.1"
     postcss-preset-env: "npm:^7.0.1"
+    process: "npm:^0.11.10"
     prompts: "npm:^2.4.2"
     protobufjs: "npm:^7.2.5"
     react: "npm:^18.2.0"

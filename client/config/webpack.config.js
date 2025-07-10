@@ -62,7 +62,7 @@ const useTypeScript = fs.existsSync(paths.appTsConfig);
 // const useTailwind = fs.existsSync(
 //   path.join(paths.appPath, 'tailwind.config.js'),
 // );
-const useTailwind = process.env.USE_TAILWIND === 'true'
+const useTailwind = process.env.USE_TAILWIND === 'true';
 
 // Get the path to the uncompiled service worker (if it exists).
 const swSrc = paths.swSrc;
@@ -329,7 +329,7 @@ module.exports = function (webpackEnv) {
       },
       fallback: {
         buffer: require.resolve('buffer'),
-        process: require.resolve('process'),
+        process: require.resolve('process/browser'),
         util: require.resolve('util'),
         vm: require.resolve('vm-browserify'),
         crypto: require.resolve('crypto-browserify'),
@@ -582,6 +582,11 @@ module.exports = function (webpackEnv) {
       ].filter(Boolean),
     },
     plugins: [
+      // Provide global polyfills for Node.js modules
+      new webpack.ProvidePlugin({
+        Buffer: ['buffer', 'Buffer'],
+        process: 'process',
+      }),
       // Generates an `index.html` file with the <script> injected.
       new HtmlWebpackPlugin(
         Object.assign(

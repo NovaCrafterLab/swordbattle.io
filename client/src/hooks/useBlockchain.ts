@@ -2,7 +2,11 @@
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
-import { getAssociatedTokenAddress, getAccount } from '@solana/spl-token';
+import {
+  getAssociatedTokenAddress,
+  getAccount,
+  getMint,
+} from '@solana/spl-token';
 import { useSolanaVault } from './useSolanaVault';
 
 // Separate custom hooks to avoid rules of hooks violations
@@ -139,6 +143,11 @@ export const useSPLTokenBalance = (
 
   const fetchBalance = useCallback(async () => {
     if (!walletAddress || !tokenMintAddress || !connection) {
+      console.log('🔍 SPL Balance fetch skipped - missing parameters:', {
+        walletAddress: !!walletAddress,
+        tokenMintAddress: !!tokenMintAddress,
+        connection: !!connection,
+      });
       setBalance(BigInt(0));
       return;
     }
@@ -146,6 +155,12 @@ export const useSPLTokenBalance = (
     try {
       setIsLoading(true);
       setError(null);
+
+      console.log('🔍 Fetching SPL token balance:', {
+        wallet: walletAddress.slice(0, 8) + '...',
+        token: tokenMintAddress.slice(0, 8) + '...',
+        fullTokenMint: tokenMintAddress,
+      });
 
       const walletPubkey = new PublicKey(walletAddress);
       const mintPubkey = new PublicKey(tokenMintAddress);
@@ -156,19 +171,39 @@ export const useSPLTokenBalance = (
         walletPubkey,
       );
 
+      console.log(
+        '🔍 Associated token account:',
+        associatedTokenAddress.toString(),
+      );
+
       // Get token account info
       const tokenAccount = await getAccount(connection, associatedTokenAddress);
-      setBalance(BigInt(tokenAccount.amount.toString()));
+      const balance = BigInt(tokenAccount.amount.toString());
+      setBalance(balance);
 
       console.log(
-        `💰 SPL Token Balance for ${walletAddress}: ${tokenAccount.amount.toString()} tokens`,
+        `💰 SPL Token Balance found for ${walletAddress.slice(0, 8)}...: ${balance.toString()} tokens (${tokenMintAddress.slice(0, 8)}...)`,
       );
     } catch (err) {
       const error = err as Error;
       console.log(
-        `ℹ️ No SPL token account found for ${walletAddress} (${tokenMintAddress.slice(0, 8)}...)`,
+        `ℹ️ No SPL token account found for ${walletAddress.slice(0, 8)}... (${tokenMintAddress.slice(0, 8)}...):`,
+        error.message,
       );
-      setError(null); // Don't treat missing token account as error
+
+      // Check if it's specifically a TokenAccountNotFoundError
+      if (
+        error.message.includes('could not find account') ||
+        error.message.includes('TokenAccountNotFoundError') ||
+        error.message.includes('Account does not exist')
+      ) {
+        console.log("📝 This is normal - user hasn't received this token yet");
+        setError(null); // Don't treat missing token account as error
+      } else {
+        console.error('❌ Unexpected error fetching SPL token balance:', error);
+        setError(error);
+      }
+
       setBalance(BigInt(0));
     } finally {
       setIsLoading(false);
@@ -198,6 +233,96 @@ export const useSPLBalance = (address: string) => {
     process.env.REACT_APP_TOKEN_MINT ||
     'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr';
   return useSPLTokenBalance(address, tokenMint);
+};
+
+/**
+ * Hook to dynamically fetch token metadata from on-chain
+ */
+export const useTokenMetadata = (tokenMintAddress: string) => {
+  const { connection } = useConnection();
+  const [metadata, setMetadata] = useState<{
+    symbol: string;
+    name: string;
+    decimals: number;
+  } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchMetadata = useCallback(async () => {
+    if (!tokenMintAddress || !connection) {
+      setMetadata(null);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const mintPubkey = new PublicKey(tokenMintAddress);
+
+      // Get mint account info to get decimals
+      const mintInfo = await getMint(connection, mintPubkey);
+
+      // For now, we'll use a simple mapping for known tokens
+      // In the future, this could be enhanced with actual metadata program calls
+      let symbol = 'UNKNOWN';
+      let name = 'Unknown Token';
+
+      if (tokenMintAddress === 'So11111111111111111111111111111111111111112') {
+        symbol = 'SOL';
+        name = 'Solana';
+      } else if (
+        tokenMintAddress === 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr'
+      ) {
+        symbol = 'USDC';
+        name = 'USD Coin';
+      } else if (
+        tokenMintAddress === 'Hk4BerAoKbemG277HShrk8DSHiMEUKbm6D23RKhLDLKq'
+      ) {
+        symbol = 'SBTT';
+        name = 'SwordBattle Test Token';
+      } else {
+        // For unknown tokens, try to get a better display name
+        symbol = tokenMintAddress.slice(0, 4) + '...';
+        name = 'Custom Token';
+      }
+
+      setMetadata({
+        symbol,
+        name,
+        decimals: mintInfo.decimals,
+      });
+
+      console.log(`🏷️ Token metadata for ${tokenMintAddress}:`, {
+        symbol,
+        name,
+        decimals: mintInfo.decimals,
+      });
+    } catch (err) {
+      const error = err as Error;
+      console.error(
+        `❌ Failed to fetch token metadata for ${tokenMintAddress}:`,
+        error,
+      );
+      setError(error);
+      setMetadata(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [tokenMintAddress, connection]);
+
+  useEffect(() => {
+    if (tokenMintAddress) {
+      fetchMetadata();
+    }
+  }, [tokenMintAddress, fetchMetadata]);
+
+  return {
+    data: metadata,
+    isLoading,
+    error,
+    refetch: fetchMetadata,
+  };
 };
 
 /**
@@ -257,9 +382,24 @@ export const useCurrentGameToken = () => {
         throw new Error('Token mint information not available');
       }
 
-      // Map token address to symbol and name
+      // 🚀 Dynamic token metadata retrieval
       let tokenSymbol = 'UNKNOWN';
       let tokenName = 'Unknown Token';
+      let tokenDecimals = 9; // Default decimals
+
+      // Try to get mint info for decimals and better metadata
+      try {
+        const mintPubkey = new PublicKey(tokenMint);
+        const mintInfo = await getMint(
+          new (await import('@solana/web3.js')).Connection(
+            'https://api.devnet.solana.com',
+          ),
+          mintPubkey,
+        );
+        tokenDecimals = mintInfo.decimals;
+      } catch (error) {
+        console.warn('Failed to get mint info, using default decimals:', error);
+      }
 
       // 使用 tokenInfo 中的信息，或基于 tokenMint 地址判断
       if (
@@ -268,14 +408,20 @@ export const useCurrentGameToken = () => {
       ) {
         tokenSymbol = 'SOL';
         tokenName = 'Solana';
+        tokenDecimals = 9;
       } else if (
         tokenInfoData?.isUSDC ||
         tokenMint === 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr'
       ) {
         tokenSymbol = 'USDC';
         tokenName = 'USD Coin';
+        tokenDecimals = 6;
+      } else if (tokenMint === 'Hk4BerAoKbemG277HShrk8DSHiMEUKbm6D23RKhLDLKq') {
+        tokenSymbol = 'SBTT';
+        tokenName = 'SwordBattle Test Token';
+        tokenDecimals = 9; // From test-token-config.json
       } else {
-        // Try to get token metadata from on-chain (simplified)
+        // For unknown tokens, use a more descriptive fallback
         tokenSymbol = tokenMint.slice(0, 4) + '...';
         tokenName = 'Custom Token';
       }
@@ -286,15 +432,17 @@ export const useCurrentGameToken = () => {
         tokenMint,
         tokenSymbol,
         tokenName,
+        tokenDecimals, // 添加 decimals 信息
         isSOL: false, // 🔧 重要：即使是 WSOL 也应该作为 SPL Token 处理
         isWSol: tokenMint === 'So11111111111111111111111111111111111111112', // 添加 WSOL 标识
         isUSDC:
           tokenInfoData?.isUSDC ||
           tokenMint === 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
+        isSBTT: tokenMint === 'Hk4BerAoKbemG277HShrk8DSHiMEUKbm6D23RKhLDLKq', // 添加 SBTT 标识
         gameId: gameStatus.gameId?.toString() || '0',
         tier: 'low', // 默认 tier，可以从服务器配置获取
         canBuyTickets: true, // 默认允许购买
-        retrievalMethod: 'serverinfo-optimized', // 标记为优化版本
+        retrievalMethod: 'serverinfo-optimized-with-metadata', // 标记为优化版本
       };
 
       setTokenInfo(gameTokenInfo);
@@ -1072,6 +1220,7 @@ export const useBlockchain = () => {
     useCurrentGameToken,
     useTierPricing,
     useDynamicTokenBalance,
+    useTokenMetadata,
 
     // Game operations
     buyTicket,
