@@ -63,22 +63,6 @@ const ClockIcon = () => (
   </svg>
 );
 
-const WarningIcon = () => (
-  <svg
-    className="w-4 h-4"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-    />
-  </svg>
-);
-
 interface RaceGameModalProps {
   serverUrl: string;
   onClose: () => void;
@@ -598,8 +582,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     if (!hasSufficientBalance) {
       return (
         <button className="race-btn disabled" disabled>
-          <WarningIcon />
-          Insufficient {gameToken.data?.tokenSymbol || 'Token'} Balance
+          ⚠️ Insufficient {gameToken.data?.tokenSymbol || 'Token'} Balance
         </button>
       );
     }
@@ -726,40 +709,94 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
 
       {/* Content - Game Status Full Width + Two Column Layout */}
       <div className="race-content">
-        {/* Game Status - Full Width */}
-        <div className="game-status">
+        {/* Game Status - Enhanced Server Status Display */}
+        <div
+          className={`game-status ${gameState.isRaceServer ? 'ready' : gameState.error ? 'error' : 'connecting'}`}
+        >
           <div className="status-info">
             <span
               className={`status-dot ${gameState.getGameStatusColor()}`}
             ></span>
             <span className="status-text">
               {gameState.isRaceServer
-                ? `Race Server Ready • ${gameState.gameState.registeredCount} players joined`
-                : gameState.error || 'Connecting to server...'}
+                ? `🏁 Race Server Active • ${gameState.gameState.registeredCount} players ready • Game #${gameState.gameId || 'Loading...'}`
+                : gameState.error
+                  ? `❌ Connection Failed: ${gameState.error}`
+                  : '🔄 Connecting to race server...'}
             </span>
           </div>
 
-          <button
-            onClick={() => {
-              const now = Date.now();
-              if (now - lastRefreshTime < 2000) return;
-              setLastRefreshTime(now);
+          {/* 右侧控制区域 */}
+          <div className="status-controls">
+            {/* 服务器状态指示器 */}
+            <div
+              className={`server-indicator ${gameState.isRaceServer ? 'online' : gameState.error ? 'error' : 'connecting'}`}
+            >
+              {gameState.isRaceServer ? (
+                <>
+                  <svg
+                    className="indicator-icon"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <span className="indicator-text">READY</span>
+                </>
+              ) : gameState.error ? (
+                <>
+                  <svg
+                    className="indicator-icon"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <span className="indicator-text">ERROR</span>
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="indicator-icon"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M5.05 4.05a7 7 0 119.9 9.9L5.05 4.05zM5.05 4.05L4.343 4.757a1 1 0 101.414 1.414L5.05 4.05zM14.95 15.95L15.657 15.243a1 1 0 10-1.414-1.414L14.95 15.95z" />
+                  </svg>
+                  <span className="indicator-text">CONNECTING</span>
+                </>
+              )}
+            </div>
 
-              Promise.allSettled([
-                gameState.refreshGameData(),
-                gameToken.refetch(),
-                tierPricing.refetch(),
-                ...(isConnected && address
-                  ? [playerData.refreshPlayerData(), dynamicBalance.refetch()]
-                  : []),
-              ]).catch((error) => {
-                console.warn('Manual refresh failed:', error);
-              });
-            }}
-            className="refresh-button"
-          >
-            Refresh
-          </button>
+            <button
+              onClick={() => {
+                const now = Date.now();
+                if (now - lastRefreshTime < 2000) return;
+                setLastRefreshTime(now);
+
+                Promise.allSettled([
+                  gameState.refreshGameData(),
+                  gameToken.refetch(),
+                  tierPricing.refetch(),
+                  ...(isConnected && address
+                    ? [playerData.refreshPlayerData(), dynamicBalance.refetch()]
+                    : []),
+                ]).catch((error) => {
+                  console.warn('Manual refresh failed:', error);
+                });
+              }}
+              className="refresh-button"
+              title="Refresh game data"
+            ></button>
+          </div>
         </div>
 
         {/* Two Column Grid */}
@@ -957,11 +994,8 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
 
                 {!hasSufficientBalance && gameToken.data && (
                   <div className="insufficient-warning">
-                    <WarningIcon />
-                    Insufficient balance! Need at least{' '}
-                    {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(
-                      4,
-                    )}{' '}
+                    ⚠️ Insufficient balance! Need at least{' '}
+                    {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}{' '}
                     {gameToken.data.tokenSymbol}
                   </div>
                 )}

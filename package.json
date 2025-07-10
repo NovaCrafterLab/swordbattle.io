@@ -46,6 +46,8 @@
     "generate:env": "node tools/gen-env.js"
   },
   "dependencies": {
+    "@solana/spl-token": "^0.4.13",
+    "@solana/web3.js": "^1.98.2",
     "http-proxy": "^1.18.1",
     "pm2": "^5.4.2"
   },
