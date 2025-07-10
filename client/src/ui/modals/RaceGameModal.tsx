@@ -808,257 +808,273 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content - Two Column Layout */}
       <div className="race-content">
-        {/* Game Status */}
-        <div className="game-status">
-          <div className="status-info">
-            <span
-              className={`status-dot ${gameState.getGameStatusColor()}`}
-            ></span>
-            <span className="status-text">
-              {gameState.isRaceServer
-                ? `Race Server Ready • ${gameState.gameState.registeredCount} players joined`
-                : gameState.error || 'Connecting to server...'}
-            </span>
-          </div>
-
-          <button
-            onClick={() => {
-              const now = Date.now();
-              if (now - lastRefreshTime < 2000) return;
-              setLastRefreshTime(now);
-
-              Promise.allSettled([
-                gameState.refreshGameData(),
-                gameToken.refetch(),
-                tierPricing.refetch(),
-                ...(isConnected && address
-                  ? [playerData.refreshPlayerData(), dynamicBalance.refetch()]
-                  : []),
-              ]).catch((error) => {
-                console.warn('Manual refresh failed:', error);
-              });
-            }}
-            className="refresh-button"
-          >
-            Refresh
-          </button>
-        </div>
-
-        {/* Stats Grid - Clean 4-column layout */}
-        {gameState.isRaceServer && gameToken.data && (
-          <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-icon prize">
-                <TrophyIcon />
-              </div>
-              <div className="stat-label">Prize Pool</div>
-              <div className="stat-value">
-                {(
-                  (Number(entryFeeAmount) *
-                    gameState.gameState.registeredCount) /
-                  LAMPORTS_PER_SOL
-                ).toFixed(4)}{' '}
-                {gameToken.data.tokenSymbol}
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-icon users">
-                <UsersIcon />
-              </div>
-              <div className="stat-label">Players</div>
-              <div className="stat-value">
-                {gameState.gameState.registeredCount}/
-                {gameState.gameState.playerCount}
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-icon time">
-                <ClockIcon />
-              </div>
-              <div className="stat-label">Entry Fee</div>
-              <div className="stat-value">
-                {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}{' '}
-                {gameToken.data.tokenSymbol}
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-icon level">
-                <ZapIcon />
-              </div>
-              <div className="stat-label">Game ID</div>
-              <div className="stat-value">
-                #{gameState.gameId || 'Loading...'}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Wallet Detection Status - Show when not connected */}
-        {!isConnected && (
-          <div className="wallet-detection-status">
-            <div className="detection-header">
-              <WalletIcon />
-              <span className="detection-title">Wallet Detection</span>
-            </div>
-
-            <div className="detection-info">
-              {walletStatus.isInstalled ? (
-                <div className="detection-success">
-                  ✅ Detected: {walletStatus.detectedWallets.join(', ')}
-                </div>
-              ) : (
-                <div className="detection-warning">
-                  ⚠️ No Solana wallet detected. Install Phantom or Solflare to
-                  continue.
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Wallet Section - Simplified Design */}
-        {isConnected && (
-          <div className="wallet-section">
-            <div className="wallet-header">
-              <WalletIcon />
-              <span className="wallet-title">Your Wallet</span>
-              <span className="wallet-address">
-                {address?.slice(0, 6)}...{address?.slice(-4)}
-              </span>
-            </div>
-
-            <div className="balance-grid">
-              <div className="balance-item">
-                <span className="balance-label">Balance</span>
+        <div className="race-content-grid">
+          {/* Left Column - Race Information */}
+          <div className="race-info-column">
+            {/* Game Status */}
+            <div className="game-status">
+              <div className="status-info">
                 <span
-                  className={`balance-value ${hasSufficientBalance ? 'sufficient' : 'insufficient'}`}
-                >
-                  {dynamicBalance.isLoading
-                    ? 'Loading...'
-                    : `${(Number(dynamicBalance.data || BigInt(0)) / LAMPORTS_PER_SOL).toFixed(4)} ${gameToken.data?.tokenSymbol || ''}`}
+                  className={`status-dot ${gameState.getGameStatusColor()}`}
+                ></span>
+                <span className="status-text">
+                  {gameState.isRaceServer
+                    ? `Race Server Ready • ${gameState.gameState.registeredCount} players joined`
+                    : gameState.error || 'Connecting to server...'}
                 </span>
               </div>
 
-              <div className="balance-item">
-                <span className="balance-label">Required</span>
-                <span className="balance-value">
-                  {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}{' '}
-                  {gameToken.data?.tokenSymbol || ''}
-                </span>
-              </div>
+              <button
+                onClick={() => {
+                  const now = Date.now();
+                  if (now - lastRefreshTime < 2000) return;
+                  setLastRefreshTime(now);
+
+                  Promise.allSettled([
+                    gameState.refreshGameData(),
+                    gameToken.refetch(),
+                    tierPricing.refetch(),
+                    ...(isConnected && address
+                      ? [
+                          playerData.refreshPlayerData(),
+                          dynamicBalance.refetch(),
+                        ]
+                      : []),
+                  ]).catch((error) => {
+                    console.warn('Manual refresh failed:', error);
+                  });
+                }}
+                className="refresh-button"
+              >
+                Refresh
+              </button>
             </div>
 
-            {!hasSufficientBalance && gameToken.data && (
-              <div className="insufficient-warning">
-                <WarningIcon />
-                Insufficient balance! Need at least{' '}
-                {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}{' '}
-                {gameToken.data.tokenSymbol}
+            {/* Stats Grid - Clean 2x2 layout */}
+            {gameState.isRaceServer && gameToken.data && (
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <div className="stat-icon prize">
+                    <TrophyIcon />
+                  </div>
+                  <div className="stat-label">Prize Pool</div>
+                  <div className="stat-value">
+                    {(
+                      (Number(entryFeeAmount) *
+                        gameState.gameState.registeredCount) /
+                      LAMPORTS_PER_SOL
+                    ).toFixed(4)}{' '}
+                    {gameToken.data.tokenSymbol}
+                  </div>
+                </div>
+
+                <div className="stat-card">
+                  <div className="stat-icon users">
+                    <UsersIcon />
+                  </div>
+                  <div className="stat-label">Players</div>
+                  <div className="stat-value">
+                    {gameState.gameState.registeredCount}/
+                    {gameState.gameState.playerCount}
+                  </div>
+                </div>
+
+                <div className="stat-card">
+                  <div className="stat-icon time">
+                    <ClockIcon />
+                  </div>
+                  <div className="stat-label">Entry Fee</div>
+                  <div className="stat-value">
+                    {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}{' '}
+                    {gameToken.data.tokenSymbol}
+                  </div>
+                </div>
+
+                <div className="stat-card">
+                  <div className="stat-icon level">
+                    <ZapIcon />
+                  </div>
+                  <div className="stat-label">Game ID</div>
+                  <div className="stat-value">
+                    #{gameState.gameId || 'Loading...'}
+                  </div>
+                </div>
               </div>
             )}
-          </div>
-        )}
 
-        {/* Loading States */}
-        {(gameToken.isLoading || tierPricing.isLoading) && (
-          <div className="loading-state">
-            🎯 Loading game token information and pricing...
-          </div>
-        )}
+            {/* Transaction Status - Enhanced with detailed wallet interaction states */}
+            {(txStep !== 'idle' || solanaVault.txStatus !== 'idle') && (
+              <div className="tx-status">
+                <div className="tx-step-indicator">
+                  {solanaVault.txStatus === 'building' && (
+                    <div className="tx-step active">
+                      🔧 Building transaction...
+                    </div>
+                  )}
+                  {solanaVault.txStatus === 'signing' && (
+                    <div className="tx-step active">
+                      💳 Please confirm transaction in your wallet...
+                    </div>
+                  )}
+                  {solanaVault.txStatus === 'sending' && (
+                    <div className="tx-step active">
+                      📡 Sending transaction to blockchain...
+                    </div>
+                  )}
+                  {solanaVault.txStatus === 'confirming' && (
+                    <div className="tx-step active">
+                      ⏳ Waiting for blockchain confirmation...
+                      {solanaVault.currentTxHash && (
+                        <div className="tx-hash">
+                          TX: {solanaVault.currentTxHash.slice(0, 8)}...
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {solanaVault.txStatus === 'verifying' && (
+                    <div className="tx-step active">
+                      🔍 Verifying ticket creation...
+                    </div>
+                  )}
+                  {solanaVault.txStatus === 'completed' && (
+                    <div className="tx-step completed">
+                      ✅ Transaction completed successfully!
+                    </div>
+                  )}
 
-        {/* Error States */}
-        {(gameState.error ||
-          playerData.error ||
-          gameToken.error ||
-          tierPricing.error ||
-          dynamicBalance.error) && (
-          <div className="error-state">
-            {String(
-              gameState.error ||
-                playerData.error ||
-                gameToken.error ||
-                tierPricing.error ||
-                dynamicBalance.error,
-            )}
-          </div>
-        )}
-
-        {/* Transaction Status - Enhanced with detailed wallet interaction states */}
-        {(txStep !== 'idle' || solanaVault.txStatus !== 'idle') && (
-          <div className="tx-status">
-            <div className="tx-step-indicator">
-              {solanaVault.txStatus === 'building' && (
-                <div className="tx-step active">🔧 Building transaction...</div>
-              )}
-              {solanaVault.txStatus === 'signing' && (
-                <div className="tx-step active">
-                  💳 Please confirm transaction in your wallet...
-                </div>
-              )}
-              {solanaVault.txStatus === 'sending' && (
-                <div className="tx-step active">
-                  📡 Sending transaction to blockchain...
-                </div>
-              )}
-              {solanaVault.txStatus === 'confirming' && (
-                <div className="tx-step active">
-                  ⏳ Waiting for blockchain confirmation...
-                  {solanaVault.currentTxHash && (
-                    <div className="tx-hash">
-                      TX: {solanaVault.currentTxHash.slice(0, 8)}...
+                  {/* Fallback to old states for backward compatibility */}
+                  {solanaVault.txStatus === 'idle' &&
+                    txStep === 'approving' && (
+                      <div className="tx-step active">
+                        ⏳ Approving {gameToken.data?.tokenSymbol || 'token'}...
+                      </div>
+                    )}
+                  {solanaVault.txStatus === 'idle' && txStep === 'joining' && (
+                    <div className="tx-step active">
+                      ⏳ Joining {currentTier} tier game...
+                    </div>
+                  )}
+                  {solanaVault.txStatus === 'idle' && txStep === 'waiting' && (
+                    <div className="tx-step active">
+                      ✅ Transaction confirmed! Entering game...
                     </div>
                   )}
                 </div>
-              )}
-              {solanaVault.txStatus === 'verifying' && (
-                <div className="tx-step active">
-                  🔍 Verifying ticket creation...
-                </div>
-              )}
-              {solanaVault.txStatus === 'completed' && (
-                <div className="tx-step completed">
-                  ✅ Transaction completed successfully!
-                </div>
-              )}
 
-              {/* Fallback to old states for backward compatibility */}
-              {solanaVault.txStatus === 'idle' && txStep === 'approving' && (
-                <div className="tx-step active">
-                  ⏳ Approving {gameToken.data?.tokenSymbol || 'token'}...
-                </div>
-              )}
-              {solanaVault.txStatus === 'idle' && txStep === 'joining' && (
-                <div className="tx-step active">
-                  ⏳ Joining {currentTier} tier game...
-                </div>
-              )}
-              {solanaVault.txStatus === 'idle' && txStep === 'waiting' && (
-                <div className="tx-step active">
-                  ✅ Transaction confirmed! Entering game...
-                </div>
-              )}
-            </div>
-
-            {/* Show transaction hash if available */}
-            {solanaVault.currentTxHash && (
-              <div className="tx-hash-info">
-                <a
-                  href={`https://solscan.io/tx/${solanaVault.currentTxHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="tx-hash-link"
-                >
-                  View on Solscan
-                </a>
+                {/* Show transaction hash if available */}
+                {solanaVault.currentTxHash && (
+                  <div className="tx-hash-info">
+                    <a
+                      href={`https://solscan.io/tx/${solanaVault.currentTxHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="tx-hash-link"
+                    >
+                      View on Solscan
+                    </a>
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
+
+          {/* Right Column - Wallet Information */}
+          <div className="wallet-info-column">
+            {/* Wallet Detection Status - Show when not connected */}
+            {!isConnected && (
+              <div className="wallet-detection-status">
+                <div className="detection-header">
+                  <WalletIcon />
+                  <span className="detection-title">Wallet Detection</span>
+                </div>
+
+                <div className="detection-info">
+                  {walletStatus.isInstalled ? (
+                    <div className="detection-success">
+                      ✅ Detected: {walletStatus.detectedWallets.join(', ')}
+                    </div>
+                  ) : (
+                    <div className="detection-warning">
+                      ⚠️ No Solana wallet detected. Install Phantom or Solflare
+                      to continue.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Wallet Section - Simplified Design */}
+            {isConnected && (
+              <div className="wallet-section">
+                <div className="wallet-header">
+                  <WalletIcon />
+                  <span className="wallet-title">Your Wallet</span>
+                  <span className="wallet-address">
+                    {address?.slice(0, 6)}...{address?.slice(-4)}
+                  </span>
+                </div>
+
+                <div className="balance-grid">
+                  <div className="balance-item">
+                    <span className="balance-label">Balance</span>
+                    <span
+                      className={`balance-value ${hasSufficientBalance ? 'sufficient' : 'insufficient'}`}
+                    >
+                      {dynamicBalance.isLoading
+                        ? 'Loading...'
+                        : `${(Number(dynamicBalance.data || BigInt(0)) / LAMPORTS_PER_SOL).toFixed(4)} ${gameToken.data?.tokenSymbol || ''}`}
+                    </span>
+                  </div>
+
+                  <div className="balance-item">
+                    <span className="balance-label">Required</span>
+                    <span className="balance-value">
+                      {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}{' '}
+                      {gameToken.data?.tokenSymbol || ''}
+                    </span>
+                  </div>
+                </div>
+
+                {!hasSufficientBalance && gameToken.data && (
+                  <div className="insufficient-warning">
+                    <WarningIcon />
+                    Insufficient balance! Need at least{' '}
+                    {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(
+                      4,
+                    )}{' '}
+                    {gameToken.data.tokenSymbol}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Loading States */}
+            {(gameToken.isLoading || tierPricing.isLoading) && (
+              <div className="loading-state">
+                🎯 Loading game token information and pricing...
+              </div>
+            )}
+
+            {/* Error States */}
+            {(gameState.error ||
+              playerData.error ||
+              gameToken.error ||
+              tierPricing.error ||
+              dynamicBalance.error) && (
+              <div className="error-state">
+                {String(
+                  gameState.error ||
+                    playerData.error ||
+                    gameToken.error ||
+                    tierPricing.error ||
+                    dynamicBalance.error,
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Actions */}

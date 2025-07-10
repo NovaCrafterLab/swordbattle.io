@@ -119,26 +119,52 @@ export class VaultSDK {
       .rpc();
 
     // Create vault token account after initialization
-    // 🔧 修复：统一创建SPL Token账户（包括WSOL）
+    // 🔧 修复：统一创建SPL Token账户（包括WSOL），添加重试机制
     console.log(
       `🪙 Creating Associated Token Account for token ${params.tokenMint.toString()}`,
     );
-    try {
-      await getOrCreateAssociatedTokenAccount(
-        this.connection,
-        this.wallet,
-        params.tokenMint,
-        vault,
-        true, // allowOwnerOffCurve
-      );
-      console.log('✅ Associated Token Account created successfully');
-    } catch (error) {
-      console.warn('⚠️ Failed to create Associated Token Account:', error);
-      // 🔧 修复：对于WSOL，ATA创建失败不应阻止游戏创建
-      // 游戏仍可以继续，稍后在实际交易时再处理ATA创建
+
+    let ataCreated = false;
+    const maxRetries = 3;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(
+          `🔄 Game creation - Attempt ${attempt}/${maxRetries}: Creating vault ATA...`,
+        );
+        await getOrCreateAssociatedTokenAccount(
+          this.connection,
+          this.wallet,
+          params.tokenMint,
+          vault,
+          true, // allowOwnerOffCurve
+        );
+        console.log('✅ Associated Token Account created successfully');
+        ataCreated = true;
+        break;
+      } catch (error) {
+        console.warn(
+          `⚠️ Game creation - Attempt ${attempt} failed:`,
+          error instanceof Error ? error.message : String(error),
+        );
+        if (attempt === maxRetries) {
+          console.log(
+            '⚠️ Continuing game creation without pre-created ATA (will create on-demand)',
+          );
+          // 不抛出错误，允许游戏创建继续，但在buyTicket时会强制创建ATA
+          break;
+        }
+        // 等待一秒后重试
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+
+    if (ataCreated) {
       console.log(
-        '⚠️ Continuing game creation without pre-created ATA (will create on-demand)',
+        '🎯 Game vault ATA successfully pre-created during initialization',
       );
+    } else {
+      console.log('⚠️ Game vault ATA will be created on first ticket purchase');
     }
 
     return tx;
@@ -170,19 +196,44 @@ export class VaultSDK {
       `🪙 Using SPL token ${(vaultAccount.tokenMint as PublicKey).toString()} for ticket purchase with vault ATA ${vaultToken.toString()}`,
     );
 
-    // 🔧 修复：确保vault ATA存在，如果不存在则创建
-    try {
-      await getOrCreateAssociatedTokenAccount(
-        this.connection,
-        this.wallet,
-        vaultAccount.tokenMint as PublicKey,
-        vault,
-        true, // allowOwnerOffCurve
+    // 🔧 修复：确保vault ATA存在，添加重试机制处理网络问题
+    let vaultAtaCreated = false;
+    const maxRetries = 3;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(
+          `🔄 Attempt ${attempt}/${maxRetries}: Creating/verifying vault ATA...`,
+        );
+        await getOrCreateAssociatedTokenAccount(
+          this.connection,
+          this.wallet,
+          vaultAccount.tokenMint as PublicKey,
+          vault,
+          true, // allowOwnerOffCurve
+        );
+        console.log('✅ Vault ATA verified/created successfully');
+        vaultAtaCreated = true;
+        break;
+      } catch (error) {
+        console.warn(
+          `⚠️ Attempt ${attempt} failed to create vault ATA:`,
+          error instanceof Error ? error.message : String(error),
+        );
+        if (attempt === maxRetries) {
+          throw new Error(
+            `Failed to create vault ATA after ${maxRetries} attempts: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+        // 等待一秒后重试
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+
+    if (!vaultAtaCreated) {
+      throw new Error(
+        'Vault ATA creation failed - cannot proceed with ticket purchase',
       );
-      console.log('✅ Vault ATA verified/created successfully');
-    } catch (error) {
-      console.warn('⚠️ Failed to create vault ATA:', error);
-      // 继续尝试交易，也许ATA已经存在但检查失败
     }
 
     // Server-side price validation for security
@@ -368,26 +419,52 @@ export class VaultSDK {
       .rpc();
 
     // Create vault token account after initialization
-    // 🔧 修复：统一创建SPL Token账户（包括WSOL）
+    // 🔧 修复：统一创建SPL Token账户（包括WSOL），添加重试机制
     console.log(
       `🪙 Creating Associated Token Account for token ${params.tokenMint.toString()}`,
     );
-    try {
-      await getOrCreateAssociatedTokenAccount(
-        this.connection,
-        this.wallet,
-        params.tokenMint,
-        vault,
-        true, // allowOwnerOffCurve
-      );
-      console.log('✅ Associated Token Account created successfully');
-    } catch (error) {
-      console.warn('⚠️ Failed to create Associated Token Account:', error);
-      // 🔧 修复：对于WSOL，ATA创建失败不应阻止游戏创建
-      // 游戏仍可以继续，稍后在实际交易时再处理ATA创建
+
+    let ataCreated = false;
+    const maxRetries = 3;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(
+          `🔄 Game creation with tier - Attempt ${attempt}/${maxRetries}: Creating vault ATA...`,
+        );
+        await getOrCreateAssociatedTokenAccount(
+          this.connection,
+          this.wallet,
+          params.tokenMint,
+          vault,
+          true, // allowOwnerOffCurve
+        );
+        console.log('✅ Associated Token Account created successfully');
+        ataCreated = true;
+        break;
+      } catch (error) {
+        console.warn(
+          `⚠️ Game creation with tier - Attempt ${attempt} failed:`,
+          error instanceof Error ? error.message : String(error),
+        );
+        if (attempt === maxRetries) {
+          console.log(
+            '⚠️ Continuing game creation without pre-created ATA (will create on-demand)',
+          );
+          // 不抛出错误，允许游戏创建继续，但在buyTicket时会强制创建ATA
+          break;
+        }
+        // 等待一秒后重试
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+
+    if (ataCreated) {
       console.log(
-        '⚠️ Continuing game creation without pre-created ATA (will create on-demand)',
+        '🎯 Game vault ATA successfully pre-created during tier initialization',
       );
+    } else {
+      console.log('⚠️ Game vault ATA will be created on first ticket purchase');
     }
 
     return tx;
