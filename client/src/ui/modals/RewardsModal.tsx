@@ -298,7 +298,27 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
 
   const formatTime = (timestamp?: number) => {
     if (!timestamp) return 'Unknown';
-    return new Date(timestamp).toLocaleDateString();
+
+    const now = Date.now();
+    const diffMs = now - timestamp;
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMinutes < 60) {
+      return `${diffMinutes}m ago`;
+    } else if (diffHours < 24) {
+      return `${diffHours}h ago`;
+    } else if (diffDays < 7) {
+      const remainingHours = diffHours % 24;
+      if (remainingHours === 0) {
+        return `${diffDays}d ago`;
+      } else {
+        return `${diffDays}d ${remainingHours}h ago`;
+      }
+    } else {
+      return `${diffDays}d ago`;
+    }
   };
 
   const modalContent = (

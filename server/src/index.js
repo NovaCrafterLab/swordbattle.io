@@ -558,6 +558,124 @@ function registerPublicRoutes(app, game) {
       }
     });
 
+    // Get player reward status from Solana chain - New endpoint
+    app.get(
+      '/api/solana/player-reward-status/:gameId/:playerAddress',
+      async (res, req) => {
+        // Register abort handler FIRST
+        res.onAborted(() => {
+          console.warn('Player reward status request aborted by client');
+        });
+
+        setCors(res);
+        let hasResponded = false;
+
+        // Set timeout
+        const timeout = setTimeout(() => {
+          if (!hasResponded) {
+            hasResponded = true;
+            res.writeStatus('408 Request Timeout').end(
+              JSON.stringify({
+                success: false,
+                error: 'Request timeout',
+              }),
+            );
+          }
+        }, 10000);
+
+        try {
+          const gameId = parseInt(req.getParameter(0));
+          const playerAddress = req.getParameter(1);
+
+          if (!game.solanaVaultService) {
+            if (!hasResponded) {
+              hasResponded = true;
+              clearTimeout(timeout);
+              res.writeStatus('400 Bad Request').end(
+                JSON.stringify({
+                  success: false,
+                  error: 'Solana vault service not available',
+                }),
+              );
+            }
+            return;
+          }
+
+          const { PublicKey } = require('@solana/web3.js');
+          const playerPubkey = new PublicKey(playerAddress);
+
+          console.log(
+            `🔍 Checking reward status for player ${playerAddress} in game ${gameId}`,
+          );
+
+          // 1. Check if player has a reward in the reward map
+          const rewardMapAccount =
+            await game.solanaVaultService.vaultSDK.getRewardMapAccount(gameId);
+          let hasReward = false;
+          let rewardAmount = '0';
+
+          if (rewardMapAccount) {
+            const playerReward = rewardMapAccount.rewards.find(
+              (reward) => reward.user.toString() === playerAddress,
+            );
+            if (playerReward) {
+              hasReward = true;
+              rewardAmount = (parseInt(playerReward.amount) / 1e9).toFixed(6); // Convert lamports to SOL
+            }
+          }
+
+          // 2. Check if player has already claimed (via user ticket)
+          let hasClaimed = false;
+          const userTicketAccount =
+            await game.solanaVaultService.vaultSDK.getUserTicketAccount(
+              gameId,
+              playerPubkey,
+            );
+
+          if (userTicketAccount) {
+            hasClaimed = userTicketAccount.hasWithdrawn;
+          }
+
+          // 3. Determine claimable status
+          const claimable = hasReward && !hasClaimed;
+
+          if (!hasResponded) {
+            hasResponded = true;
+            clearTimeout(timeout);
+            res.end(
+              JSON.stringify({
+                success: true,
+                data: {
+                  gameId,
+                  playerAddress,
+                  hasReward,
+                  claimed: hasClaimed,
+                  claimable,
+                  rewardAmount,
+                  timestamp: Date.now(),
+                },
+              }),
+            );
+          }
+        } catch (error) {
+          console.error(
+            `❌ Failed to get player reward status:`,
+            error.message,
+          );
+          if (!hasResponded) {
+            hasResponded = true;
+            clearTimeout(timeout);
+            res.writeStatus('500 Internal Server Error').end(
+              JSON.stringify({
+                success: false,
+                error: error.message,
+              }),
+            );
+          }
+        }
+      },
+    );
+
     // Get current game token info endpoint - Fixed async error handling
     app.get('/api/current-game-token', async (res, req) => {
       // Register abort handler FIRST

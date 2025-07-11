@@ -345,4 +345,57 @@ export class RaceGamesService {
       throw error;
     }
   }
+
+  /**
+   * 查询Solana链上特定游戏的奖励状态
+   */
+  async getChainRewardStatus(playerAddress: string, gameId: number) {
+    try {
+      this.logger.debug(
+        `Querying chain reward status for player ${playerAddress}, game ${gameId}`,
+      );
+
+      // 调用游戏服务器的Solana查询端点
+      try {
+        const serverResponse = await fetch(
+          `http://localhost:8000/api/solana/player-reward-status/${gameId}/${playerAddress}`,
+        );
+
+        if (serverResponse.ok) {
+          const serverData = await serverResponse.json();
+          if (serverData.success) {
+            return {
+              gameId,
+              playerAddress,
+              claimed: serverData.data.claimed || false,
+              claimable: serverData.data.claimable || false,
+              rewardAmount: serverData.data.rewardAmount || '0',
+              lastUpdated: Date.now(),
+            };
+          }
+        }
+      } catch (serverError) {
+        this.logger.warn(
+          `Failed to query game server for chain status: ${serverError.message}`,
+        );
+      }
+
+      // 如果服务器查询失败，返回保守的默认值
+      return {
+        gameId,
+        playerAddress,
+        claimed: false, // 保守假设未领取
+        claimable: false, // 保守假设不可领取
+        rewardAmount: '0',
+        lastUpdated: Date.now(),
+        error: 'Unable to query chain status',
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to get chain reward status for player ${playerAddress}, game ${gameId}:`,
+        error,
+      );
+      throw error;
+    }
+  }
 }

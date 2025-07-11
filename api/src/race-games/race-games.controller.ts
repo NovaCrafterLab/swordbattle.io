@@ -264,6 +264,29 @@ export class RaceGamesController {
     }
   }
 
+  // 查询Solana链上特定游戏的奖励状态
+  @Get('players/:playerAddress/rewards/:gameId/chain-status')
+  async getChainRewardStatus(
+    @Param('playerAddress') playerAddress: string,
+    @Param('gameId') gameId: string,
+  ) {
+    try {
+      const result = await this.raceGamesService.getChainRewardStatus(
+        playerAddress,
+        parseInt(gameId),
+      );
+      return {
+        success: true,
+        data: result,
+      };
+    } catch (error) {
+      throw new HttpException(
+        { success: false, error: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
   // 健康检查
   @Get('ping')
   ping() {
