@@ -17,7 +17,7 @@ export class RaceGame {
   @Column({ name: 'game_id' })
   gameId: number;
 
-  @Column({ name: 'player_address', length: 42 })
+  @Column({ name: 'player_address', length: 50, nullable: true })
   playerAddress: string;
 
   @Column({ default: 0 })
