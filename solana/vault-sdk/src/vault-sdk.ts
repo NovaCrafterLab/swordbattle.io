@@ -274,6 +274,14 @@ export class VaultSDK {
     const { vault } = this.getVaultPdas(params.gameId);
     const rewardMap = this.getRewardMapPda(params.gameId);
 
+    console.log('🔧 Finalizing game with accounts:', {
+      gameId: params.gameId,
+      vault: vault.toString(),
+      rewardMap: rewardMap.toString(),
+      authority: this.wallet.publicKey.toString(),
+      rewardCount: params.rewards.length,
+    });
+
     const tx = await this.program.methods
       .finalizeGame(
         params.rewards.map((reward: RewardEntry) => ({
@@ -283,10 +291,13 @@ export class VaultSDK {
       )
       .accounts({
         vault: vault,
+        rewardMap: rewardMap,
         authority: this.wallet.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .rpc();
 
+    console.log('✅ Game finalized successfully, tx:', tx);
     return tx;
   }
 

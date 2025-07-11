@@ -1263,10 +1263,10 @@ class Game {
         return { success: true, rewardsDistributed: 0 };
       }
 
-      // Convert rewards to array format expected by SolanaVaultService
+      // Convert rewards Map to array format for SolanaVaultService
       const rewardArray = Array.from(killRewards.values());
 
-      console.log(`💰 Distributing rewards:`, {
+      console.log(`💰 Distributing pre-calculated rewards:`, {
         playerCount: rewardArray.length,
         totalSOL: rewardArray
           .reduce((sum, r) => sum + r.rewardSOL, 0)
@@ -1276,10 +1276,10 @@ class Game {
         ),
       });
 
-      // Single VaultSDK call to finalize game with tier (vs complex BSC flow)
+      // Pass pre-calculated rewards to SolanaVaultService (no re-calculation)
       const result = await this.solanaVaultService.finalizeGame(
         this.solanaGameId,
-        rewardArray,
+        rewardArray, // Pre-calculated reward data
         tier,
       );
 

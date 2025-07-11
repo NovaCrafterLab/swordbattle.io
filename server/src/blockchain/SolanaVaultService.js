@@ -398,15 +398,50 @@ class SolanaVaultService {
   }
 
   /**
+   * Extensible reward calculation system
+   * Currently implements kill-based rewards but designed for future expansion
+   */
+  async calculateGameRewards(players, tier = 'low', gameId = null) {
+    const rewards = [];
+
+    Logger.server.info('💰 Calculating game rewards with extensible system', {
+      playerCount: players.length,
+      tier,
+      gameId,
+    });
+
+    // Current implementation: Kill-based rewards
+    const killRewards = this.calculateKillBasedRewards(players, tier);
+    rewards.push(...killRewards);
+
+    // Future expansion points:
+    // const survivalRewards = await this.calculateSurvivalRewards(players, tier, gameId);
+    // const performanceRewards = await this.calculatePerformanceRewards(players, tier, gameId);
+    // const bonusRewards = await this.calculateBonusRewards(players, tier, gameId);
+    // rewards.push(...survivalRewards, ...performanceRewards, ...bonusRewards);
+
+    Logger.server.info('💰 Final reward calculation completed', {
+      totalPlayers: players.length,
+      rewardedPlayers: rewards.length,
+      tier,
+      totalRewardSOL: rewards
+        .reduce((sum, r) => sum + r.rewardSOL, 0)
+        .toFixed(6),
+    });
+
+    return rewards;
+  }
+
+  /**
    * Calculate tier-based kill rewards
-   * Replaces complex BSC scoring system
+   * Core reward calculation method
    */
   calculateKillBasedRewards(players, tier = 'low') {
     const rewards = [];
     const tierConfig = this.getTierConfig(tier);
     const killReward = tierConfig.killReward;
 
-    Logger.server.info('💰 Calculating tier-based kill rewards', {
+    Logger.server.debug('💰 Calculating kill-based rewards', {
       playerCount: players.length,
       tier,
       killReward,
@@ -424,12 +459,12 @@ class SolanaVaultService {
           tier,
           rewardAmount: Math.floor(rewardAmount * 1e9), // Convert to lamports
           rewardSOL: rewardAmount,
+          rewardType: 'kill-based',
         });
       }
     }
 
-    Logger.server.info('💰 Tier-based kill rewards calculated', {
-      totalPlayers: players.length,
+    Logger.server.debug('💰 Kill-based rewards calculated', {
       rewardedPlayers: rewards.length,
       tier,
       killReward,
@@ -440,71 +475,192 @@ class SolanaVaultService {
   }
 
   /**
-   * Finalize game with tier-based rewards using VaultSDK
-   * Replaces complex BSC score submission and reward distribution
+   * Format pre-calculated rewards from Game.js for VaultSDK
+   * @param {Array} rewardData - Array of reward objects from Game.js
+   * @returns {Array} Formatted rewards for VaultSDK
    */
-  async finalizeGame(gameId, players, tier = 'low') {
+  formatRewardsForVaultSDK(rewardData) {
+    Logger.server.debug('💰 Formatting pre-calculated rewards for VaultSDK', {
+      rewardCount: rewardData.length,
+    });
+
+    const formattedRewards = rewardData.map((reward) => ({
+      playerAddress: reward.walletAddress, // Game.js uses 'walletAddress'
+      playerName: reward.playerName,
+      kills: reward.kills,
+      tier: 'kill-based', // Mark as pre-calculated
+      rewardAmount: reward.rewardLamports, // Already in lamports
+      rewardSOL: reward.rewardSOL,
+      rewardType: 'pre-calculated',
+    }));
+
+    Logger.server.debug('💰 Rewards formatted for VaultSDK', {
+      formattedCount: formattedRewards.length,
+      totalRewardSOL: formattedRewards
+        .reduce((sum, r) => sum + r.rewardSOL, 0)
+        .toFixed(6),
+    });
+
+    return formattedRewards;
+  }
+
+  // Reserved interfaces for future reward types:
+
+  /**
+   * Calculate survival-based rewards (future implementation)
+   * @param {Array} players - Array of player objects
+   * @param {string} tier - Game tier
+   * @param {string} gameId - Game ID for context
+   * @returns {Promise<Array>} Array of survival reward objects
+   */
+  async calculateSurvivalRewards(players, tier, gameId) {
+    // Future implementation: reward based on survival time
+    return [];
+  }
+
+  /**
+   * Calculate performance-based rewards (future implementation)
+   * @param {Array} players - Array of player objects
+   * @param {string} tier - Game tier
+   * @param {string} gameId - Game ID for context
+   * @returns {Promise<Array>} Array of performance reward objects
+   */
+  async calculatePerformanceRewards(players, tier, gameId) {
+    // Future implementation: reward based on overall performance metrics
+    return [];
+  }
+
+  /**
+   * Calculate bonus rewards (future implementation)
+   * @param {Array} players - Array of player objects
+   * @param {string} tier - Game tier
+   * @param {string} gameId - Game ID for context
+   * @returns {Promise<Array>} Array of bonus reward objects
+   */
+  async calculateBonusRewards(players, tier, gameId) {
+    // Future implementation: special event bonuses, achievements, etc.
+    return [];
+  }
+
+  /**
+   * Finalize game with pre-calculated rewards using VaultSDK
+   * Enhanced with retry mechanism and proper data handling
+   */
+  async finalizeGame(gameId, rewardData, tier = 'low') {
     if (!this.isInitialized || !this.vaultSDK) {
       throw new Error('Solana vault service not initialized');
     }
 
-    try {
-      Logger.server.info('🏁 Finalizing Solana game with tier', {
-        gameId,
-        playerCount: players.length,
-        tier,
-      });
+    const maxRetries = 3;
+    const baseDelay = 2000; // 2 seconds
+    let lastError;
 
-      // Calculate tier-based kill rewards
-      const rewards = this.calculateKillBasedRewards(players, tier);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        Logger.server.info(
+          `🏁 Finalizing Solana game (attempt ${attempt}/${maxRetries})`,
+          {
+            gameId,
+            rewardCount: rewardData.length,
+            tier,
+          },
+        );
 
-      if (rewards.length === 0) {
-        Logger.server.warn('No rewards to distribute', { gameId });
-        return { success: true, rewardsDistributed: 0 };
+        // Use pre-calculated rewards from Game.js
+        const rewards = this.formatRewardsForVaultSDK(rewardData);
+
+        if (rewards.length === 0) {
+          Logger.server.warn('No rewards to distribute', { gameId });
+          return { success: true, rewardsDistributed: 0 };
+        }
+
+        // Validate and convert rewards to format expected by VaultSDK
+        const rewardEntries = rewards.map((reward) => {
+          // Validate required fields
+          if (!reward.playerAddress || !reward.rewardAmount) {
+            throw new Error(
+              `Invalid reward data: missing playerAddress or rewardAmount for ${reward.playerName}`,
+            );
+          }
+
+          try {
+            return {
+              user: new PublicKey(reward.playerAddress),
+              amount: reward.rewardAmount.toString(),
+            };
+          } catch (error) {
+            throw new Error(
+              `Invalid player address: ${reward.playerAddress} for ${reward.playerName}`,
+            );
+          }
+        });
+
+        Logger.server.info('📝 Reward entries prepared', {
+          gameId,
+          entries: rewardEntries.length,
+          totalRewardSOL: rewards
+            .reduce((sum, r) => sum + r.rewardSOL, 0)
+            .toFixed(6),
+        });
+
+        // Call VaultSDK to finalize the game with rewards
+        const txHash = await this.vaultSDK.finalizeGame({
+          gameId: parseInt(gameId),
+          rewards: rewardEntries,
+        });
+
+        // Wait for transaction confirmation
+        await this.waitForTransactionConfirmation(txHash);
+
+        Logger.server.info('✅ Game finalized on Solana', {
+          gameId,
+          txHash,
+          rewardsDistributed: rewards.length,
+          attempt,
+        });
+
+        return {
+          success: true,
+          gameId,
+          tier,
+          txHash,
+          rewardsDistributed: rewards.length,
+          totalRewardSOL: rewards.reduce((sum, r) => sum + r.rewardSOL, 0),
+          rewards,
+          attempt,
+        };
+      } catch (error) {
+        lastError = error;
+        Logger.server.warn(`❌ Game finalization attempt ${attempt} failed`, {
+          gameId,
+          error: error.message,
+          attemptsLeft: maxRetries - attempt,
+        });
+
+        // Don't retry on certain errors
+        if (this.isNonRetryableError(error)) {
+          Logger.server.error('Non-retryable error encountered', {
+            gameId,
+            error: error.message,
+          });
+          throw error;
+        }
+
+        // Wait before retry (exponential backoff)
+        if (attempt < maxRetries) {
+          const delay = baseDelay * Math.pow(2, attempt - 1);
+          Logger.server.info(`⏳ Waiting ${delay}ms before retry...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
       }
-
-      // Convert rewards to format expected by VaultSDK
-      const rewardEntries = rewards.map((reward) => ({
-        user: new PublicKey(reward.playerAddress),
-        amount: reward.rewardAmount.toString(),
-      }));
-
-      Logger.server.info('📝 Reward entries prepared', {
-        gameId,
-        entries: rewardEntries.length,
-        totalRewardSOL: rewards
-          .reduce((sum, r) => sum + r.rewardSOL, 0)
-          .toFixed(6),
-      });
-
-      // Call VaultSDK to actually finalize the game with rewards
-      const txHash = await this.vaultSDK.finalizeGame({
-        gameId: gameId,
-        rewards: rewardEntries,
-      });
-
-      Logger.server.info('✅ Game finalized on Solana', {
-        gameId,
-        txHash,
-        rewardsDistributed: rewards.length,
-      });
-
-      return {
-        success: true,
-        gameId,
-        tier,
-        txHash,
-        rewardsDistributed: rewards.length,
-        totalRewardSOL: rewards.reduce((sum, r) => sum + r.rewardSOL, 0),
-        rewards,
-      };
-    } catch (error) {
-      Logger.server.error('Failed to finalize game', {
-        gameId,
-        error: error.message,
-      });
-      throw error;
     }
+
+    Logger.server.error('All finalization attempts failed', {
+      gameId,
+      maxRetries,
+      finalError: lastError.message,
+    });
+    throw lastError;
   }
 
   /**
@@ -653,7 +809,79 @@ class SolanaVaultService {
   }
 
   /**
-   * Get service status
+   * Wait for transaction confirmation with timeout
+   * @param {string} txHash - Transaction hash to wait for
+   * @param {number} timeout - Timeout in milliseconds (default: 60s)
+   * @returns {Promise<boolean>} True if confirmed, throws on timeout
+   */
+  async waitForTransactionConfirmation(txHash, timeout = 60000) {
+    const startTime = Date.now();
+    const checkInterval = 2000; // Check every 2 seconds
+
+    Logger.server.debug('⏳ Waiting for transaction confirmation', {
+      txHash: txHash.slice(0, 8) + '...',
+      timeout: timeout / 1000 + 's',
+    });
+
+    while (Date.now() - startTime < timeout) {
+      try {
+        const status = await this.connection.getSignatureStatus(txHash);
+
+        if (
+          status?.value?.confirmationStatus === 'confirmed' ||
+          status?.value?.confirmationStatus === 'finalized'
+        ) {
+          Logger.server.debug('✅ Transaction confirmed', {
+            txHash: txHash.slice(0, 8) + '...',
+            confirmationStatus: status.value.confirmationStatus,
+          });
+          return true;
+        }
+
+        if (status?.value?.err) {
+          throw new Error(
+            `Transaction failed: ${JSON.stringify(status.value.err)}`,
+          );
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, checkInterval));
+      } catch (error) {
+        Logger.server.warn('Error checking transaction status', {
+          txHash: txHash.slice(0, 8) + '...',
+          error: error.message,
+        });
+        await new Promise((resolve) => setTimeout(resolve, checkInterval));
+      }
+    }
+
+    throw new Error(
+      `Transaction confirmation timeout after ${timeout / 1000}s`,
+    );
+  }
+
+  /**
+   * Check if an error is non-retryable
+   * @param {Error} error - The error to check
+   * @returns {boolean} True if error should not be retried
+   */
+  isNonRetryableError(error) {
+    const message = error.message.toLowerCase();
+
+    // Non-retryable error patterns
+    const nonRetryablePatterns = [
+      'invalid account data',
+      'account not found',
+      'insufficient funds',
+      'invalid instruction',
+      'program error',
+      'unauthorized',
+    ];
+
+    return nonRetryablePatterns.some((pattern) => message.includes(pattern));
+  }
+
+  /**
+   * Get comprehensive service status
    */
   getStatus() {
     return {
@@ -661,7 +889,69 @@ class SolanaVaultService {
       walletAddress: this.wallet?.publicKey?.toString() || null,
       rpcUrl: this.config.rpcUrl,
       programId: this.config.programId,
+      tokenMint: this.config.tokenMint,
+      availableTiers: Object.keys(this.config.tiers || {}),
+      timestamp: Date.now(),
     };
+  }
+
+  /**
+   * Test connection and vault SDK functionality
+   * @returns {Promise<Object>} Test results
+   */
+  async testConnection() {
+    const results = {
+      connection: false,
+      wallet: false,
+      vaultSDK: false,
+      errors: [],
+    };
+
+    try {
+      // Test connection
+      const latestBlockhash = await this.connection.getLatestBlockhash();
+      results.connection = true;
+      Logger.server.debug('✅ Connection test passed', {
+        blockhash: latestBlockhash.blockhash.slice(0, 8) + '...',
+      });
+    } catch (error) {
+      results.errors.push(`Connection failed: ${error.message}`);
+    }
+
+    try {
+      // Test wallet
+      if (this.wallet?.publicKey) {
+        results.wallet = true;
+        Logger.server.debug('✅ Wallet test passed', {
+          address: this.wallet.publicKey.toString(),
+        });
+      } else {
+        results.errors.push('Wallet not initialized');
+      }
+    } catch (error) {
+      results.errors.push(`Wallet test failed: ${error.message}`);
+    }
+
+    try {
+      // Test VaultSDK (try to get all game IDs)
+      if (this.vaultSDK) {
+        await this.vaultSDK.getAllGameIds();
+        results.vaultSDK = true;
+        Logger.server.debug('✅ VaultSDK test passed');
+      } else {
+        results.errors.push('VaultSDK not initialized');
+      }
+    } catch (error) {
+      results.errors.push(`VaultSDK test failed: ${error.message}`);
+    }
+
+    const allPassed = results.connection && results.wallet && results.vaultSDK;
+    Logger.server.info('🧪 Connection test completed', {
+      allPassed,
+      results,
+    });
+
+    return { ...results, allPassed };
   }
 }
 
