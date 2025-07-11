@@ -33,16 +33,8 @@ export const useSOLBalance = (walletAddress: string) => {
       const publicKey = new PublicKey(walletAddress);
       const lamports = await connection.getBalance(publicKey);
       setBalance(BigInt(lamports));
-
-      console.log(
-        `💰 SOL Balance for ${walletAddress}: ${lamports / LAMPORTS_PER_SOL} SOL`,
-      );
     } catch (err) {
       const error = err as Error;
-      console.error(
-        `❌ Failed to fetch SOL balance for ${walletAddress}:`,
-        error,
-      );
       setError(error);
       setBalance(BigInt(0));
     } finally {
@@ -100,12 +92,8 @@ export const useGameCounter = () => {
       }
 
       setGameId(currentGameId);
-      console.log(
-        `🎮 Game Counter from server: ${currentGameId} (source: ${serverInfo?.gameStatus?.gameId ? 'gameStatus' : 'solanaGameId'})`,
-      );
     } catch (err) {
       const error = err as Error;
-      console.error(`❌ Failed to fetch game counter:`, error);
       setError(error);
       setGameId(0);
     } finally {
@@ -143,11 +131,6 @@ export const useSPLTokenBalance = (
 
   const fetchBalance = useCallback(async () => {
     if (!walletAddress || !tokenMintAddress || !connection) {
-      console.log('🔍 SPL Balance fetch skipped - missing parameters:', {
-        walletAddress: !!walletAddress,
-        tokenMintAddress: !!tokenMintAddress,
-        connection: !!connection,
-      });
       setBalance(BigInt(0));
       return;
     }
@@ -155,12 +138,6 @@ export const useSPLTokenBalance = (
     try {
       setIsLoading(true);
       setError(null);
-
-      console.log('🔍 Fetching SPL token balance:', {
-        wallet: walletAddress.slice(0, 8) + '...',
-        token: tokenMintAddress.slice(0, 8) + '...',
-        fullTokenMint: tokenMintAddress,
-      });
 
       const walletPubkey = new PublicKey(walletAddress);
       const mintPubkey = new PublicKey(tokenMintAddress);
@@ -171,25 +148,12 @@ export const useSPLTokenBalance = (
         walletPubkey,
       );
 
-      console.log(
-        '🔍 Associated token account:',
-        associatedTokenAddress.toString(),
-      );
-
       // Get token account info
       const tokenAccount = await getAccount(connection, associatedTokenAddress);
       const balance = BigInt(tokenAccount.amount.toString());
       setBalance(balance);
-
-      console.log(
-        `💰 SPL Token Balance found for ${walletAddress.slice(0, 8)}...: ${balance.toString()} tokens (${tokenMintAddress.slice(0, 8)}...)`,
-      );
     } catch (err) {
       const error = err as Error;
-      console.log(
-        `ℹ️ No SPL token account found for ${walletAddress.slice(0, 8)}... (${tokenMintAddress.slice(0, 8)}...):`,
-        error.message,
-      );
 
       // Check if it's specifically a TokenAccountNotFoundError
       if (
@@ -197,10 +161,8 @@ export const useSPLTokenBalance = (
         error.message.includes('TokenAccountNotFoundError') ||
         error.message.includes('Account does not exist')
       ) {
-        console.log("📝 This is normal - user hasn't received this token yet");
         setError(null); // Don't treat missing token account as error
       } else {
-        console.error('❌ Unexpected error fetching SPL token balance:', error);
         setError(error);
       }
 
@@ -292,18 +254,8 @@ export const useTokenMetadata = (tokenMintAddress: string) => {
         name,
         decimals: mintInfo.decimals,
       });
-
-      console.log(`🏷️ Token metadata for ${tokenMintAddress}:`, {
-        symbol,
-        name,
-        decimals: mintInfo.decimals,
-      });
     } catch (err) {
       const error = err as Error;
-      console.error(
-        `❌ Failed to fetch token metadata for ${tokenMintAddress}:`,
-        error,
-      );
       setError(error);
       setMetadata(null);
     } finally {
@@ -375,7 +327,6 @@ export const useCurrentGameToken = () => {
       // 如果 gameStatus 中没有 token 信息，回退到服务器配置
       if (!tokenMint && serverInfo.solanaConfig) {
         tokenMint = 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr'; // 默认 USDC
-        console.log('🔄 Using fallback token mint from server config');
       }
 
       if (!tokenMint) {
@@ -398,7 +349,7 @@ export const useCurrentGameToken = () => {
         );
         tokenDecimals = mintInfo.decimals;
       } catch (error) {
-        console.warn('Failed to get mint info, using default decimals:', error);
+        // Silent failure - use default decimals
       }
 
       // 使用 tokenInfo 中的信息，或基于 tokenMint 地址判断
@@ -446,20 +397,8 @@ export const useCurrentGameToken = () => {
       };
 
       setTokenInfo(gameTokenInfo);
-
-      console.log('🎯 Current game token info from serverinfo:', {
-        symbol: tokenSymbol,
-        address: tokenMint.slice(0, 8) + '...',
-        gameId: gameTokenInfo.gameId,
-        method: 'serverinfo-optimized',
-        source: gameStatus.tokenMint ? 'gameStatus' : 'fallback',
-      });
     } catch (err) {
       const error = err as Error;
-      console.error(
-        '❌ Failed to fetch current game token from serverinfo:',
-        error,
-      );
       setError(error);
       setTokenInfo(null);
     } finally {
@@ -533,14 +472,8 @@ export const useTierPricing = (tier: string = 'low') => {
       }
 
       setPricing(config);
-
-      console.log(`🎯 Tier pricing for ${tier}:`, {
-        entranceFee: Number(config.entranceFee) / LAMPORTS_PER_SOL,
-        killReward: Number(config.killReward) / LAMPORTS_PER_SOL,
-      });
     } catch (err) {
       const error = err as Error;
-      console.error(`❌ Failed to get tier pricing for ${tier}:`, error);
       setError(error);
       setPricing(null);
     } finally {
@@ -647,14 +580,8 @@ export const usePlayerTicket = (gameId: number, playerAddress: string) => {
       const result = await response.json();
 
       setTicket(result.ticket);
-
-      console.log(
-        `🎫 Player ticket for game ${gameId}:`,
-        result.ticket ? 'HAS TICKET' : 'NO TICKET',
-      );
     } catch (err) {
       const error = err as Error;
-      console.error(`❌ Failed to fetch player ticket:`, error);
       setError(error);
       setTicket(null);
     } finally {
@@ -704,11 +631,8 @@ export const useGameVault = (gameId: number) => {
       const result = await response.json();
 
       setVault(result.vault);
-
-      console.log(`🏦 Game vault ${gameId}:`, result.vault);
     } catch (err) {
       const error = err as Error;
-      console.error(`❌ Failed to fetch game vault:`, error);
       setError(error);
       setVault(null);
     } finally {
@@ -818,12 +742,7 @@ export const useBlockchain = () => {
 
   // 调试钱包状态
   useEffect(() => {
-    console.log('🔗 useBlockchain wallet state:', {
-      connected,
-      publicKey: publicKey?.toString(),
-      hasSignTransaction: !!signTransaction,
-      hasSendTransaction: !!sendTransaction,
-    });
+    // Silent state monitoring
   }, [connected, publicKey, signTransaction, sendTransaction]);
 
   // Return Solana wallet state
@@ -832,9 +751,7 @@ export const useBlockchain = () => {
 
   // Only log on connection state changes, not every render
   useEffect(() => {
-    console.log(
-      `🔗 useBlockchain: Solana - Connected: ${isConnected}, Address: ${address?.slice(0, 10)}...`,
-    );
+    // Silent state monitoring
   }, [isConnected, address]);
 
   // Placeholder implementations for backward compatibility
@@ -936,10 +853,6 @@ export const useBlockchain = () => {
       }
 
       try {
-        console.log(
-          `🎫 Buying ticket for game ${gameId}, tier: ${tier}, level: ${playerLevel}`,
-        );
-
         // Get tier pricing to determine the correct amount
         const tierConfigs = {
           low: { entranceFee: BigInt(Math.floor(0.01 * LAMPORTS_PER_SOL)) },
@@ -962,22 +875,14 @@ export const useBlockchain = () => {
         const serverInfo = await response.json();
 
         let tokenMint: PublicKey;
-        let isSOL = false;
 
         if (serverInfo.gameStatus?.tokenMint) {
           tokenMint = new PublicKey(serverInfo.gameStatus.tokenMint);
-          // Check if it's SOL using the existing logic
-          isSOL =
-            serverInfo.gameStatus.tokenInfo?.isSOL ||
-            tokenMint.equals(
-              new PublicKey('So11111111111111111111111111111111111111112'),
-            );
         } else {
           // Default to USDC if no token mint specified
           tokenMint = new PublicKey(
             'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
           );
-          isSOL = false;
         }
 
         // Check if vault is configured
@@ -996,13 +901,8 @@ export const useBlockchain = () => {
           config.entranceFee, // expected amount for validation
         );
 
-        console.log(
-          `✅ Ticket purchased successfully via Solana - Tier: ${tier}, TX: ${result}`,
-        );
-
         return { success: true, txHash: result, tier };
       } catch (error) {
-        console.error(`❌ Failed to buy ticket:`, error);
         throw error;
       }
     },
@@ -1011,39 +911,28 @@ export const useBlockchain = () => {
 
   const joinGame = useCallback(
     (gameId: number, tier: string = 'low', playerLevel: number = 1) => {
-      console.log(
-        `🎮 Joining game ${gameId} with tier ${tier} and level ${playerLevel}`,
-      );
       return buyTicket(gameId, tier, playerLevel);
     },
     [buyTicket],
   );
 
   const smartJoinGame = useCallback(
-    (level: number = 0, maxWaitTime: number = 300) => {
-      console.log(
-        `🎮 Smart joining Solana game level ${level} - TODO: implement`,
-      );
+    (_level: number = 0, _maxWaitTime: number = 300) => {
+      // TODO: implement smart join game logic
     },
     [],
   );
 
-  const joinMultipleGames = useCallback((gameIds: number[]) => {
-    console.log(
-      `🎮 Joining multiple Solana games ${gameIds} - TODO: implement`,
-    );
+  const joinMultipleGames = useCallback((_gameIds: number[]) => {
+    // TODO: implement multiple games join logic
   }, []);
 
   // Reward claiming - Solana implementation
   const claimGameReward = useCallback(
-    async (gameId: number, claimType: ClaimType = ClaimType.ALL) => {
+    async (gameId: number, _claimType: ClaimType = ClaimType.ALL) => {
       if (!isConnected || !address || !publicKey) {
         throw new Error('Wallet not connected');
       }
-
-      console.log(
-        `💰 Claiming Solana rewards for game ${gameId}, type ${claimType}`,
-      );
 
       try {
         // Check if vault is configured
@@ -1056,12 +945,8 @@ export const useBlockchain = () => {
         // Use Solana vault to claim reward
         const result = await solanaVault.claimReward(gameId);
 
-        console.log(
-          `✅ Reward claimed successfully for game ${gameId} - TX: ${result}`,
-        );
         return result;
       } catch (error) {
-        console.error(`❌ Failed to claim reward for game ${gameId}:`, error);
         throw error;
       }
     },
@@ -1069,10 +954,8 @@ export const useBlockchain = () => {
   );
 
   const claimAllPlayerRewards = useCallback(
-    (claimType: ClaimType = ClaimType.ALL, maxGames: number = 25) => {
-      console.log(
-        `💰 Claiming all Solana rewards, type ${claimType}, max ${maxGames} games - TODO: implement`,
-      );
+    (_claimType: ClaimType = ClaimType.ALL, _maxGames: number = 25) => {
+      // TODO: implement claim all rewards logic
     },
     [],
   );
@@ -1107,7 +990,7 @@ export const useBlockchain = () => {
 
   // Compatibility methods (keeping backward compatibility)
   const useEntryFee = useCallback(
-    (level: number = 0) => ({
+    (_level: number = 0) => ({
       data: BigInt(1000000), // 0.001 SOL in lamports
       isLoading: false,
       error: null,
@@ -1117,7 +1000,7 @@ export const useBlockchain = () => {
   );
 
   const useLevelConfig = useCallback(
-    (level: number) => ({
+    (_level: number) => ({
       data: {
         entryFee: BigInt(1000000), // 0.001 SOL in lamports
         killReward: BigInt(100000), // 0.0001 SOL in lamports
@@ -1131,7 +1014,7 @@ export const useBlockchain = () => {
   );
 
   const useGamePlayers = useCallback(
-    (gameId: number) => ({
+    (_gameId: number) => ({
       data: [] as string[],
       isLoading: false,
       error: null,
@@ -1141,7 +1024,7 @@ export const useBlockchain = () => {
   );
 
   const usePlayerNonce = useCallback(
-    (playerAddress: string) => ({
+    (_playerAddress: string) => ({
       data: BigInt(0),
       isLoading: false,
       error: null,
@@ -1151,7 +1034,7 @@ export const useBlockchain = () => {
   );
 
   const usePlayerScore = useCallback(
-    (gameId: number, playerAddress: string) => ({
+    (_gameId: number, _playerAddress: string) => ({
       data: BigInt(0),
       isLoading: false,
       error: null,
@@ -1161,7 +1044,7 @@ export const useBlockchain = () => {
   );
 
   const useCanClaimReward = useCallback(
-    (gameId: number, playerAddress: string) => ({
+    (_gameId: number, _playerAddress: string) => ({
       data: false,
       isLoading: false,
       error: null,
@@ -1172,7 +1055,7 @@ export const useBlockchain = () => {
 
   // SPL Token allowance (placeholder)
   const useSPLAllowance = useCallback(
-    (owner: string, spender: string) => ({
+    (_owner: string, _spender: string) => ({
       data: BigInt(0),
       isLoading: false,
       error: null,
@@ -1194,14 +1077,14 @@ export const useBlockchain = () => {
 
   // SPL Token operations (placeholder)
   const approveSPL = useCallback(
-    (spenderOrAmount: string | bigint, amount?: bigint) => {
-      console.log(`🪙 Approving SPL tokens - TODO: implement`);
+    (_spenderOrAmount: string | bigint, _amount?: bigint) => {
+      // TODO: implement SPL token approval
     },
     [],
   );
 
-  const approveSPLToGameProgram = useCallback((amount: bigint) => {
-    console.log(`🪙 Approving SPL to game program - TODO: implement`);
+  const approveSPLToGameProgram = useCallback((_amount: bigint) => {
+    // TODO: implement SPL approval to game program
   }, []);
 
   // Deprecated compatibility methods
