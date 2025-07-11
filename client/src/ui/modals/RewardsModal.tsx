@@ -108,36 +108,98 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
   const [solanaGameHistory, setSolanaGameHistory] = useState<any>(null);
   const [isSolanaLoading, setIsSolanaLoading] = useState(false);
 
-  // 获取Solana奖励数据
-  const fetchSolanaRewards = useCallback(async () => {
-    if (!address) {
-      console.log('⚠️ No address provided for Solana rewards fetch');
-      return;
-    }
+  // 状态验证：确保前端状态与后端状态一致
+  const validateClaimStatus = useCallback(
+    async (gameId: number) => {
+      console.log(`🔍 Validating claim status for game ${gameId}`);
+      try {
+        const response = await fetch(
+          `http://localhost:8080/race-games/players/${address}/games?t=${Date.now()}`,
+        );
+        const data = await response.json();
 
-    console.log(`🔍 Fetching Solana rewards for address: ${address}`);
+        if (data.success) {
+          const game = data.data.games.find((g: any) => g.gameId === gameId);
+          if (game) {
+            const shouldBeClaimed = game.hasClaimed;
 
-    try {
-      setIsSolanaLoading(true);
-      const response = await fetch(
-        `http://localhost:8080/race-games/players/${address}/games`,
-      );
-      const data = await response.json();
+            // 检查前端状态是否与后端一致
+            setSolanaRewards((prev) => {
+              const currentGame = prev.find((r) => r.gameId === gameId);
+              if (
+                currentGame &&
+                currentGame.solanaClaimed !== shouldBeClaimed
+              ) {
+                console.log(
+                  `🔧 Correcting state mismatch for game ${gameId}: frontend=${currentGame.solanaClaimed}, backend=${shouldBeClaimed}`,
+                );
+                return prev.map((reward) =>
+                  reward.gameId === gameId
+                    ? {
+                        ...reward,
+                        solanaClaimed: shouldBeClaimed,
+                        solanaClaimable:
+                          !shouldBeClaimed && reward.solanaReward! > 0,
+                      }
+                    : reward,
+                );
+              }
+              return prev;
+            });
 
-      console.log('📊 Solana rewards API response:', data);
-
-      if (data.success) {
-        setSolanaGameHistory(data);
-        console.log('✅ Solana game history set successfully');
-      } else {
-        console.error('❌ API returned success: false', data);
+            console.log(
+              `✅ Claim status validation completed for game ${gameId}: ${shouldBeClaimed ? 'claimed' : 'not claimed'}`,
+            );
+          }
+        }
+      } catch (error) {
+        console.warn(
+          `⚠️ Failed to validate claim status for game ${gameId}:`,
+          error,
+        );
       }
-    } catch (error) {
-      console.error('❌ Failed to fetch Solana rewards:', error);
-    } finally {
-      setIsSolanaLoading(false);
-    }
-  }, [address]);
+    },
+    [address],
+  );
+
+  // 获取Solana奖励数据
+  const fetchSolanaRewards = useCallback(
+    async (bustCache = false) => {
+      if (!address) {
+        console.log('⚠️ No address provided for Solana rewards fetch');
+        return;
+      }
+
+      console.log(
+        `🔍 Fetching Solana rewards for address: ${address}${bustCache ? ' (cache-busted)' : ''}`,
+      );
+
+      try {
+        setIsSolanaLoading(true);
+        // 添加timestamp参数破坏缓存
+        const url = bustCache
+          ? `http://localhost:8080/race-games/players/${address}/games?t=${Date.now()}`
+          : `http://localhost:8080/race-games/players/${address}/games`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        console.log('📊 Solana rewards API response:', data);
+
+        if (data.success) {
+          setSolanaGameHistory(data);
+          console.log('✅ Solana game history set successfully');
+        } else {
+          console.error('❌ API returned success: false', data);
+        }
+      } catch (error) {
+        console.error('❌ Failed to fetch Solana rewards:', error);
+      } finally {
+        setIsSolanaLoading(false);
+      }
+    },
+    [address],
+  );
 
   // 在组件挂载时获取Solana奖励
   useEffect(() => {
@@ -477,9 +539,87 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
         const result = await blockchain.claimGameReward(gameId);
         console.log(`✅ Claim result:`, result);
 
-        // 刷新Solana奖励数据
+        // 1. 立即更新前端状态（乐观更新）
+        console.log(
+          `🚀 Optimistically updating frontend state for game ${gameId}`,
+        );
+        setSolanaRewards((prev) =>
+          prev.map((reward) =>
+            reward.gameId === gameId
+              ? { ...reward, solanaClaimed: true, solanaClaimable: false }
+              : reward,
+          ),
+        );
+
+        // 2. 更新数据库中的领取状态（带重试）
+        console.log(`📝 Updating claim status in database for game ${gameId}`);
+        let dbUpdateSuccess = false;
+        const maxRetries = 3;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            const updateResponse = await fetch(
+              `http://localhost:8080/race-games/games/${gameId}/players/${address}/claim`,
+              {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ claimed: true }),
+              },
+            );
+
+            if (updateResponse.ok) {
+              console.log(
+                `✅ Database claim status updated for game ${gameId} (attempt ${attempt})`,
+              );
+              dbUpdateSuccess = true;
+              break;
+            } else {
+              console.warn(
+                `⚠️ Database update attempt ${attempt} failed: ${updateResponse.statusText}`,
+              );
+              if (attempt === maxRetries) {
+                console.error(
+                  `❌ All ${maxRetries} database update attempts failed for game ${gameId}`,
+                );
+              }
+            }
+          } catch (dbError) {
+            console.warn(
+              `⚠️ Database update attempt ${attempt} error:`,
+              dbError,
+            );
+            if (attempt === maxRetries) {
+              console.error(
+                `❌ All ${maxRetries} database update attempts failed for game ${gameId}`,
+              );
+            }
+          }
+
+          // 如果不是最后一次尝试，等待1秒再重试
+          if (attempt < maxRetries) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+        }
+
+        // 3. 刷新Solana奖励数据（立即 + 延迟验证）
         console.log(`🔄 Refreshing Solana rewards data`);
-        await fetchSolanaRewards();
+        await fetchSolanaRewards(true); // 破坏缓存的立即刷新
+
+        // 延迟验证：2秒后再次检查状态确保一致性
+        setTimeout(async () => {
+          console.log(
+            `🔍 Delayed verification: re-checking state for game ${gameId}`,
+          );
+          try {
+            await validateClaimStatus(gameId);
+            console.log(`✅ Delayed verification completed for game ${gameId}`);
+          } catch (error) {
+            console.warn(
+              `⚠️ Delayed verification failed for game ${gameId}:`,
+              error,
+            );
+          }
+        }, 2000);
 
         // 清除三重保护
         globalClaimLock.current.delete(gameId);
@@ -490,9 +630,11 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
         );
 
         // 显示成功消息
-        alert(
-          `Successfully claimed reward for game ${gameId}! Transaction: ${result}`,
-        );
+        const successMessage = dbUpdateSuccess
+          ? `Successfully claimed reward for game ${gameId}! Status updated in database. Transaction: ${result}`
+          : `Successfully claimed reward for game ${gameId}! Transaction: ${result}\n(Note: Database sync may take a moment)`;
+
+        alert(successMessage);
       } catch (error) {
         console.error(
           `❌ Failed to claim Solana reward for game ${gameId}:`,
@@ -528,7 +670,14 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
         );
       }
     },
-    [address, isConnected, claimingGameId, blockchain, fetchSolanaRewards],
+    [
+      address,
+      isConnected,
+      claimingGameId,
+      blockchain,
+      fetchSolanaRewards,
+      validateClaimStatus,
+    ],
   );
 
   /**
