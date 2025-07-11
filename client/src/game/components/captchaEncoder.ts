@@ -4,8 +4,8 @@
 import logger from '@/utils/logger';
 
 export default function exportCaptcha(captcha: string) {
-  const PARTS = 6;           // number of chunks
-  const MAX_LEN = 200;       // max chars per chunk
+  const PARTS = 6; // number of chunks
+  const MAX_LEN = 200; // max chars per chunk
 
   // length guard
   if (captcha.length > PARTS * MAX_LEN) {

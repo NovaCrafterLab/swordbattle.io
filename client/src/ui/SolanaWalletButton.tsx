@@ -45,7 +45,7 @@ const SolanaWalletButton: React.FC = () => {
   if (!connected) {
     return (
       <div className="wallet-button-container">
-        <button 
+        <button
           className="wallet-button connect"
           onClick={() => setVisible(true)}
           disabled={connecting}
@@ -58,19 +58,18 @@ const SolanaWalletButton: React.FC = () => {
 
   return (
     <div className="wallet-button-container" style={{ position: 'relative' }}>
-      <button 
+      <button
         className="wallet-button connected"
         onClick={() => setShowDropdown(!showDropdown)}
         title={publicKey?.toString()}
       >
-        {publicKey ? 
-          `${publicKey.toString().slice(0, 4)}...${publicKey.toString().slice(-4)}` :
-          'Connected'
-        }
+        {publicKey
+          ? `${publicKey.toString().slice(0, 4)}...${publicKey.toString().slice(-4)}`
+          : 'Connected'}
       </button>
-      
+
       {showDropdown && (
-        <div 
+        <div
           className="wallet-dropdown"
           style={{
             position: 'absolute',
@@ -82,18 +81,24 @@ const SolanaWalletButton: React.FC = () => {
             borderRadius: '8px',
             marginTop: '5px',
             zIndex: 1000,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
           }}
         >
           <div style={{ padding: '12px', borderBottom: '1px solid #333' }}>
-            <div style={{ color: '#87CEEB', fontSize: '12px', marginBottom: '4px' }}>
+            <div
+              style={{
+                color: '#87CEEB',
+                fontSize: '12px',
+                marginBottom: '4px',
+              }}
+            >
               Balance
             </div>
             <div style={{ color: 'white', fontWeight: 'bold' }}>
               {balance !== null ? `${balance.toFixed(4)} SOL` : 'Loading...'}
             </div>
           </div>
-          
+
           <button
             onClick={copyAddress}
             style={{
@@ -105,14 +110,18 @@ const SolanaWalletButton: React.FC = () => {
               textAlign: 'left',
               cursor: 'pointer',
               fontSize: '14px',
-              borderBottom: '1px solid #333'
+              borderBottom: '1px solid #333',
             }}
-            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#2a2a4e'}
-            onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            onMouseOver={(e) =>
+              (e.currentTarget.style.backgroundColor = '#2a2a4e')
+            }
+            onMouseOut={(e) =>
+              (e.currentTarget.style.backgroundColor = 'transparent')
+            }
           >
             📋 Copy Address
           </button>
-          
+
           <button
             onClick={handleDisconnect}
             style={{
@@ -123,10 +132,14 @@ const SolanaWalletButton: React.FC = () => {
               color: '#ff6b6b',
               textAlign: 'left',
               cursor: 'pointer',
-              fontSize: '14px'
+              fontSize: '14px',
             }}
-            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#2a2a4e'}
-            onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            onMouseOver={(e) =>
+              (e.currentTarget.style.backgroundColor = '#2a2a4e')
+            }
+            onMouseOut={(e) =>
+              (e.currentTarget.style.backgroundColor = 'transparent')
+            }
           >
             🚪 Disconnect
           </button>

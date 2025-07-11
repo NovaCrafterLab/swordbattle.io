@@ -14,9 +14,9 @@ class Account {
       try {
         this.skins = JSON.parse(this.skins);
       } catch (e) {
-        Logger.server.error('Error parsing account skins', { 
+        Logger.server.error('Error parsing account skins', {
           accountId: this.id,
-          error: e.message 
+          error: e.message,
         });
       }
     }

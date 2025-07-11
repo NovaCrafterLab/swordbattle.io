@@ -1,22 +1,22 @@
 # ./docker-compose.yml                # root
 
-version: "3.9"
+version: '3.9'
 
 ###############################################################################
 # anchors ─ reusable blocks
 ###############################################################################
 x-logging: &log-common
   logging:
-    driver: "json-file"
+    driver: 'json-file'
     options:
-      max-size: "10m"
-      max-file: "3"
+      max-size: '10m'
+      max-file: '3'
 
 x-resources-512m: &res-512
   deploy:
     resources:
       limits:
-        cpus: "1.5"
+        cpus: '1.5'
         memory: 512M
       reservations:
         memory: 256M
@@ -25,7 +25,7 @@ x-resources-256m: &res-256
   deploy:
     resources:
       limits:
-        cpus: "0.5"
+        cpus: '0.5'
         memory: 256M
       reservations:
         memory: 128M
@@ -67,7 +67,7 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME}']
       interval: 5s
       retries: 20
 
@@ -88,19 +88,19 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "8090:8080"
+      - '8090:8080'
 
   server:
     <<: *server-common
     ports:
-      - "8000:8000"
+      - '8000:8000'
 
   server-race:
     <<: *server-common
-    profiles: ["race"]
+    profiles: ['race']
     env_file: [./env/development.server.race.env]
     ports:
-      - "8001:8000"
+      - '8001:8000'
 
   client:
     <<: [*net-common, *res-256]
@@ -113,7 +113,7 @@ services:
     env_file: [./env/client.env.development]
     depends_on: [server]
     ports:
-      - "3000:80"
+      - '3000:80'
 
 ###############################################################################
 # volumes & networks

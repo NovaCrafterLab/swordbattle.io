@@ -12,11 +12,11 @@ describe('VaultSDK', () => {
     connection = new Connection('http://localhost:8899', 'confirmed');
     wallet = Keypair.generate();
     programId = new PublicKey('AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV');
-    
+
     sdk = new VaultSDK({
       programId,
       connection,
-      wallet
+      wallet,
     });
   });
 
@@ -27,7 +27,7 @@ describe('VaultSDK', () => {
   test('should calculate vault PDAs correctly', async () => {
     const gameId = 12345;
     const vaultInfo = await sdk.getVaultInfo(gameId);
-    
+
     expect(vaultInfo.vault).toBeDefined();
     expect(vaultInfo.vaultSigner).toBeDefined();
     expect(vaultInfo.userTicket).toBeDefined();
@@ -45,4 +45,4 @@ describe('VaultSDK', () => {
     expect(typeof sdk.getUserTicketAccount).toBe('function');
     expect(typeof sdk.getRewardMapAccount).toBe('function');
   });
-}); 
+});

@@ -17,27 +17,35 @@ blockchain/
 ## 核心模块
 
 ### BlockchainService.js
+
 主要的区块链服务类，提供：
+
 - 与BSC网络的连接和交互
 - 合约读写操作封装
 - EIP-712签名功能
 - 自动RPC故障转移
 
 ### RPCManager.js
+
 RPC节点管理器，功能包括：
+
 - 多RPC节点池管理
 - 自动故障检测和切换
 - 健康检查和延迟测试
 - 统计信息收集
 
 ### networkConfig.js
+
 网络配置模块，包含：
+
 - BSC主网/测试网RPC池
 - 环境感知逻辑
 - 网络参数配置
 
 ### abis.js
+
 合约ABI管理，功能：
+
 - 从客户端配置文件加载ABI
 - 提供备用ABI（防止文件读取失败）
 - 支持SwordBattle和ERC20合约
@@ -45,6 +53,7 @@ RPC节点管理器，功能包括：
 ## 使用方法
 
 ### 基本使用
+
 ```javascript
 const { BlockchainService } = require('./blockchain');
 
@@ -56,14 +65,13 @@ await blockchainService.initialize();
 
 // 读取合约
 const contract = blockchainService.getSwordBattleContract();
-const gameInfo = await blockchainService.readContract(
-  contract, 
-  'getGameInfo', 
-  [gameId]
-);
+const gameInfo = await blockchainService.readContract(contract, 'getGameInfo', [
+  gameId,
+]);
 ```
 
 ### 高级功能
+
 ```javascript
 // 获取RPC统计
 const stats = blockchainService.getRPCStats();
@@ -81,6 +89,7 @@ blockchainService.resetRPCFailures();
 ## 配置说明
 
 ### 环境变量
+
 - `NODE_ENV`: 环境类型 (`development` | `production`)
 - `BLOCKCHAIN_RPC_URL`: 自定义RPC地址（可选）
 - `SWORD_BATTLE_CONTRACT`: SwordBattle合约地址
@@ -88,6 +97,7 @@ blockchainService.resetRPCFailures();
 - `TRUSTED_SIGNER_PRIVATE_KEY`: 签名私钥
 
 ### 网络配置
+
 - **开发环境**: 自动使用BSC测试网
 - **生产环境**: 自动使用BSC主网
 - **RPC池**: 内置多个高可用RPC节点
@@ -95,21 +105,25 @@ blockchainService.resetRPCFailures();
 ## 特性
 
 ### 🔄 自动故障转移
+
 - 检测RPC节点故障
 - 自动切换到可用节点
 - 智能重试机制
 
 ### 📊 健康监控
+
 - 定期健康检查
 - 延迟测试
 - 统计信息收集
 
 ### 🛡️ 错误处理
+
 - 完善的错误捕获
 - 自动重连机制
 - 降级处理
 
 ### 🔧 易于维护
+
 - 模块化设计
 - 配置与代码分离
 - 统一的接口
@@ -138,6 +152,7 @@ blockchainService.resetRPCFailures();
    - 确认合约地址格式正确
 
 ### 调试命令
+
 ```javascript
 // 获取环境信息
 blockchainService.getEnvironmentInfo();
@@ -147,4 +162,4 @@ blockchainService.getRPCStats();
 
 // 测试连接
 await blockchainService.isConnected();
-``` 
+```

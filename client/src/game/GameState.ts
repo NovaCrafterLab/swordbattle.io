@@ -48,7 +48,6 @@ class GameState {
   recentDeadPlayers: Record<number, { name: string; time: number }> = {};
 
   constructor(game: Game) {
-
     this.game = game;
     this.gameMap = new GameMap(this.game);
     this.spectator = new Spectator(this.game);
@@ -71,7 +70,10 @@ class GameState {
     if (unbind) {
       try {
         this.socket.removeEventListener('open', this.onServerOpen.bind(this));
-        this.socket.removeEventListener('message', this.onServerMessage.bind(this));
+        this.socket.removeEventListener(
+          'message',
+          this.onServerMessage.bind(this),
+        );
         this.socket.removeEventListener('close', this.onServerClose.bind(this));
       } catch (e) {
         logger.warn('Error unbinding socket events', e);
@@ -81,21 +83,28 @@ class GameState {
     }
     // rebind
     console.time('getServer');
-    getServer().then((server) => {
-      console.timeEnd('getServer');
-      if (this.debugMode) {
-        logger.info('Sending ws connection to', server.address, 'name', server.name);
-      }
-      logger.info('connecting to', server.address, Date.now());
-      this.socket = Socket.connect(
-        server.address,
-        this.onServerOpen.bind(this),
-        this.onServerMessage.bind(this),
-        this.onServerClose.bind(this),
-      );
-    }).catch((e) => {
-      logger.error('getServer failed', e);
-    });
+    getServer()
+      .then((server) => {
+        console.timeEnd('getServer');
+        if (this.debugMode) {
+          logger.info(
+            'Sending ws connection to',
+            server.address,
+            'name',
+            server.name,
+          );
+        }
+        logger.info('connecting to', server.address, Date.now());
+        this.socket = Socket.connect(
+          server.address,
+          this.onServerOpen.bind(this),
+          this.onServerMessage.bind(this),
+          this.onServerClose.bind(this),
+        );
+      })
+      .catch((e) => {
+        logger.error('getServer failed', e);
+      });
   }
 
   initialize() {
@@ -127,7 +136,10 @@ class GameState {
       gameData.walletAddress = walletAddress;
       logger.info('✅ Adding walletAddress to gameData:', gameData);
     } else {
-      logger.warn('⚠️ No walletAddress provided, sending without it:', gameData);
+      logger.warn(
+        '⚠️ No walletAddress provided, sending without it:',
+        gameData,
+      );
     }
 
     Socket.emit(gameData);

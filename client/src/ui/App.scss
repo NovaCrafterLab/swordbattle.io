@@ -646,7 +646,7 @@ span {
   &.connected {
     background: rgba(40, 167, 69, 0.1);
     border: 1px solid rgba(40, 167, 69, 0.3);
-    
+
     .status-text {
       color: #28a745;
     }
@@ -655,7 +655,7 @@ span {
   &.disconnected {
     background: rgba(220, 53, 69, 0.1);
     border: 1px solid rgba(220, 53, 69, 0.3);
-    
+
     .status-text {
       color: #dc3545;
     }

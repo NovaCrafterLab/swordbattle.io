@@ -41,33 +41,35 @@ class Server {
         const client = new Client(this.game, socket);
         if (getBannedIps().includes(client.ip)) {
           client.socket.close();
-          Logger.server.warn('Banned client connection attempt', { 
-            clientId: client.id, 
-            ip: client.ip 
+          Logger.server.warn('Banned client connection attempt', {
+            clientId: client.id,
+            ip: client.ip,
           });
           return;
         }
         this.addClient(client);
-        Logger.server.info('Client connected', { 
-          clientId: client.id, 
+        Logger.server.info('Client connected', {
+          clientId: client.id,
           ip: client.ip,
-          totalClients: this.clients.size
+          totalClients: this.clients.size,
         });
       },
       message: (socket, message) => {
         const client = this.clients.get(socket.id);
         if (!client) {
-          Logger.server.warn('Message from unknown client', { socketId: socket.id });
+          Logger.server.warn('Message from unknown client', {
+            socketId: socket.id,
+          });
           return;
         }
-        
+
         const data = Protocol.decode(message);
         if (data) {
           client.addMessage(data);
         } else {
-          Logger.server.warn('Failed to decode message', { 
+          Logger.server.warn('Failed to decode message', {
             clientId: client.id,
-            messageLength: message.byteLength 
+            messageLength: message.byteLength,
           });
         }
       },
@@ -75,28 +77,31 @@ class Server {
         try {
           const client = this.clients.get(socket.id);
           if (!client) {
-            Logger.server.warn('Close event for unknown client', { socketId: socket.id, code });
+            Logger.server.warn('Close event for unknown client', {
+              socketId: socket.id,
+              code,
+            });
             return;
           }
-          
+
           client.isSocketClosed = true;
           if (client.player && !client.player.removed) {
             client.player.remove();
           }
           this.removeClient(client);
-          
-          Logger.server.info('Client disconnected', { 
+
+          Logger.server.info('Client disconnected', {
             clientId: client.id,
             ip: client.ip,
             code,
             totalClients: this.clients.size,
-            hasPlayer: !!client.player
+            hasPlayer: !!client.player,
           });
         } catch (e) {
-          Logger.server.error('Error handling client disconnect', { 
-            socketId: socket.id, 
+          Logger.server.error('Error handling client disconnect', {
+            socketId: socket.id,
             code,
-            error: e.message 
+            error: e.message,
           });
         }
       },

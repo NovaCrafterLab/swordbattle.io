@@ -35,7 +35,7 @@ const programId = new PublicKey('AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV');
 const vaultSDK = new VaultSDK({
   programId,
   connection,
-  wallet
+  wallet,
 });
 ```
 
@@ -48,7 +48,7 @@ Initialize a new game vault with a specific game ID and token mint.
 ```typescript
 const tx = await vaultSDK.initializeGameVault({
   gameId: 12345,
-  tokenMint: new PublicKey('your-token-mint-address')
+  tokenMint: new PublicKey('your-token-mint-address'),
 });
 ```
 
@@ -60,7 +60,7 @@ Purchase a ticket for a game.
 const tx = await vaultSDK.buyTicket({
   gameId: 12345,
   amount: 100000000, // 100 tokens (assuming 9 decimals)
-  userTokenAccount: new PublicKey('user-token-account-address')
+  userTokenAccount: new PublicKey('user-token-account-address'),
 });
 ```
 
@@ -71,7 +71,7 @@ Claim rewards for a user after game finalization.
 ```typescript
 const tx = await vaultSDK.claimReward({
   gameId: 12345,
-  userTokenAccount: new PublicKey('user-token-account-address')
+  userTokenAccount: new PublicKey('user-token-account-address'),
 });
 ```
 
@@ -85,9 +85,9 @@ const tx = await vaultSDK.finalizeGame({
   rewards: [
     {
       user: new PublicKey('user-public-key'),
-      amount: '50000000' // 50 tokens
-    }
-  ]
+      amount: '50000000', // 50 tokens
+    },
+  ],
 });
 ```
 
@@ -99,7 +99,7 @@ Admin can withdraw funds from the vault.
 const tx = await vaultSDK.adminWithdraw({
   gameId: 12345,
   amount: 50000000, // 50 tokens
-  adminTokenAccount: new PublicKey('admin-token-account-address')
+  adminTokenAccount: new PublicKey('admin-token-account-address'),
 });
 ```
 
@@ -110,7 +110,7 @@ Change the token mint for a vault (admin only).
 ```typescript
 const tx = await vaultSDK.changeTokenMint({
   gameId: 12345,
-  newMint: new PublicKey('new-token-mint-address')
+  newMint: new PublicKey('new-token-mint-address'),
 });
 ```
 
@@ -149,14 +149,14 @@ console.log('All game IDs:', allGameIds); // ['1', '2', '3', ...]
 const allGames = await vaultSDK.getAllGames();
 console.log('Total games:', allGames.length);
 
-allGames.forEach(game => {
+allGames.forEach((game) => {
   console.log(`Game ${game.gameId}:`, {
     vault: game.vault.toString(),
     authority: game.authority.toString(),
     totalDeposit: game.totalDeposit,
     finalized: game.finalized,
     withdrawEnabled: game.withdrawEnabled,
-    tokenMint: game.tokenMint.toString()
+    tokenMint: game.tokenMint.toString(),
   });
 });
 ```
@@ -169,7 +169,7 @@ const filteredGames = await vaultSDK.getAllGames({
   limit: 10, // Limit to 10 games
   finalized: false, // Only active games
   authority: adminPublicKey, // Only games by specific authority
-  tokenMint: tokenMintPublicKey // Only games with specific token
+  tokenMint: tokenMintPublicKey, // Only games with specific token
 });
 ```
 
@@ -201,7 +201,7 @@ console.log('Game Statistics:', {
   total: stats.total,
   active: stats.active,
   finalized: stats.finalized,
-  withWithdrawEnabled: stats.withWithdrawEnabled
+  withWithdrawEnabled: stats.withWithdrawEnabled,
 });
 ```
 
@@ -229,14 +229,14 @@ async function analyzeGames() {
 
   // Get all games
   const allGames = await vaultSDK.getAllGames();
-  
+
   // Group by status
-  const activeGames = allGames.filter(g => !g.finalized);
-  const finalizedGames = allGames.filter(g => g.finalized);
-  
+  const activeGames = allGames.filter((g) => !g.finalized);
+  const finalizedGames = allGames.filter((g) => g.finalized);
+
   // Group by authority
   const authorityMap = new Map();
-  allGames.forEach(game => {
+  allGames.forEach((game) => {
     const authority = game.authority.toString();
     if (!authorityMap.has(authority)) {
       authorityMap.set(authority, []);
@@ -280,7 +280,7 @@ const ticketSubscription = vaultSDK.onTicketPurchased((event, slot) => {
     gameId: event.gameId,
     user: event.user.toString(),
     amount: event.amount,
-    totalDeposit: event.totalDeposit
+    totalDeposit: event.totalDeposit,
   });
 });
 
@@ -288,7 +288,7 @@ const rewardSubscription = vaultSDK.onRewardClaimed((event, slot) => {
   console.log('Reward claimed:', {
     gameId: event.gameId,
     user: event.user.toString(),
-    rewardAmount: event.rewardAmount
+    rewardAmount: event.rewardAmount,
   });
 });
 
@@ -296,7 +296,7 @@ const finalizeSubscription = vaultSDK.onGameFinalized((event, slot) => {
   console.log('Game finalized:', {
     gameId: event.gameId,
     totalDeposit: event.totalDeposit,
-    rewardCount: event.rewardCount
+    rewardCount: event.rewardCount,
   });
 });
 
@@ -304,7 +304,7 @@ const adminWithdrawSubscription = vaultSDK.onAdminWithdrawn((event, slot) => {
   console.log('Admin withdrawn:', {
     gameId: event.gameId,
     authority: event.authority.toString(),
-    amount: event.amount
+    amount: event.amount,
   });
 });
 
@@ -312,7 +312,7 @@ const tokenMintSubscription = vaultSDK.onTokenMintChanged((event, slot) => {
   console.log('Token mint changed:', {
     gameId: event.gameId,
     oldMint: event.oldMint.toString(),
-    newMint: event.newMint.toString()
+    newMint: event.newMint.toString(),
   });
 });
 
@@ -345,7 +345,7 @@ const filteredEvents = await vaultSDK.getEvents({
   gameId: 12345,
   user: userPublicKey,
   fromSlot: 1000000,
-  toSlot: 2000000
+  toSlot: 2000000,
 });
 ```
 
@@ -406,21 +406,27 @@ async function monitorGameEvents(gameId: number) {
   // 监听购票事件
   const ticketSubscription = vaultSDK.onTicketPurchased((event, slot) => {
     if (event.gameId === gameId.toString()) {
-      console.log(`🎫 新购票: 用户 ${event.user.toString()} 购买了 ${event.amount} 代币`);
+      console.log(
+        `🎫 新购票: 用户 ${event.user.toString()} 购买了 ${event.amount} 代币`,
+      );
     }
   });
 
   // 监听游戏结束事件
   const finalizeSubscription = vaultSDK.onGameFinalized((event, slot) => {
     if (event.gameId === gameId.toString()) {
-      console.log(`🏁 游戏结束: 总存款 ${event.totalDeposit}, 奖励数量 ${event.rewardCount}`);
+      console.log(
+        `🏁 游戏结束: 总存款 ${event.totalDeposit}, 奖励数量 ${event.rewardCount}`,
+      );
     }
   });
 
   // 监听奖励领取事件
   const rewardSubscription = vaultSDK.onRewardClaimed((event, slot) => {
     if (event.gameId === gameId.toString()) {
-      console.log(`🏆 奖励领取: 用户 ${event.user.toString()} 领取了 ${event.rewardAmount} 代币`);
+      console.log(
+        `🏆 奖励领取: 用户 ${event.user.toString()} 领取了 ${event.rewardAmount} 代币`,
+      );
     }
   });
 
@@ -447,45 +453,78 @@ setTimeout(() => {
 ```typescript
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { VaultSDK } from 'vault-sdk';
-import { getAssociatedTokenAddress, createMint, createAssociatedTokenAccount, mintTo } from '@solana/spl-token';
+import {
+  getAssociatedTokenAddress,
+  createMint,
+  createAssociatedTokenAccount,
+  mintTo,
+} from '@solana/spl-token';
 
 async function completeGameFlow() {
-  const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
+  const connection = new Connection(
+    'https://api.devnet.solana.com',
+    'confirmed',
+  );
   const admin = Keypair.generate();
   const user = Keypair.generate();
-  const programId = new PublicKey('AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV');
-  
+  const programId = new PublicKey(
+    'AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV',
+  );
+
   // Create token mint
   const tokenMint = await createMint(
     connection,
     admin,
     admin.publicKey,
     null,
-    9
+    9,
   );
 
   // Create token accounts
-  const adminTokenAccount = await getAssociatedTokenAddress(tokenMint, admin.publicKey);
-  const userTokenAccount = await getAssociatedTokenAddress(tokenMint, user.publicKey);
-  
-  await createAssociatedTokenAccount(connection, admin, tokenMint, admin.publicKey);
-  await createAssociatedTokenAccount(connection, admin, tokenMint, user.publicKey);
-  
+  const adminTokenAccount = await getAssociatedTokenAddress(
+    tokenMint,
+    admin.publicKey,
+  );
+  const userTokenAccount = await getAssociatedTokenAddress(
+    tokenMint,
+    user.publicKey,
+  );
+
+  await createAssociatedTokenAccount(
+    connection,
+    admin,
+    tokenMint,
+    admin.publicKey,
+  );
+  await createAssociatedTokenAccount(
+    connection,
+    admin,
+    tokenMint,
+    user.publicKey,
+  );
+
   // Mint tokens to user
-  await mintTo(connection, admin, tokenMint, userTokenAccount, admin, 1000000000);
+  await mintTo(
+    connection,
+    admin,
+    tokenMint,
+    userTokenAccount,
+    admin,
+    1000000000,
+  );
 
   // Initialize SDK for admin
   const adminSDK = new VaultSDK({
     programId,
     connection,
-    wallet: admin
+    wallet: admin,
   });
 
   // Initialize SDK for user
   const userSDK = new VaultSDK({
     programId,
     connection,
-    wallet: user
+    wallet: user,
   });
 
   const gameId = 12345;
@@ -493,36 +532,38 @@ async function completeGameFlow() {
   // 1. Admin initializes vault
   await adminSDK.initializeGameVault({
     gameId,
-    tokenMint
+    tokenMint,
   });
 
   // 2. User buys ticket
   await userSDK.buyTicket({
     gameId,
     amount: 100000000,
-    userTokenAccount
+    userTokenAccount,
   });
 
   // 3. Admin finalizes game with rewards
   await adminSDK.finalizeGame({
     gameId,
-    rewards: [{
-      user: user.publicKey,
-      amount: '50000000' // 50 tokens reward
-    }]
+    rewards: [
+      {
+        user: user.publicKey,
+        amount: '50000000', // 50 tokens reward
+      },
+    ],
   });
 
   // 4. User claims reward
   await userSDK.claimReward({
     gameId,
-    userTokenAccount
+    userTokenAccount,
   });
 
   // 5. Admin withdraws remaining funds
   await adminSDK.adminWithdraw({
     gameId,
     amount: 50000000, // 50 tokens
-    adminTokenAccount
+    adminTokenAccount,
   });
 }
 ```
@@ -624,4 +665,4 @@ npm test
 
 ## License
 
-MIT 
+MIT

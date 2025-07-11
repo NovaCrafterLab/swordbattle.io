@@ -5,7 +5,7 @@ const isProduction = ENV === 'production';
 
 require('dotenv').config();
 
-console.log("state:", process.env.BUILD_ENV);
+console.log('state:', process.env.BUILD_ENV);
 console.log('workspace:', process.cwd());
 
 interface ConfigProps {

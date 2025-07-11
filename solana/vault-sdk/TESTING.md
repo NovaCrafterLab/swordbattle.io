@@ -3,11 +3,13 @@
 ## 前置要求
 
 1. **Solana CLI** - 安装 Solana 命令行工具
+
    ```bash
    sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
    ```
 
 2. **Anchor Framework** - 安装 Anchor 开发框架
+
    ```bash
    npm install -g @coral-xyz/anchor-cli
    ```
@@ -24,6 +26,7 @@ npm run setup
 ```
 
 这个脚本会：
+
 - 检查必要的工具是否安装
 - 启动本地 Solana 验证器
 - 设置本地网络配置
@@ -84,7 +87,7 @@ npm run build
 
 ### 4. 运行测试
 
-```bash
+````bash
 # 快速测试
 node quick-test.js
 
@@ -137,7 +140,7 @@ curl http://localhost:8899
 
 # 如果未运行，启动验证器
 solana-test-validator
-```
+````
 
 ### 2. 程序未部署
 
@@ -174,22 +177,28 @@ npm run build
 const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
 
 // 使用 Testnet
-const connection = new Connection('https://api.testnet.solana.com', 'confirmed');
+const connection = new Connection(
+  'https://api.testnet.solana.com',
+  'confirmed',
+);
 ```
 
 ## 调试技巧
 
 1. **查看交易日志**
+
    ```bash
    solana logs
    ```
 
 2. **检查账户余额**
+
    ```bash
    solana balance <PUBLIC_KEY>
    ```
 
 3. **查看代币余额**
+
    ```bash
    spl-token balance <TOKEN_MINT>
    ```
@@ -231,6 +240,7 @@ const connection = new Connection('https://api.testnet.solana.com', 'confirmed')
 4. 账户权限是否正确
 
 更多信息请参考：
+
 - [Solana 文档](https://docs.solana.com/)
 - [Anchor 文档](https://book.anchor-lang.com/)
-- [SPL Token 文档](https://spl.solana.com/token) 
+- [SPL Token 文档](https://spl.solana.com/token)

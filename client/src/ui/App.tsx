@@ -67,7 +67,7 @@ import UnifiedWalletButton from './UnifiedWalletButton';
 let debugMode = false;
 try {
   debugMode = window.location.search.includes('debugAlertMode');
-} catch (e) { }
+} catch (e) {}
 
 function App() {
   const dispatch = useDispatch();
@@ -364,7 +364,7 @@ function App() {
     dispatch(changeNameAsync(newName) as any);
   };
   const onChangeClan = () => {
-    navigate('/clans')
+    navigate('/clans');
   };
 
   const openShop = () => {
@@ -375,7 +375,6 @@ function App() {
     // TODO
     navigate('/leaderboard');
   };
-
 
   useEffect(() => {
     if (modal?.type?.displayName === 'ShopModal') {

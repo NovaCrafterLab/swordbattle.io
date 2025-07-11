@@ -2,7 +2,7 @@
 import CountUp from 'react-countup';
 import { useScale } from '../Scale';
 
-import HomeImg      from '../../assets/img/home.png';
+import HomeImg from '../../assets/img/home.png';
 import PlayAgainImg from '../../assets/img/play-again.png';
 
 import './GameResults.scss';
@@ -32,7 +32,7 @@ function GameResults({ onHome, results, game, isLoggedIn, adElement }: any) {
 
   const titleMap: Record<number, string> = {
     [DisconnectTypes.Player]: 'You got stabbed',
-    [DisconnectTypes.Mob]:    'You were destroyed',
+    [DisconnectTypes.Mob]: 'You were destroyed',
     [DisconnectTypes.Server]: isRaceFinished
       ? 'Race finished # new round soon'
       : 'You were disconnected',
@@ -40,15 +40,12 @@ function GameResults({ onHome, results, game, isLoggedIn, adElement }: any) {
 
   const labelMap: Record<number, string> = {
     [DisconnectTypes.Player]: 'Stabbed by',
-    [DisconnectTypes.Mob]:    'By',
+    [DisconnectTypes.Mob]: 'By',
     [DisconnectTypes.Server]: isRaceFinished ? '' : 'Disconnect reason:',
   };
 
   /* ===== login data ===== */
-  const { gems, xp, ultimacy } = calculateGemsXP(
-    results.coins,
-    results.kills,
-  );
+  const { gems, xp, ultimacy } = calculateGemsXP(results.coins, results.kills);
 
   /* ===== render ===== */
   return (
@@ -62,12 +59,16 @@ function GameResults({ onHome, results, game, isLoggedIn, adElement }: any) {
 
         {/* --- data --- */}
         <div className="results-container">
-          {labelMap[code] && (
-            <InfoRow title={labelMap[code]} value={reason} />
-          )}
+          {labelMap[code] && <InfoRow title={labelMap[code]} value={reason} />}
 
-          <InfoRow title="Coins:" value={<CountUp end={results.coins} duration={3} />} />
-          <InfoRow title="Stabs:" value={<CountUp end={results.kills} duration={3} />} />
+          <InfoRow
+            title="Coins:"
+            value={<CountUp end={results.coins} duration={3} />}
+          />
+          <InfoRow
+            title="Stabs:"
+            value={<CountUp end={results.kills} duration={3} />}
+          />
           <InfoRow
             title="Survived:"
             value={
@@ -83,16 +84,30 @@ function GameResults({ onHome, results, game, isLoggedIn, adElement }: any) {
 
           {isLoggedIn && (
             <>
-              <InfoRow title="Gems Gained"    value={<CountUp end={gems}     duration={3} />} />
-              <InfoRow title="XP Gained"      value={<CountUp end={xp}       duration={3} />} />
-              <InfoRow title="Mastery Earned" value={<CountUp end={ultimacy} duration={3} />} />
+              <InfoRow
+                title="Gems Gained"
+                value={<CountUp end={gems} duration={3} />}
+              />
+              <InfoRow
+                title="XP Gained"
+                value={<CountUp end={xp} duration={3} />}
+              />
+              <InfoRow
+                title="Mastery Earned"
+                value={<CountUp end={ultimacy} duration={3} />}
+              />
             </>
           )}
         </div>
 
         {/* --- button --- */}
         <div className="results-buttons">
-          <IconButton className="to-home" img={HomeImg} alt="Home" onClick={handleHome} />
+          <IconButton
+            className="to-home"
+            img={HomeImg}
+            alt="Home"
+            onClick={handleHome}
+          />
           {code !== DisconnectTypes.Server && !isRaceFinished && (
             <IconButton
               className="play-again"

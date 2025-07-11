@@ -36,7 +36,9 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
   const playerData = usePlayerData();
 
   // 获取玩家仪表板数据（包含碎片余额、奖励等所有信息）
-  const { data: playerDashboardRaw } = blockchain.usePlayerDashboard(address || '');
+  const { data: playerDashboardRaw } = blockchain.usePlayerDashboard(
+    address || '',
+  );
   const playerDashboard = playerDashboardRaw as PlayerDashboard | null;
 
   const [gameRewards, setGameRewards] = useState<GameReward[]>([]);
@@ -49,7 +51,7 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
 
   // 重试函数
   const handleRetry = () => {
-    setRetryTrigger(prev => prev + 1);
+    setRetryTrigger((prev) => prev + 1);
   };
 
   // 组件挂载时立即刷新playerData
@@ -67,25 +69,29 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
   // 简化的数据获取逻辑 - 当playerData更新时同步到组件状态
   useEffect(() => {
     // 修改条件：只要playerData加载完成且有playerProfile就同步数据（包括空数据）
-    if (!playerData.isLoading && playerData.playerProfile?.gameHistory !== undefined) {
-      const gameRewardsData: GameReward[] = playerData.playerProfile.gameHistory.map(game => ({
-        gameId: game.gameId,
-        score: game.score,
-        reward: game.reward,
-        usdReward: game.usdReward,
-        nclabReward: game.nclabReward,
-        hasClaimed: game.hasClaimed,
-        usdClaimed: game.usdClaimed,
-        nclabClaimed: game.nclabClaimed,
-        usdClaimable: game.usdClaimable,
-        nclabClaimable: game.nclabClaimable,
-        nclabClaimableTime: game.nclabClaimableTime,
-        rank: game.rank,
-        isWinner: game.isWinner,
-        timestamp: game.timestamp,
-        level: game.level,
-      }));
-      
+    if (
+      !playerData.isLoading &&
+      playerData.playerProfile?.gameHistory !== undefined
+    ) {
+      const gameRewardsData: GameReward[] =
+        playerData.playerProfile.gameHistory.map((game) => ({
+          gameId: game.gameId,
+          score: game.score,
+          reward: game.reward,
+          usdReward: game.usdReward,
+          nclabReward: game.nclabReward,
+          hasClaimed: game.hasClaimed,
+          usdClaimed: game.usdClaimed,
+          nclabClaimed: game.nclabClaimed,
+          usdClaimable: game.usdClaimable,
+          nclabClaimable: game.nclabClaimable,
+          nclabClaimableTime: game.nclabClaimableTime,
+          rank: game.rank,
+          isWinner: game.isWinner,
+          timestamp: game.timestamp,
+          level: game.level,
+        }));
+
       setGameRewards(gameRewardsData);
       setIsLoading(false);
     }
@@ -108,10 +114,10 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
       console.log('🎉 交易确认，刷新奖励数据...');
       setClaimingGameId(null);
       setClaimingAll(false);
-      
+
       // 立即刷新数据，然后再次延迟刷新确保状态同步
       playerData.refreshPlayerData();
-      
+
       // 延迟2秒后再次刷新，确保区块链状态完全更新
       setTimeout(() => {
         playerData.refreshPlayerData();
@@ -185,10 +191,14 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
    */
   const getLevelDisplay = (level?: number) => {
     switch (level) {
-      case 0: return { text: 'LOW', color: '#10b981' };
-      case 1: return { text: 'MEDIUM', color: '#f59e0b' };
-      case 2: return { text: 'HIGH', color: '#ef4444' };
-      default: return { text: 'UNKNOWN', color: '#6b7280' };
+      case 0:
+        return { text: 'LOW', color: '#10b981' };
+      case 1:
+        return { text: 'MEDIUM', color: '#f59e0b' };
+      case 2:
+        return { text: 'HIGH', color: '#ef4444' };
+      default:
+        return { text: 'UNKNOWN', color: '#6b7280' };
     }
   };
 
@@ -208,8 +218,10 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
     const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
+    const diffInHours = Math.floor(
+      (now.getTime() - date.getTime()) / (1000 * 60 * 60),
+    );
+
     if (diffInHours < 24) {
       return `${diffInHours}h ago`;
     } else {
@@ -222,42 +234,53 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
   useEffect(() => {
     if (blockchain.isConfirmed && claimingGameId) {
       // 更新奖励状态
-      setGameRewards(prev => 
-        prev.map(reward => 
-          reward.gameId === claimingGameId 
+      setGameRewards((prev) =>
+        prev.map((reward) =>
+          reward.gameId === claimingGameId
             ? { ...reward, hasClaimed: true }
-            : reward
-        )
+            : reward,
+        ),
       );
       setClaimingGameId(null);
-      
+
       // 刷新玩家数据
       playerData.refreshPlayerData();
     }
   }, [blockchain.isConfirmed, claimingGameId]);
 
   // 计算统计数据
-  const totalRewards = gameRewards.reduce((sum, reward) => sum + reward.reward, BigInt(0));
+  const totalRewards = gameRewards.reduce(
+    (sum, reward) => sum + reward.reward,
+    BigInt(0),
+  );
   const unclaimedUsdRewards = gameRewards
-    .filter(reward => reward.usdClaimable)
+    .filter((reward) => reward.usdClaimable)
     .reduce((sum, reward) => sum + reward.usdReward, BigInt(0));
   const unclaimedNclabRewards = gameRewards
-    .filter(reward => reward.nclabClaimable)
+    .filter((reward) => reward.nclabClaimable)
     .reduce((sum, reward) => sum + reward.nclabReward, BigInt(0));
   const totalGames = gameRewards.length;
-  const winCount = gameRewards.filter(reward => reward.isWinner).length;
-  const winRate = totalGames > 0 ? (winCount / totalGames * 100).toFixed(1) : '0';
+  const winCount = gameRewards.filter((reward) => reward.isWinner).length;
+  const winRate =
+    totalGames > 0 ? ((winCount / totalGames) * 100).toFixed(1) : '0';
 
   // 可claim的奖励数量
-  const claimableUsdCount = gameRewards.filter(reward => reward.usdClaimable).length;
-  const claimableNclabCount = gameRewards.filter(reward => reward.nclabClaimable).length;
+  const claimableUsdCount = gameRewards.filter(
+    (reward) => reward.usdClaimable,
+  ).length;
+  const claimableNclabCount = gameRewards.filter(
+    (reward) => reward.nclabClaimable,
+  ).length;
   const claimableCount = claimableUsdCount + claimableNclabCount;
   const claimableAmount = unclaimedUsdRewards + unclaimedNclabRewards;
 
   // 根据过滤条件过滤对局
-  const filteredRewards = showFilter === 'claimable' 
-    ? gameRewards.filter(reward => reward.usdClaimable || reward.nclabClaimable)
-    : gameRewards;
+  const filteredRewards =
+    showFilter === 'claimable'
+      ? gameRewards.filter(
+          (reward) => reward.usdClaimable || reward.nclabClaimable,
+        )
+      : gameRewards;
 
   // 检查是否正在获取数据
   const isDataLoading = isLoading || playerData.isLoading;
@@ -283,9 +306,13 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
           <div className="loading-content">
             <div className="loading-spinner">🔄</div>
             <h3>Loading Your Rewards...</h3>
-            <p>Fetching game history from database and reward info from blockchain</p>
+            <p>
+              Fetching game history from database and reward info from
+              blockchain
+            </p>
             <div style={{ fontSize: '12px', color: '#888', marginTop: '16px' }}>
-              💾 Database → Game history, scores, rankings<br/>
+              💾 Database → Game history, scores, rankings
+              <br />
               🔗 Blockchain → Real-time reward amounts, claim status
             </div>
           </div>
@@ -296,11 +323,15 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
           <div className="rewards-stats">
             <div className="stat-item">
               <label>Total Rewards</label>
-              <span className="stat-value">{(Number(totalRewards) / LAMPORTS_PER_SOL).toFixed(4)} SOL</span>
+              <span className="stat-value">
+                {(Number(totalRewards) / LAMPORTS_PER_SOL).toFixed(4)} SOL
+              </span>
             </div>
             <div className="stat-item">
               <label>Available to Claim</label>
-              <span className="stat-value claimable">{(Number(claimableAmount) / LAMPORTS_PER_SOL).toFixed(4)} SOL</span>
+              <span className="stat-value claimable">
+                {(Number(claimableAmount) / LAMPORTS_PER_SOL).toFixed(4)} SOL
+              </span>
             </div>
             <div className="stat-item">
               <label>Games Played</label>
@@ -316,44 +347,59 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
           <div className="rewards-history">
             <div className="history-header">
               <h3>Reward History</h3>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: '10px' }}
+              >
                 {/* 过滤选项 */}
                 <div className="filter-options">
-                  <button 
+                  <button
                     className={`filter-btn ${showFilter === 'all' ? 'active' : ''}`}
                     onClick={() => setShowFilter('all')}
                   >
                     All Games ({totalGames})
                   </button>
-                  <button 
+                  <button
                     className={`filter-btn ${showFilter === 'claimable' ? 'active' : ''}`}
                     onClick={() => setShowFilter('claimable')}
                   >
                     Claimable ({claimableCount})
                   </button>
                 </div>
-                
+
                 {/* 批量领取按钮 */}
                 {claimableCount > 1 && (
-                  <button 
+                  <button
                     onClick={handleClaimAllRewards}
-                    disabled={claimingAll || (playerDashboard ? !playerDashboard.hasClaimableRewards : false)}
+                    disabled={
+                      claimingAll ||
+                      (playerDashboard
+                        ? !playerDashboard.hasClaimableRewards
+                        : false)
+                    }
                     className="filter-btn"
-                    style={{ 
-                      fontSize: '12px', 
+                    style={{
+                      fontSize: '12px',
                       padding: '6px 12px',
                       backgroundColor: '#10b981',
                       color: 'white',
-                      opacity: (claimingAll || (playerDashboard ? !playerDashboard.hasClaimableRewards : false)) ? 0.6 : 1
+                      opacity:
+                        claimingAll ||
+                        (playerDashboard
+                          ? !playerDashboard.hasClaimableRewards
+                          : false)
+                          ? 0.6
+                          : 1,
                     }}
                   >
-                    {claimingAll ? '🔄 Claiming...' : `💰 Claim All (${claimableCount})`}
+                    {claimingAll
+                      ? '🔄 Claiming...'
+                      : `💰 Claim All (${claimableCount})`}
                   </button>
                 )}
 
                 {/* 刷新按钮 */}
-                <button 
+                <button
                   onClick={handleRetry}
                   className="filter-btn"
                   style={{ fontSize: '12px', padding: '4px 8px' }}
@@ -362,14 +408,11 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
                 </button>
               </div>
             </div>
-            
+
             {fetchError ? (
               <div className="error-state">
                 <p>❌ {fetchError}</p>
-                <button 
-                  className="retry-btn"
-                  onClick={handleRetry}
-                >
+                <button className="retry-btn" onClick={handleRetry}>
                   🔄 Retry
                 </button>
               </div>
@@ -390,43 +433,62 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
             ) : (
               <div className="rewards-list">
                 {filteredRewards.map((reward) => (
-                  <div 
-                    key={reward.gameId} 
+                  <div
+                    key={reward.gameId}
                     className={`reward-item ${reward.isWinner ? 'winner' : 'loser'}`}
                   >
                     <div className="reward-info">
                       <div className="game-info">
                         <span className="game-id">Game #{reward.gameId}</span>
                         {reward.level !== undefined && (
-                          <span 
+                          <span
                             className="level-badge"
-                            style={{ 
-                              backgroundColor: getLevelDisplay(reward.level).color,
+                            style={{
+                              backgroundColor: getLevelDisplay(reward.level)
+                                .color,
                               color: 'white',
                               padding: '2px 6px',
                               borderRadius: '4px',
                               fontSize: '0.7em',
-                              fontWeight: 'bold'
+                              fontWeight: 'bold',
                             }}
                           >
                             {getLevelDisplay(reward.level).text}
                           </span>
                         )}
-                        <span className="rank">{getRankDisplay(reward.rank)}</span>
+                        <span className="rank">
+                          {getRankDisplay(reward.rank)}
+                        </span>
                         {reward.timestamp && (
-                          <span className="time">{formatTime(reward.timestamp)}</span>
+                          <span className="time">
+                            {formatTime(reward.timestamp)}
+                          </span>
                         )}
                       </div>
-                      
+
                       <div className="game-stats">
-                        <span className="score">Score: {reward.score.toLocaleString()}</span>
+                        <span className="score">
+                          Score: {reward.score.toLocaleString()}
+                        </span>
                         <div className="reward-amounts">
-                          <span className={`reward-amount ${reward.usdReward > BigInt(0) ? 'positive' : 'zero'}`}>
-                            💰 {(Number(reward.usdReward) / LAMPORTS_PER_SOL).toFixed(4)} SOL
+                          <span
+                            className={`reward-amount ${reward.usdReward > BigInt(0) ? 'positive' : 'zero'}`}
+                          >
+                            💰{' '}
+                            {(
+                              Number(reward.usdReward) / LAMPORTS_PER_SOL
+                            ).toFixed(4)}{' '}
+                            SOL
                           </span>
                           {reward.nclabReward > BigInt(0) && (
-                            <span className={`reward-amount ${reward.nclabReward > BigInt(0) ? 'positive' : 'zero'}`}>
-                              ⚡ {(Number(reward.nclabReward) / LAMPORTS_PER_SOL).toFixed(4)} SPL
+                            <span
+                              className={`reward-amount ${reward.nclabReward > BigInt(0) ? 'positive' : 'zero'}`}
+                            >
+                              ⚡{' '}
+                              {(
+                                Number(reward.nclabReward) / LAMPORTS_PER_SOL
+                              ).toFixed(4)}{' '}
+                              SPL
                             </span>
                           )}
                         </div>
@@ -434,38 +496,59 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
                     </div>
 
                     <div className="reward-actions">
-                      {reward.usdReward > BigInt(0) || reward.nclabReward > BigInt(0) ? (
+                      {reward.usdReward > BigInt(0) ||
+                      reward.nclabReward > BigInt(0) ? (
                         <div className="claim-buttons">
-                          {reward.usdReward > BigInt(0) && (
-                            reward.usdClaimed ? (
-                              <span className="claimed-badge">💰 USD Claimed</span>
+                          {reward.usdReward > BigInt(0) &&
+                            (reward.usdClaimed ? (
+                              <span className="claimed-badge">
+                                💰 USD Claimed
+                              </span>
                             ) : reward.usdClaimable ? (
                               <button
                                 className="claim-btn usd"
-                                onClick={() => handleClaimUSDReward(reward.gameId)}
-                                disabled={claimingGameId === reward.gameId || blockchain.isWritePending}
+                                onClick={() =>
+                                  handleClaimUSDReward(reward.gameId)
+                                }
+                                disabled={
+                                  claimingGameId === reward.gameId ||
+                                  blockchain.isWritePending
+                                }
                               >
-                                {claimingGameId === reward.gameId ? 'Claiming...' : '💰 Claim USD'}
+                                {claimingGameId === reward.gameId
+                                  ? 'Claiming...'
+                                  : '💰 Claim USD'}
                               </button>
                             ) : (
-                              <span className="not-claimable">💰 USD Not Claimable</span>
-                            )
-                          )}
-                          {reward.nclabReward > BigInt(0) && (
-                            reward.nclabClaimed ? (
-                              <span className="claimed-badge">⚡ NCLab Claimed</span>
+                              <span className="not-claimable">
+                                💰 USD Not Claimable
+                              </span>
+                            ))}
+                          {reward.nclabReward > BigInt(0) &&
+                            (reward.nclabClaimed ? (
+                              <span className="claimed-badge">
+                                ⚡ NCLab Claimed
+                              </span>
                             ) : reward.nclabClaimable ? (
                               <button
                                 className="claim-btn nclab"
-                                onClick={() => handleClaimNclabReward(reward.gameId)}
-                                disabled={claimingGameId === reward.gameId || blockchain.isWritePending}
+                                onClick={() =>
+                                  handleClaimNclabReward(reward.gameId)
+                                }
+                                disabled={
+                                  claimingGameId === reward.gameId ||
+                                  blockchain.isWritePending
+                                }
                               >
-                                {claimingGameId === reward.gameId ? 'Claiming...' : '⚡ Claim NCLab'}
+                                {claimingGameId === reward.gameId
+                                  ? 'Claiming...'
+                                  : '⚡ Claim NCLab'}
                               </button>
                             ) : (
-                              <span className="not-claimable">⚡ NCLab Cooldown</span>
-                            )
-                          )}
+                              <span className="not-claimable">
+                                ⚡ NCLab Cooldown
+                              </span>
+                            ))}
                         </div>
                       ) : (
                         <span className="no-reward">No reward</span>
@@ -487,7 +570,13 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
     </div>
   );
 
-  return <Modal child={modalContent} close={onClose} className="rewards-modal-wrapper" />;
+  return (
+    <Modal
+      child={modalContent}
+      close={onClose}
+      className="rewards-modal-wrapper"
+    />
+  );
 };
 
-export default RewardsModal; 
+export default RewardsModal;

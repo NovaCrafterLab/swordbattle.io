@@ -39,10 +39,30 @@ class QuadTreeImpl {
     const next = this.level + 1;
 
     this.nodes.push(
-      new QuadTree({ x: x + hw, y, width: hw, height: hh }, this.capacity, this.maxLevel, next),
-      new QuadTree({ x, y, width: hw, height: hh }, this.capacity, this.maxLevel, next),
-      new QuadTree({ x, y: y + hh, width: hw, height: hh }, this.capacity, this.maxLevel, next),
-      new QuadTree({ x: x + hw, y: y + hh, width: hw, height: hh }, this.capacity, this.maxLevel, next),
+      new QuadTree(
+        { x: x + hw, y, width: hw, height: hh },
+        this.capacity,
+        this.maxLevel,
+        next,
+      ),
+      new QuadTree(
+        { x, y, width: hw, height: hh },
+        this.capacity,
+        this.maxLevel,
+        next,
+      ),
+      new QuadTree(
+        { x, y: y + hh, width: hw, height: hh },
+        this.capacity,
+        this.maxLevel,
+        next,
+      ),
+      new QuadTree(
+        { x: x + hw, y: y + hh, width: hw, height: hh },
+        this.capacity,
+        this.maxLevel,
+        next,
+      ),
     );
 
     for (const item of this.items) {

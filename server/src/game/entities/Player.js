@@ -22,7 +22,6 @@ const { clamp, calculateGemsXP } = require('../../helpers');
 const { skins } = require('../../cosmetics.json');
 const Logger = require('../../utils/Logger');
 
-
 class Player extends Entity {
   constructor(game, name) {
     super(game, Types.Entity.Player);
@@ -40,7 +39,12 @@ class Player extends Entity {
 
     const { speed, radius, maxHealth, regeneration, viewport } = config.player;
     this.shape = Circle.create(0, 0, radius);
-    if (!(process.env.NODE_ENV === 'development' && this.name === 'Update Testing Account')) {
+    if (
+      !(
+        process.env.NODE_ENV === 'development' &&
+        this.name === 'Update Testing Account'
+      )
+    ) {
       this.speed = new Property(1000);
     } else {
       this.speed = new Property(speed);
@@ -172,8 +176,7 @@ class Player extends Entity {
 
       biome.collides(this, sharedResp);
 
-      const allowed =
-        biome.type !== Types.Biome.Safezone || this.inSafezone;
+      const allowed = biome.type !== Types.Biome.Safezone || this.inSafezone;
       if (allowed && biome.zIndex > topZ) {
         topBiome = biome;
         topZ = biome.zIndex;
@@ -209,7 +212,8 @@ class Player extends Entity {
     const mouse = this.mouse;
     const modNoDiag = this.modifiers.disableDiagonalMovement;
     let speed = this.speed.value;
-    let dx = 0, dy = 0;
+    let dx = 0,
+      dy = 0;
 
     if (mouse) {
       const FORCE_MAX = 150;
@@ -224,16 +228,20 @@ class Player extends Entity {
 
       if (modNoDiag && dx && dy) {
         if (Math.abs(dx) > Math.abs(dy)) {
-          dx = dx > 0 ? speed : -speed; dy = 0;
+          dx = dx > 0 ? speed : -speed;
+          dy = 0;
         } else {
-          dy = dy > 0 ? speed : -speed; dx = 0;
+          dy = dy > 0 ? speed : -speed;
+          dx = 0;
         }
       }
       this.movementDirection = ang;
     } else {
-      const dirX = (this.inputs.isInputDown(Types.Input.Right) ? 1 : 0) -
+      const dirX =
+        (this.inputs.isInputDown(Types.Input.Right) ? 1 : 0) -
         (this.inputs.isInputDown(Types.Input.Left) ? 1 : 0);
-      const dirY = (this.inputs.isInputDown(Types.Input.Down) ? 1 : 0) -
+      const dirY =
+        (this.inputs.isInputDown(Types.Input.Down) ? 1 : 0) -
         (this.inputs.isInputDown(Types.Input.Up) ? 1 : 0);
 
       if (dirX || dirY) {
@@ -263,8 +271,8 @@ class Player extends Entity {
     this.velocity.scale(0.6);
 
     const frictionMul = 1 - this.friction.value;
-    dx += (this.movedDistance.x *= frictionMul);
-    dy += (this.movedDistance.y *= frictionMul);
+    dx += this.movedDistance.x *= frictionMul;
+    dy += this.movedDistance.y *= frictionMul;
 
     const maxLen = speed;
     const len2 = dx * dx + dy * dy;
@@ -286,7 +294,12 @@ class Player extends Entity {
   }
 
   damaged(damage, entity = null) {
-    if (!(process.env.NODE_ENV === 'development' && this.name === 'Update Testing Account')) {
+    if (
+      !(
+        process.env.NODE_ENV === 'development' &&
+        this.name === 'Update Testing Account'
+      )
+    ) {
       this.health.damaged(damage);
     }
 
@@ -371,7 +384,7 @@ class Player extends Entity {
       c.saveGame({
         coins: this.levels.coins,
         kills: this.kills,
-        playtime: this.playtime
+        playtime: this.playtime,
       });
     }
 
@@ -386,12 +399,15 @@ class Player extends Entity {
       this.evolutions.skippedEvols.clear();
     }
 
-    if (!(process.env.NODE_ENV === 'development' && this.name === 'Update Testing Account')) {
+    if (
+      !(
+        process.env.NODE_ENV === 'development' &&
+        this.name === 'Update Testing Account'
+      )
+    ) {
       const drop = this.calculateDropAmount();
       if (drop > 0) {
-        this.game.map.spawnCoinsInShape(
-          this.shape, drop, c?.account?.id,
-        );
+        this.game.map.spawnCoinsInShape(this.shape, drop, c?.account?.id);
         // Logger.game.debug('Coins dropped on player death', {
         //   playerId: this.id,
         //   playerName: this.name,
@@ -409,7 +425,7 @@ class Player extends Entity {
         kills: this.kills,
         coins: this.levels?.coins || 0,
         playtime: this.playtime,
-        hasClient: !!this.client
+        hasClient: !!this.client,
       });
 
       // 移除自动游戏结束检查 - 游戏只能通过手动结束、超时、周期重启或服务器关闭来结束
@@ -417,16 +433,15 @@ class Player extends Entity {
     }
   }
 
-
   calculateDropAmount() {
     const coins = this.levels.coins;
     return coins < 13
       ? 10
       : Math.round(
-        coins < 25000
-          ? coins * 0.8
-          : Math.log10(coins) * 30000 - 111938.2002602,
-      );
+          coins < 25000
+            ? coins * 0.8
+            : Math.log10(coins) * 30000 - 111938.2002602,
+        );
   }
 
   cleanup() {
@@ -446,7 +461,6 @@ class Player extends Entity {
   }
 }
 
-
 // Check if any duplicate ids in cosmetics.json
 (function verifyCosmeticIds() {
   const seen = new Map();
@@ -454,7 +468,11 @@ class Player extends Entity {
 
   for (const skin of Object.values(skins)) {
     if (seen.has(skin.id)) {
-      duplicates.push({ id: skin.id, name: skin.name, first: seen.get(skin.id) });
+      duplicates.push({
+        id: skin.id,
+        name: skin.name,
+        first: seen.get(skin.id),
+      });
     } else {
       seen.set(skin.id, skin.name);
     }

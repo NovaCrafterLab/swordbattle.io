@@ -38,6 +38,10 @@
 }
 
 @media (max-width: 480px) {
-  .sb-clans-cm-row { grid-template-columns: 1fr auto auto; }
-  .sb-clans-cm-role { display: none; }
+  .sb-clans-cm-row {
+    grid-template-columns: 1fr auto auto;
+  }
+  .sb-clans-cm-role {
+    display: none;
+  }
 }

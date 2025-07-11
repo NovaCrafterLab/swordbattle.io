@@ -6,7 +6,7 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data:rw
     environment:
-      NODE_ENV: "production"
+      NODE_ENV: 'production'
     restart: always
 
   api:
@@ -14,9 +14,9 @@ services:
       - ./env/api.env.production
     build:
       args:
-        NODE_ENV: "production"
+        NODE_ENV: 'production'
     environment:
-      NODE_ENV: "production"
+      NODE_ENV: 'production'
     restart: always
 
   server:
@@ -24,9 +24,9 @@ services:
       - ./env/server.env.production
     build:
       args:
-        NODE_ENV: "production"
+        NODE_ENV: 'production'
     environment:
-      NODE_ENV: "production"
+      NODE_ENV: 'production'
     restart: always
 
   server-race:
@@ -34,9 +34,9 @@ services:
       - ./env/production.server.race.env
     build:
       args:
-        NODE_ENV: "production"
+        NODE_ENV: 'production'
     environment:
-      NODE_ENV: "production"
+      NODE_ENV: 'production'
     restart: always
 
   client:
@@ -46,5 +46,5 @@ services:
       args:
         BUILD_ENV: production
     environment:
-      NODE_ENV: "production"
+      NODE_ENV: 'production'
     restart: always

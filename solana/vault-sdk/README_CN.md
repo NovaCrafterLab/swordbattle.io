@@ -35,7 +35,7 @@ const programId = new PublicKey('AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV');
 const vaultSDK = new VaultSDK({
   programId,
   connection,
-  wallet
+  wallet,
 });
 ```
 
@@ -48,7 +48,7 @@ const vaultSDK = new VaultSDK({
 ```typescript
 const tx = await vaultSDK.initializeGameVault({
   gameId: 12345,
-  tokenMint: new PublicKey('your-token-mint-address')
+  tokenMint: new PublicKey('your-token-mint-address'),
 });
 ```
 
@@ -60,7 +60,7 @@ const tx = await vaultSDK.initializeGameVault({
 const tx = await vaultSDK.buyTicket({
   gameId: 12345,
   amount: 100000000, // 100 代币 (假设9位小数)
-  userTokenAccount: new PublicKey('user-token-account-address')
+  userTokenAccount: new PublicKey('user-token-account-address'),
 });
 ```
 
@@ -71,7 +71,7 @@ const tx = await vaultSDK.buyTicket({
 ```typescript
 const tx = await vaultSDK.claimReward({
   gameId: 12345,
-  userTokenAccount: new PublicKey('user-token-account-address')
+  userTokenAccount: new PublicKey('user-token-account-address'),
 });
 ```
 
@@ -85,9 +85,9 @@ const tx = await vaultSDK.finalizeGame({
   rewards: [
     {
       user: new PublicKey('user-public-key'),
-      amount: '50000000' // 50 代币
-    }
-  ]
+      amount: '50000000', // 50 代币
+    },
+  ],
 });
 ```
 
@@ -99,7 +99,7 @@ const tx = await vaultSDK.finalizeGame({
 const tx = await vaultSDK.adminWithdraw({
   gameId: 12345,
   amount: 50000000, // 50 代币
-  adminTokenAccount: new PublicKey('admin-token-account-address')
+  adminTokenAccount: new PublicKey('admin-token-account-address'),
 });
 ```
 
@@ -110,7 +110,7 @@ const tx = await vaultSDK.adminWithdraw({
 ```typescript
 const tx = await vaultSDK.changeTokenMint({
   gameId: 12345,
-  newMint: new PublicKey('new-token-mint-address')
+  newMint: new PublicKey('new-token-mint-address'),
 });
 ```
 
@@ -149,14 +149,14 @@ console.log('所有游戏ID:', allGameIds); // ['1', '2', '3', ...]
 const allGames = await vaultSDK.getAllGames();
 console.log('总游戏数:', allGames.length);
 
-allGames.forEach(game => {
+allGames.forEach((game) => {
   console.log(`游戏 ${game.gameId}:`, {
     vault: game.vault.toString(),
     authority: game.authority.toString(),
     totalDeposit: game.totalDeposit,
     finalized: game.finalized,
     withdrawEnabled: game.withdrawEnabled,
-    tokenMint: game.tokenMint.toString()
+    tokenMint: game.tokenMint.toString(),
   });
 });
 ```
@@ -169,7 +169,7 @@ const filteredGames = await vaultSDK.getAllGames({
   limit: 10, // 限制10个游戏
   finalized: false, // 只要活跃游戏
   authority: adminPublicKey, // 只要特定管理员的游戏
-  tokenMint: tokenMintPublicKey // 只要特定代币的游戏
+  tokenMint: tokenMintPublicKey, // 只要特定代币的游戏
 });
 ```
 
@@ -201,7 +201,7 @@ console.log('游戏统计:', {
   total: stats.total,
   active: stats.active,
   finalized: stats.finalized,
-  withWithdrawEnabled: stats.withWithdrawEnabled
+  withWithdrawEnabled: stats.withWithdrawEnabled,
 });
 ```
 
@@ -229,14 +229,14 @@ async function analyzeGames() {
 
   // 获取所有游戏
   const allGames = await vaultSDK.getAllGames();
-  
+
   // 按状态分组
-  const activeGames = allGames.filter(g => !g.finalized);
-  const finalizedGames = allGames.filter(g => g.finalized);
-  
+  const activeGames = allGames.filter((g) => !g.finalized);
+  const finalizedGames = allGames.filter((g) => g.finalized);
+
   // 按管理员分组
   const authorityMap = new Map();
-  allGames.forEach(game => {
+  allGames.forEach((game) => {
     const authority = game.authority.toString();
     if (!authorityMap.has(authority)) {
       authorityMap.set(authority, []);
@@ -280,7 +280,7 @@ const ticketSubscription = vaultSDK.onTicketPurchased((event, slot) => {
     gameId: event.gameId,
     user: event.user.toString(),
     amount: event.amount,
-    totalDeposit: event.totalDeposit
+    totalDeposit: event.totalDeposit,
   });
 });
 
@@ -288,7 +288,7 @@ const rewardSubscription = vaultSDK.onRewardClaimed((event, slot) => {
   console.log('奖励领取:', {
     gameId: event.gameId,
     user: event.user.toString(),
-    rewardAmount: event.rewardAmount
+    rewardAmount: event.rewardAmount,
   });
 });
 
@@ -296,7 +296,7 @@ const finalizeSubscription = vaultSDK.onGameFinalized((event, slot) => {
   console.log('游戏结束:', {
     gameId: event.gameId,
     totalDeposit: event.totalDeposit,
-    rewardCount: event.rewardCount
+    rewardCount: event.rewardCount,
   });
 });
 
@@ -304,7 +304,7 @@ const adminWithdrawSubscription = vaultSDK.onAdminWithdrawn((event, slot) => {
   console.log('管理员提款:', {
     gameId: event.gameId,
     authority: event.authority.toString(),
-    amount: event.amount
+    amount: event.amount,
   });
 });
 
@@ -312,7 +312,7 @@ const tokenMintSubscription = vaultSDK.onTokenMintChanged((event, slot) => {
   console.log('代币铸造更改:', {
     gameId: event.gameId,
     oldMint: event.oldMint.toString(),
-    newMint: event.newMint.toString()
+    newMint: event.newMint.toString(),
   });
 });
 
@@ -345,7 +345,7 @@ const filteredEvents = await vaultSDK.getEvents({
   gameId: 12345,
   user: userPublicKey,
   fromSlot: 1000000,
-  toSlot: 2000000
+  toSlot: 2000000,
 });
 ```
 
@@ -406,21 +406,27 @@ async function monitorGameEvents(gameId: number) {
   // 监听购票事件
   const ticketSubscription = vaultSDK.onTicketPurchased((event, slot) => {
     if (event.gameId === gameId.toString()) {
-      console.log(`🎫 新购票: 用户 ${event.user.toString()} 购买了 ${event.amount} 代币`);
+      console.log(
+        `🎫 新购票: 用户 ${event.user.toString()} 购买了 ${event.amount} 代币`,
+      );
     }
   });
 
   // 监听游戏结束事件
   const finalizeSubscription = vaultSDK.onGameFinalized((event, slot) => {
     if (event.gameId === gameId.toString()) {
-      console.log(`🏁 游戏结束: 总存款 ${event.totalDeposit}, 奖励数量 ${event.rewardCount}`);
+      console.log(
+        `🏁 游戏结束: 总存款 ${event.totalDeposit}, 奖励数量 ${event.rewardCount}`,
+      );
     }
   });
 
   // 监听奖励领取事件
   const rewardSubscription = vaultSDK.onRewardClaimed((event, slot) => {
     if (event.gameId === gameId.toString()) {
-      console.log(`🏆 奖励领取: 用户 ${event.user.toString()} 领取了 ${event.rewardAmount} 代币`);
+      console.log(
+        `🏆 奖励领取: 用户 ${event.user.toString()} 领取了 ${event.rewardAmount} 代币`,
+      );
     }
   });
 
@@ -447,45 +453,78 @@ setTimeout(() => {
 ```typescript
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { VaultSDK } from 'vault-sdk';
-import { getAssociatedTokenAddress, createMint, createAssociatedTokenAccount, mintTo } from '@solana/spl-token';
+import {
+  getAssociatedTokenAddress,
+  createMint,
+  createAssociatedTokenAccount,
+  mintTo,
+} from '@solana/spl-token';
 
 async function completeGameFlow() {
-  const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
+  const connection = new Connection(
+    'https://api.devnet.solana.com',
+    'confirmed',
+  );
   const admin = Keypair.generate();
   const user = Keypair.generate();
-  const programId = new PublicKey('AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV');
-  
+  const programId = new PublicKey(
+    'AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV',
+  );
+
   // 创建代币铸造
   const tokenMint = await createMint(
     connection,
     admin,
     admin.publicKey,
     null,
-    9
+    9,
   );
 
   // 创建代币账户
-  const adminTokenAccount = await getAssociatedTokenAddress(tokenMint, admin.publicKey);
-  const userTokenAccount = await getAssociatedTokenAddress(tokenMint, user.publicKey);
-  
-  await createAssociatedTokenAccount(connection, admin, tokenMint, admin.publicKey);
-  await createAssociatedTokenAccount(connection, admin, tokenMint, user.publicKey);
-  
+  const adminTokenAccount = await getAssociatedTokenAddress(
+    tokenMint,
+    admin.publicKey,
+  );
+  const userTokenAccount = await getAssociatedTokenAddress(
+    tokenMint,
+    user.publicKey,
+  );
+
+  await createAssociatedTokenAccount(
+    connection,
+    admin,
+    tokenMint,
+    admin.publicKey,
+  );
+  await createAssociatedTokenAccount(
+    connection,
+    admin,
+    tokenMint,
+    user.publicKey,
+  );
+
   // 向用户铸造代币
-  await mintTo(connection, admin, tokenMint, userTokenAccount, admin, 1000000000);
+  await mintTo(
+    connection,
+    admin,
+    tokenMint,
+    userTokenAccount,
+    admin,
+    1000000000,
+  );
 
   // 为管理员初始化SDK
   const adminSDK = new VaultSDK({
     programId,
     connection,
-    wallet: admin
+    wallet: admin,
   });
 
   // 为用户初始化SDK
   const userSDK = new VaultSDK({
     programId,
     connection,
-    wallet: user
+    wallet: user,
   });
 
   const gameId = 12345;
@@ -493,36 +532,38 @@ async function completeGameFlow() {
   // 1. 管理员初始化金库
   await adminSDK.initializeGameVault({
     gameId,
-    tokenMint
+    tokenMint,
   });
 
   // 2. 用户购买门票
   await userSDK.buyTicket({
     gameId,
     amount: 100000000,
-    userTokenAccount
+    userTokenAccount,
   });
 
   // 3. 管理员结束游戏并设置奖励
   await adminSDK.finalizeGame({
     gameId,
-    rewards: [{
-      user: user.publicKey,
-      amount: '50000000' // 50 代币奖励
-    }]
+    rewards: [
+      {
+        user: user.publicKey,
+        amount: '50000000', // 50 代币奖励
+      },
+    ],
   });
 
   // 4. 用户领取奖励
   await userSDK.claimReward({
     gameId,
-    userTokenAccount
+    userTokenAccount,
   });
 
   // 5. 管理员提取剩余资金
   await adminSDK.adminWithdraw({
     gameId,
     amount: 50000000, // 50 代币
-    adminTokenAccount
+    adminTokenAccount,
   });
 }
 ```
@@ -624,4 +665,4 @@ npm test
 
 ## 许可证
 
-MIT 
+MIT

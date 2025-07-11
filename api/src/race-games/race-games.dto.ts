@@ -1,4 +1,10 @@
-import { IsString, IsNumber, IsBoolean, IsOptional, IsEthereumAddress } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsBoolean,
+  IsOptional,
+  IsEthereumAddress,
+} from 'class-validator';
 
 export class SaveRaceGameDTO {
   @IsNumber()
@@ -70,4 +76,4 @@ export class GetPlayerHistoryDTO {
   @IsOptional()
   @IsNumber()
   offset?: number = 0;
-} 
+}

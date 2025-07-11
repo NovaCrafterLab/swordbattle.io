@@ -6,12 +6,9 @@ import { RaceGamesController } from './race-games.controller';
 import { BlockchainModule } from '../blockchain/blockchain.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([RaceGame]),
-    BlockchainModule,
-  ],
+  imports: [TypeOrmModule.forFeature([RaceGame]), BlockchainModule],
   controllers: [RaceGamesController],
   providers: [RaceGamesService],
   exports: [RaceGamesService],
 })
-export class RaceGamesModule {} 
+export class RaceGamesModule {}

@@ -1,24 +1,29 @@
 // client/src/blockchain.ts - Solana-Only Configuration
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
-import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
+import {
+  PhantomWalletAdapter,
+  SolflareWalletAdapter,
+} from '@solana/wallet-adapter-wallets';
 import { clusterApiUrl, Connection } from '@solana/web3.js';
 import { SOLANA_ENVIRONMENT, SOLANA_RPC_POOLS } from './config/walletConfig';
 
 // ========================================
-// SOLANA CONFIGURATION  
+// SOLANA CONFIGURATION
 // ========================================
 // Determine network based on environment
-export const network = SOLANA_ENVIRONMENT.isDev 
-  ? WalletAdapterNetwork.Devnet 
+export const network = SOLANA_ENVIRONMENT.isDev
+  ? WalletAdapterNetwork.Devnet
   : WalletAdapterNetwork.Mainnet;
 
 // Create Solana connection with RPC pool
 export const createSolanaConnection = () => {
-  const rpcPool = SOLANA_ENVIRONMENT.isDev 
-    ? SOLANA_RPC_POOLS.devnet 
+  const rpcPool = SOLANA_ENVIRONMENT.isDev
+    ? SOLANA_RPC_POOLS.devnet
     : SOLANA_RPC_POOLS.mainnet;
-  
-  console.log(`🔗 Creating Solana connection: ${SOLANA_ENVIRONMENT.networkName}, RPC pool size: ${rpcPool.length}`);
+
+  console.log(
+    `🔗 Creating Solana connection: ${SOLANA_ENVIRONMENT.networkName}, RPC pool size: ${rpcPool.length}`,
+  );
   return new Connection(rpcPool[0], 'confirmed');
 };
 
@@ -46,5 +51,7 @@ export const BLOCKCHAIN_INFO = {
   cluster: SOLANA_ENVIRONMENT.cluster,
   isDev: SOLANA_ENVIRONMENT.isDev,
   commitment: SOLANA_ENVIRONMENT.commitment,
-  rpcCount: SOLANA_ENVIRONMENT.isDev ? SOLANA_RPC_POOLS.devnet.length : SOLANA_RPC_POOLS.mainnet.length,
+  rpcCount: SOLANA_ENVIRONMENT.isDev
+    ? SOLANA_RPC_POOLS.devnet.length
+    : SOLANA_RPC_POOLS.mainnet.length,
 };

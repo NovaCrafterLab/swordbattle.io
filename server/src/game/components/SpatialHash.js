@@ -23,7 +23,12 @@ class SpatialHash {
 
   insert(rect) {
     if (!rect.entity.prevRect) {
-      rect.entity.prevRect = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+      rect.entity.prevRect = {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      };
     }
 
     const [minX, maxX] = SpatialHash._cellRange(rect.x, rect.x + rect.width);
@@ -52,17 +57,30 @@ class SpatialHash {
 
     const entityId = SpatialHash._getEntityKey(rect);
 
-    const [currMinX, currMaxX] = SpatialHash._cellRange(rect.x, rect.x + rect.width);
-    const [currMinY, currMaxY] = SpatialHash._cellRange(rect.y, rect.y + rect.height);
-    const [prevMinX, prevMaxX] = SpatialHash._cellRange(prevRect.x, prevRect.x + prevRect.width);
-    const [prevMinY, prevMaxY] = SpatialHash._cellRange(prevRect.y, prevRect.y + prevRect.height);
+    const [currMinX, currMaxX] = SpatialHash._cellRange(
+      rect.x,
+      rect.x + rect.width,
+    );
+    const [currMinY, currMaxY] = SpatialHash._cellRange(
+      rect.y,
+      rect.y + rect.height,
+    );
+    const [prevMinX, prevMaxX] = SpatialHash._cellRange(
+      prevRect.x,
+      prevRect.x + prevRect.width,
+    );
+    const [prevMinY, prevMaxY] = SpatialHash._cellRange(
+      prevRect.y,
+      prevRect.y + prevRect.height,
+    );
 
     if (
       currMinX === prevMinX &&
       currMaxX === prevMaxX &&
       currMinY === prevMinY &&
       currMaxY === prevMaxY
-    ) return;
+    )
+      return;
 
     const minX = Math.min(currMinX, prevMinX);
     const maxX = Math.max(currMaxX, prevMaxX);
@@ -74,8 +92,10 @@ class SpatialHash {
         const key = SpatialHash._hash(cx, cy);
         let bucket = this.buckets.get(key);
 
-        const isInCurr = cx >= currMinX && cx <= currMaxX && cy >= currMinY && cy <= currMaxY;
-        const isInPrev = cx >= prevMinX && cx <= prevMaxX && cy >= prevMinY && cy <= prevMaxY;
+        const isInCurr =
+          cx >= currMinX && cx <= currMaxX && cy >= currMinY && cy <= currMaxY;
+        const isInPrev =
+          cx >= prevMinX && cx <= prevMaxX && cy >= prevMinY && cy <= prevMaxY;
 
         if (isInCurr && !isInPrev) {
           if (!bucket) {
@@ -104,8 +124,14 @@ class SpatialHash {
     if (!prevRect) return;
     const entityId = SpatialHash._getEntityKey(rect);
 
-    const [minX, maxX] = SpatialHash._cellRange(prevRect.x, prevRect.x + prevRect.width);
-    const [minY, maxY] = SpatialHash._cellRange(prevRect.y, prevRect.y + prevRect.height);
+    const [minX, maxX] = SpatialHash._cellRange(
+      prevRect.x,
+      prevRect.x + prevRect.width,
+    );
+    const [minY, maxY] = SpatialHash._cellRange(
+      prevRect.y,
+      prevRect.y + prevRect.height,
+    );
 
     for (let cy = minY; cy <= maxY; cy++) {
       for (let cx = minX; cx <= maxX; cx++) {

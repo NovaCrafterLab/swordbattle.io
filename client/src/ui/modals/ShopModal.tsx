@@ -140,7 +140,7 @@ const ShopModal: React.FC<ShopModalProps> = ({ account }) => {
     api.get(`${api.endpoint}/profile/skins/buys`, (data) => {
       if (data.error) {
         addToast('error', `Error fetching skin counts: ${data.error}`);
-        return
+        return;
       }
       setSkinCounts(data);
     });

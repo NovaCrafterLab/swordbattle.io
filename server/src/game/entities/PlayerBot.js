@@ -80,7 +80,9 @@ class PlayerAI extends Player {
 
   changeStage(stage) {
     stage ??= helpers.randomChoice(
-      Object.values(BehaviourStages).filter(type => type !== BehaviourStages.RunAway)
+      Object.values(BehaviourStages).filter(
+        (type) => type !== BehaviourStages.RunAway,
+      ),
     );
     this.stage = stage;
     this.stageConfig = BehaviourConfig[this.stage];
@@ -106,8 +108,8 @@ class PlayerAI extends Player {
     if (this.entityScanTimer.finished) {
       this.entityScanTimer.renew();
       this.cachedTargets = this.getEntitiesInViewport()
-        .map(id => this.game.entities.get(id))
-        .filter(e => e && e !== this && !e.removed);
+        .map((id) => this.game.entities.get(id))
+        .filter((e) => e && e !== this && !e.removed);
     }
 
     // Target timeout
@@ -130,7 +132,12 @@ class PlayerAI extends Player {
       let minDistSq = Infinity;
       for (const e of this.cachedTargets) {
         if (!this.stageConfig.targets.includes(e.type)) continue;
-        const distSq = squaredDistance(this.shape.x, this.shape.y, e.shape.x, e.shape.y);
+        const distSq = squaredDistance(
+          this.shape.x,
+          this.shape.y,
+          e.shape.x,
+          e.shape.y,
+        );
         if (distSq < minDistSq) {
           this.target = e;
           minDistSq = distSq;
@@ -145,7 +152,11 @@ class PlayerAI extends Player {
           this.randomMovement(dt);
           break;
         case 'target':
-          this.targetEntity(dt, this.stageConfig.actions.includes('attack'), this.stageConfig.force);
+          this.targetEntity(
+            dt,
+            this.stageConfig.actions.includes('attack'),
+            this.stageConfig.force,
+          );
           break;
         case 'runAway':
           this.runAway(dt);
@@ -179,7 +190,11 @@ class PlayerAI extends Player {
     if (attack) this.attack(dist);
 
     this.angle = helpers.angleLerp(this.angle, angle, dt / 0.2);
-    this.movementDirection = helpers.angleLerp(this.movementDirection, angle, dt / 0.2);
+    this.movementDirection = helpers.angleLerp(
+      this.movementDirection,
+      angle,
+      dt / 0.2,
+    );
     this.mouse = {
       angle: this.movementDirection,
       force: helpers.random(force[0], force[1]),
@@ -188,16 +203,25 @@ class PlayerAI extends Player {
 
   runAway(dt) {
     const now = Date.now();
-    this.lavaPositions = this.lavaPositions.filter(p => now - p.time < 10000);
+    this.lavaPositions = this.lavaPositions.filter((p) => now - p.time < 10000);
     const avoid = this.lavaPositions[0] ?? this.target?.shape;
 
     if (!avoid || this.health.percent > 0.5) {
       return this.changeStage();
     }
 
-    const angleAway = helpers.angle(avoid.x, avoid.y, this.shape.x, this.shape.y);
+    const angleAway = helpers.angle(
+      avoid.x,
+      avoid.y,
+      this.shape.x,
+      this.shape.y,
+    );
 
-    this.angle = this.movementDirection = helpers.angleLerp(this.movementDirection, angleAway, dt / 0.2);
+    this.angle = this.movementDirection = helpers.angleLerp(
+      this.movementDirection,
+      angleAway,
+      dt / 0.2,
+    );
     this.mouse = {
       angle: this.movementDirection,
       force: helpers.random(130, 150),
@@ -205,7 +229,11 @@ class PlayerAI extends Player {
   }
 
   attack(distance) {
-    if (!this.sword.isAnimationFinished || this.sword.isFlying || this.attackCooldown > 0) {
+    if (
+      !this.sword.isAnimationFinished ||
+      this.sword.isFlying ||
+      this.attackCooldown > 0
+    ) {
       this.inputs.clear();
       return;
     }
@@ -222,14 +250,23 @@ class PlayerAI extends Player {
       this.levels.addBuff(helpers.randomChoice(Object.values(Types.Buff)));
     }
     if (this.smartness > 0.6 && this.evolutions.possibleEvols.size > 0) {
-      const evo = helpers.randomChoice(Array.from(this.evolutions.possibleEvols));
+      const evo = helpers.randomChoice(
+        Array.from(this.evolutions.possibleEvols),
+      );
       this.evolutions.upgrade(evo);
     }
   }
 
   damaged(damage, entity) {
-    if (entity?.type === Types.Entity.LavaPool || this.effects.has(Types.Effect.Burning)) {
-      this.lavaPositions.push({ x: this.shape.x, y: this.shape.y, time: Date.now() });
+    if (
+      entity?.type === Types.Entity.LavaPool ||
+      this.effects.has(Types.Effect.Burning)
+    ) {
+      this.lavaPositions.push({
+        x: this.shape.x,
+        y: this.shape.y,
+        time: Date.now(),
+      });
       this.changeStage(BehaviourStages.RunAway);
       this.target = null;
     } else if (entity && Math.random() > 0.8) {

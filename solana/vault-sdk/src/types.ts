@@ -147,4 +147,4 @@ export interface GameDiscoveryOptions {
   finalized?: boolean;
   withdrawEnabled?: boolean;
   tokenMint?: PublicKey;
-} 
+}

@@ -1,5 +1,11 @@
 // api/src/clans/clans.service.ts
-import { Injectable, BadRequestException, forwardRef, Inject, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  forwardRef,
+  Inject,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Clan } from './clan.entity';
@@ -16,7 +22,7 @@ export class ClansService {
     @InjectRepository(Account) private accountRepo: Repository<Account>,
     @Inject(forwardRef(() => AccountsService))
     private accountsService: AccountsService,
-  ) { }
+  ) {}
 
   /* ---------- skin helpers ---------- */
 
@@ -57,7 +63,10 @@ export class ClansService {
     owner.clan_role = 'owner';
     await this.accountRepo.save(owner);
 
-    return this.clanRepo.findOne({ where: { id: saved.id }, relations: ['owner'] });
+    return this.clanRepo.findOne({
+      where: { id: saved.id },
+      relations: ['owner'],
+    });
   }
 
   /* == @deprecated helper: find or create by tag == */
@@ -134,7 +143,11 @@ export class ClansService {
     }
 
     const total = await qb.getCount(); // total rows before pagination
-    const data = await qb.orderBy('clan.elo', 'DESC').skip(skip).take(size).getRawMany();
+    const data = await qb
+      .orderBy('clan.elo', 'DESC')
+      .skip(skip)
+      .take(size)
+      .getRawMany();
 
     return { data, total, page, size };
   }
@@ -242,7 +255,8 @@ export class ClansService {
       where: { id: targetId, clan: { id: clan.id } },
     });
     if (!target) throw new BadRequestException('Target not in clan');
-    if (actor.id === target.id) throw new BadRequestException('Cannot kick self');
+    if (actor.id === target.id)
+      throw new BadRequestException('Cannot kick self');
 
     if (actor.clan_role === 'member')
       throw new ForbiddenException('No permission');
@@ -260,7 +274,10 @@ export class ClansService {
 
   /* == promote / demote admin == */
   async toggleAdmin(tag: string, actor: Account, targetId: number) {
-    const clan = await this.clanRepo.findOne({ where: { tag }, relations: ['owner'] });
+    const clan = await this.clanRepo.findOne({
+      where: { tag },
+      relations: ['owner'],
+    });
     if (!clan) throw new BadRequestException('Clan not found');
     if (clan.owner.id !== actor.id)
       throw new ForbiddenException('Not clan owner');

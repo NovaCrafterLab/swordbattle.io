@@ -1,12 +1,12 @@
 // scripts/gen-env.js
 /* eslint-disable no-console */
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 
-const ENV_DIR        = path.resolve(__dirname, '../env');
+const ENV_DIR = path.resolve(__dirname, '../env');
 const EXAMPLE_SUFFIX = '.env.example';
-const TARGET_ENVS    = ['development', 'production'];
-const GLOBAL_HEADER  = [
+const TARGET_ENVS = ['development', 'production'];
+const GLOBAL_HEADER = [
   '#'.repeat(80),
   '#  GLOBAL (applies to every container / process)',
   '#'.repeat(80),
@@ -21,7 +21,7 @@ function globalPresets(env) {
 }
 
 function mergeContent(raw, env) {
-  const bodyLines   = raw.trimEnd().split('\n');
+  const bodyLines = raw.trimEnd().split('\n');
   const existingKey = new Set();
 
   bodyLines.forEach((l) => {
@@ -43,11 +43,11 @@ fs.readdirSync(ENV_DIR)
   .filter((file) => file.endsWith(EXAMPLE_SUFFIX))
   .forEach((file) => {
     const base = file.slice(0, -EXAMPLE_SUFFIX.length); // api / client / server
-    const src  = path.join(ENV_DIR, file);
-    const raw  = fs.readFileSync(src, 'utf8');
+    const src = path.join(ENV_DIR, file);
+    const raw = fs.readFileSync(src, 'utf8');
 
     TARGET_ENVS.forEach((env) => {
-      const target  = path.join(ENV_DIR, `${base}.env.${env}`);
+      const target = path.join(ENV_DIR, `${base}.env.${env}`);
       const content = mergeContent(raw, env);
 
       if (fs.existsSync(target)) {

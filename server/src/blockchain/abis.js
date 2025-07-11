@@ -18,5 +18,5 @@ function loadGameAggregatorABI() {
 const GAME_AGGREGATOR_ABI = loadGameAggregatorABI();
 
 module.exports = {
-  GAME_AGGREGATOR_ABI
-}; 
+  GAME_AGGREGATOR_ABI,
+};

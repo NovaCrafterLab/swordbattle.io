@@ -56,7 +56,7 @@ export async function updatePing(): Promise<Server[]> {
   const cache: Record<string, Server> = {};
 
   /* avoid parallel execution */
-  while (isUpdating) await new Promise(r => setTimeout(r, 10));
+  while (isUpdating) await new Promise((r) => setTimeout(r, 10));
 
   /* fresh enough */
   if (Date.now() - lastPingUpdate < 60_000) return servers;
@@ -66,7 +66,7 @@ export async function updatePing(): Promise<Server[]> {
 
   try {
     await Promise.all(
-      servers.map(async s => {
+      servers.map(async (s) => {
         const start = Date.now();
 
         if (!s.address || (!config.isDev && s.address.includes('localhost'))) {
@@ -110,7 +110,9 @@ export async function updatePing(): Promise<Server[]> {
 export async function getServerList(): Promise<Server[]> {
   const t0 = performance.now();
   await updatePing();
-  logger.info(`updatePingServerList took ${Math.round(performance.now() - t0)} ms`);
+  logger.info(
+    `updatePingServerList took ${Math.round(performance.now() - t0)} ms`,
+  );
 
   const auto = pickLowestPing();
   return [{ ...auto, value: 'auto', name: `AUTO (${auto.name})` }, ...servers];
@@ -124,13 +126,17 @@ export async function getServer(): Promise<Server> {
   let chosen = pickLowestPing();
 
   if (Settings.server !== 'auto') {
-    const manual = servers.find(s => s.value === Settings.server && !s.offline);
+    const manual = servers.find(
+      (s) => s.value === Settings.server && !s.offline,
+    );
     if (manual) chosen = manual;
   }
 
   /* auto-switch when selected server is offline */
   if (Settings.server !== chosen.value) {
-    logger.warn(`Switched server to ${chosen.value} because ${Settings.server} is offline`);
+    logger.warn(
+      `Switched server to ${chosen.value} because ${Settings.server} is offline`,
+    );
     Settings.server = chosen.value;
     window.location.reload();
   }

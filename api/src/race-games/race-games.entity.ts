@@ -23,7 +23,13 @@ export class RaceGame {
   @Column({ default: 0 })
   score: number;
 
-  @Column({ name: 'reward_amount', type: 'decimal', precision: 36, scale: 18, default: '0' })
+  @Column({
+    name: 'reward_amount',
+    type: 'decimal',
+    precision: 36,
+    scale: 18,
+    default: '0',
+  })
   rewardAmount: string; // 存储为字符串以保持精度
 
   @Column({ name: 'has_claimed', default: false })
@@ -46,4 +52,4 @@ export class RaceGame {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
-} 
+}

@@ -72,9 +72,7 @@ class BuffsSelect extends HudComponent {
     let height = 0;
     if (!this.minimized) {
       height =
-        (this.lineHeight + 5) *
-        Object.keys(player.buffs).length *
-        this.scale;
+        (this.lineHeight + 5) * Object.keys(player.buffs).length * this.scale;
     }
     return height + 10 + (this.hideButton?.displayHeight ?? 0);
   }
@@ -90,7 +88,7 @@ class BuffsSelect extends HudComponent {
     });
   }
 
-  resize() { }
+  resize() {}
 
   selectBuff(type: any) {
     this.game.gameState.selectedBuff = type;

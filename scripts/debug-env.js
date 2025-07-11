@@ -24,23 +24,41 @@ console.log(`  config.blockchain.enabled: ${config.blockchain.enabled}`);
 console.log('');
 
 console.log('📝 合约地址配置:');
-console.log(`  SWORD_BATTLE_CONTRACT (env): ${process.env.SWORD_BATTLE_CONTRACT || '❌ 未设置'}`);
-console.log(`  USD1_TOKEN_CONTRACT (env): ${process.env.USD1_TOKEN_CONTRACT || '❌ 未设置'}`);
-console.log(`  config.blockchain.contracts.swordBattle: ${config.blockchain.contracts?.swordBattle || '❌ 未配置'}`);
-console.log(`  config.blockchain.contracts.usd1Token: ${config.blockchain.contracts?.usd1Token || '❌ 未配置'}`);
+console.log(
+  `  SWORD_BATTLE_CONTRACT (env): ${process.env.SWORD_BATTLE_CONTRACT || '❌ 未设置'}`,
+);
+console.log(
+  `  USD1_TOKEN_CONTRACT (env): ${process.env.USD1_TOKEN_CONTRACT || '❌ 未设置'}`,
+);
+console.log(
+  `  config.blockchain.contracts.swordBattle: ${config.blockchain.contracts?.swordBattle || '❌ 未配置'}`,
+);
+console.log(
+  `  config.blockchain.contracts.usd1Token: ${config.blockchain.contracts?.usd1Token || '❌ 未配置'}`,
+);
 console.log('');
 
 console.log('🔐 签名者配置:');
 const hasPrivateKey = !!process.env.TRUSTED_SIGNER_PRIVATE_KEY;
 const privateKeyLength = process.env.TRUSTED_SIGNER_PRIVATE_KEY?.length || 0;
-console.log(`  TRUSTED_SIGNER_PRIVATE_KEY: ${hasPrivateKey ? `✅ 已设置 (长度: ${privateKeyLength})` : '❌ 未设置'}`);
-console.log(`  config.blockchain.trustedSigner: ${config.blockchain.trustedSigner ? '✅ 已配置' : '❌ 未配置'}`);
+console.log(
+  `  TRUSTED_SIGNER_PRIVATE_KEY: ${hasPrivateKey ? `✅ 已设置 (长度: ${privateKeyLength})` : '❌ 未设置'}`,
+);
+console.log(
+  `  config.blockchain.trustedSigner: ${config.blockchain.trustedSigner ? '✅ 已配置' : '❌ 未配置'}`,
+);
 console.log('');
 
 console.log('🌐 网络配置:');
-console.log(`  BLOCKCHAIN_RPC_URL: ${process.env.BLOCKCHAIN_RPC_URL || '使用默认RPC池'}`);
-console.log(`  config.blockchain.rpcUrl: ${config.blockchain.rpcUrl || '使用默认RPC池'}`);
-console.log(`  环境: ${config.blockchain.environment?.isDev ? 'BSC测试网' : 'BSC主网'}`);
+console.log(
+  `  BLOCKCHAIN_RPC_URL: ${process.env.BLOCKCHAIN_RPC_URL || '使用默认RPC池'}`,
+);
+console.log(
+  `  config.blockchain.rpcUrl: ${config.blockchain.rpcUrl || '使用默认RPC池'}`,
+);
+console.log(
+  `  环境: ${config.blockchain.environment?.isDev ? 'BSC测试网' : 'BSC主网'}`,
+);
 console.log(`  链ID: ${config.blockchain.environment?.chainId}`);
 console.log('');
 
@@ -72,7 +90,7 @@ if (issues.length === 0) {
   console.log('🎉 所有配置都正确！');
 } else {
   console.log('⚠️ 发现以下配置问题:');
-  issues.forEach(issue => console.log(`  ${issue}`));
+  issues.forEach((issue) => console.log(`  ${issue}`));
 }
 
 console.log('');
@@ -80,4 +98,4 @@ console.log('💡 如果有配置问题，请检查:');
 console.log('  1. .env 文件是否存在且包含正确的变量');
 console.log('  2. 环境变量是否在启动脚本中正确设置');
 console.log('  3. 合约地址格式是否正确 (0x开头的42位十六进制)');
-console.log('  4. 私钥格式是否正确 (0x开头的64位十六进制)'); 
+console.log('  4. 私钥格式是否正确 (0x开头的64位十六进制)');

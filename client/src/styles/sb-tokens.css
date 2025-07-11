@@ -31,12 +31,12 @@
   --sb-radius-sm: 4px;
   --sb-radius-md: 8px;
   --sb-radius-round: 9999px;
-  --sb-border-thin: 1px solid rgba(0,0,0,0.2);
+  --sb-border-thin: 1px solid rgba(0, 0, 0, 0.2);
 
   /* shadow */
   --sb-shadow-0: none;
-  --sb-shadow-1: 0 1px 2px rgba(0,0,0,0.15);
-  --sb-shadow-2: 0 4px 8px rgba(0,0,0,0.25);
+  --sb-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.15);
+  --sb-shadow-2: 0 4px 8px rgba(0, 0, 0, 0.25);
 
   /* z-index */
   --sb-z-base: 0;

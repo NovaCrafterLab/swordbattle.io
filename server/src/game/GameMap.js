@@ -150,7 +150,7 @@ class GameMap {
     const maxCoinsCount = 60;
     const coins = Math.min(
       Math.max(1, Math.round(Math.log2(totalCoinValue + 1) * 2) - 7),
-      maxCoinsCount
+      maxCoinsCount,
     );
     const coinValue = totalCoinValue / coins;
 

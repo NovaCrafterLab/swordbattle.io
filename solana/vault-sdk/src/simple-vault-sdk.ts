@@ -55,49 +55,66 @@ export class SimpleVaultSDK {
   /**
    * Initialize a new game vault (mock implementation)
    */
-  async initializeGameVault(params: { gameId: string; tokenMint: PublicKey }): Promise<string> {
+  async initializeGameVault(params: {
+    gameId: string;
+    tokenMint: PublicKey;
+  }): Promise<string> {
     // TODO: Actual Solana transaction
     // For now, increment counter and return mock transaction hash
     this.gameIdCounter = Math.max(this.gameIdCounter, parseInt(params.gameId));
-    
-    console.log(`🎮 Mock: Initializing game vault ${params.gameId} with token ${params.tokenMint.toString()}`);
-    
+
+    console.log(
+      `🎮 Mock: Initializing game vault ${params.gameId} with token ${params.tokenMint.toString()}`,
+    );
+
     // Simulate transaction delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     return `mock_tx_${params.gameId}_${Date.now()}`;
   }
 
   /**
    * Get user ticket account (mock implementation)
    */
-  async getUserTicketAccount(gameId: string, user: PublicKey): Promise<{ amount: number; hasWithdrawn: boolean } | null> {
+  async getUserTicketAccount(
+    gameId: string,
+    user: PublicKey,
+  ): Promise<{ amount: number; hasWithdrawn: boolean } | null> {
     // TODO: Query actual on-chain ticket data
     // For testing, always return a valid ticket
-    console.log(`🎫 Mock: Checking ticket for game ${gameId}, user ${user.toString().slice(0, 8)}...`);
-    
+    console.log(
+      `🎫 Mock: Checking ticket for game ${gameId}, user ${user.toString().slice(0, 8)}...`,
+    );
+
     return {
       amount: 1000000, // 1 SOL in lamports
-      hasWithdrawn: false
+      hasWithdrawn: false,
     };
   }
 
   /**
    * Finalize game with rewards (mock implementation)
    */
-  async finalizeGame(params: { gameId: string; rewards: Array<{ user: PublicKey; amount: string }> }): Promise<string> {
+  async finalizeGame(params: {
+    gameId: string;
+    rewards: Array<{ user: PublicKey; amount: string }>;
+  }): Promise<string> {
     // TODO: Actual Solana transaction to distribute rewards
-    console.log(`🏁 Mock: Finalizing game ${params.gameId} with ${params.rewards.length} rewards`);
-    
+    console.log(
+      `🏁 Mock: Finalizing game ${params.gameId} with ${params.rewards.length} rewards`,
+    );
+
     // Log reward details
     params.rewards.forEach((reward, index) => {
       const amountSOL = parseInt(reward.amount) / 1e9;
-      console.log(`   ${index + 1}. ${reward.user.toString().slice(0, 8)}...: ${amountSOL} SOL`);
+      console.log(
+        `   ${index + 1}. ${reward.user.toString().slice(0, 8)}...: ${amountSOL} SOL`,
+      );
     });
-    
+
     // Simulate transaction delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
     return `mock_finalize_tx_${params.gameId}_${Date.now()}`;
   }
 

@@ -40,7 +40,9 @@ class Entity {
 
   get _targetsSet() {
     if (!this.__targetsSet || this.__targetsVersion !== this.targets) {
-      this.__targetsSet = new Set(Array.isArray(this.targets) ? this.targets : []);
+      this.__targetsSet = new Set(
+        Array.isArray(this.targets) ? this.targets : [],
+      );
       this.__targetsVersion = this.targets;
     }
     return this.__targetsSet;
@@ -174,7 +176,7 @@ class Entity {
     this.velocity.scale(0.9);
   }
 
-  processTargetsCollision(targetEntity, dt) { }
+  processTargetsCollision(targetEntity, dt) {}
 
   cleanup() {
     this.state.cleanup();

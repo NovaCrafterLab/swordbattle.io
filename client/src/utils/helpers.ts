@@ -222,14 +222,14 @@ export function findCoinCollector(
   coin: Coin,
   players: Player[],
 ): Player | null {
-  const ERR  = 1.1;
+  const ERR = 1.1;
   const cRad = coin.shape.radius * coin.container.scale * ERR;
-  const cX   = coin.shape.x;
-  const cY   = coin.shape.y;
+  const cX = coin.shape.x;
+  const cY = coin.shape.y;
 
   for (let i = 0, len = players.length; i < len; i++) {
-    const p     = players[i];
-    const pRad  = p.shape.radius * 2 * ERR;
+    const p = players[i];
+    const pRad = p.shape.radius * 2 * ERR;
     if (pRad < cRad) continue;
 
     const dx = p.shape.x - cX;

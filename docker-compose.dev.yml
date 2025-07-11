@@ -4,44 +4,44 @@ services:
     env_file:
       - ./env/api.env.development
     ports:
-      - "5432:5432"
+      - '5432:5432'
 
   api:
     env_file:
       - ./env/api.env.development
     build:
       args:
-        NODE_ENV: "development"
+        NODE_ENV: 'development'
     environment:
-      NODE_ENV: "development"
-      FAST_REFRESH: "true"
+      NODE_ENV: 'development'
+      FAST_REFRESH: 'true'
 
   server:
     env_file:
       - ./env/server.env.development
     build:
       args:
-        NODE_ENV: "development"
+        NODE_ENV: 'development'
     environment:
-      NODE_ENV: "development"
-      DEBUG: "true"
+      NODE_ENV: 'development'
+      DEBUG: 'true'
 
   server-race:
     env_file:
       - ./env/development.server.race.env
     build:
       args:
-        NODE_ENV: "development"
+        NODE_ENV: 'development'
     environment:
-      NODE_ENV: "development"
-      DEBUG: "true"
+      NODE_ENV: 'development'
+      DEBUG: 'true'
 
   client:
     env_file:
       - ./env/client.env.development
     build:
       args:
-        BUILD_ENV: "development"
+        BUILD_ENV: 'development'
     environment:
-      NODE_ENV: "development"
-      DEBUG: "true"
+      NODE_ENV: 'development'
+      DEBUG: 'true'

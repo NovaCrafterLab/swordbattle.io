@@ -1,39 +1,45 @@
 // server/src/utilities/Loop.js
 
-const { performance } = require('node:perf_hooks');  // high-resolution monotonic timer
+const { performance } = require('node:perf_hooks'); // high-resolution monotonic timer
 
 class Loop {
   constructor(interval = 50, game) {
-    this.interval = interval;          // target frame in ms
-    this.game = game;                  // world reference
+    this.interval = interval; // target frame in ms
+    this.game = game; // world reference
 
     this.entityCnt = 0;
     this.isRunning = false;
 
-    this.ticksThisSecond = 0;          // kept for compatibility
+    this.ticksThisSecond = 0; // kept for compatibility
     this.lastSecond = Math.floor(performance.now() / 1000);
-    this.tickTimeElapsed = 0;          // last frame cost (ms)
+    this.tickTimeElapsed = 0; // last frame cost (ms)
 
     this.totalTicks = 0;
 
-    this.eventHandler  = () => {};
-    this.onTpsUpdate   = () => {};
+    this.eventHandler = () => {};
+    this.onTpsUpdate = () => {};
 
     /* timing helpers */
-    this._prevFrameMs  = performance.now();   // previous frame start time
-    this._runLoop      = this.runLoop.bind(this);
+    this._prevFrameMs = performance.now(); // previous frame start time
+    this._runLoop = this.runLoop.bind(this);
   }
 
   /* external hooks */
-  setEventHandler(fn)  { this.eventHandler  = fn; }
-  setOnTpsUpdate(fn)   { this.onTpsUpdate   = fn; }
-  setEntityCnt(n)      { this.entityCnt    = n; }
+  setEventHandler(fn) {
+    this.eventHandler = fn;
+  }
+  setOnTpsUpdate(fn) {
+    this.onTpsUpdate = fn;
+  }
+  setEntityCnt(n) {
+    this.entityCnt = n;
+  }
 
   /* lifecycle */
   start() {
     if (this.isRunning) return console.trace('Loop already running.');
     this.isRunning = true;
-    setImmediate(this._runLoop);       // first frame asap, but after current stack
+    setImmediate(this._runLoop); // first frame asap, but after current stack
   }
 
   stop() {
@@ -46,7 +52,7 @@ class Loop {
     if (!this.isRunning) return;
 
     /* ——— 计算真实 delta ——— */
-    const nowMs   = performance.now();
+    const nowMs = performance.now();
     const deltaMs = nowMs - this._prevFrameMs || this.interval; // fallback when very first frame
     this._prevFrameMs = nowMs;
 
@@ -59,7 +65,7 @@ class Loop {
     /* ——— 帧逻辑 & 耗时测量 ——— */
     const logicStart = performance.now();
     this.eventHandler();
-    const logicCost  = performance.now() - logicStart;
+    const logicCost = performance.now() - logicStart;
 
     /* 存储耗时（兼容旧字段） */
     this.tickTimeElapsed = logicCost;

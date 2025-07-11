@@ -33,7 +33,7 @@ export class AccountsService {
     private readonly transactionsRepository: Repository<Transaction>,
     @Inject(forwardRef(() => ClansService))
     private readonly clansService: ClansService,
-  ) { }
+  ) {}
 
   async create(data: Partial<Account>) {
     const account = this.accountsRepository.create(data);

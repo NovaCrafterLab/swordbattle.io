@@ -10,7 +10,7 @@ const programId = new PublicKey('AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV');
 const vaultSDK = new VaultSDK({
   programId,
   connection,
-  wallet
+  wallet,
 });
 
 async function testGameDiscovery() {
@@ -26,7 +26,7 @@ async function testGameDiscovery() {
     console.log('\n📊 获取所有游戏详细信息...');
     const allGames = await vaultSDK.getAllGames();
     console.log(`📊 找到 ${allGames.length} 个游戏:`);
-    
+
     allGames.forEach((game, index) => {
       console.log(`  ${index + 1}. 游戏 ${game.gameId}:`);
       console.log(`     - 金库地址: ${game.vault.toString()}`);
@@ -44,7 +44,7 @@ async function testGameDiscovery() {
       总游戏数: gameStats.total,
       活跃游戏: gameStats.active,
       已结束游戏: gameStats.finalized,
-      可提款游戏: gameStats.withWithdrawEnabled
+      可提款游戏: gameStats.withWithdrawEnabled,
     });
 
     // 4. 获取最新游戏ID
@@ -68,7 +68,9 @@ async function testGameDiscovery() {
       const nonExistentGameId = 999999;
       console.log(`🔍 检查游戏 ${nonExistentGameId} 是否存在...`);
       const nonExists = await vaultSDK.gameExists(nonExistentGameId);
-      console.log(`🔍 游戏 ${nonExistentGameId} 存在: ${nonExists ? '是' : '否'}`);
+      console.log(
+        `🔍 游戏 ${nonExistentGameId} 存在: ${nonExists ? '是' : '否'}`,
+      );
     }
 
     // 7. 获取活跃游戏
@@ -121,10 +123,9 @@ async function testGameDiscovery() {
     console.log('\n🔧 使用自定义选项筛选游戏...');
     const filteredGames = await vaultSDK.getAllGames({
       limit: 5, // 限制返回5个游戏
-      finalized: false // 只要活跃游戏
+      finalized: false, // 只要活跃游戏
     });
     console.log(`🔧 筛选结果: ${filteredGames.length} 个活跃游戏 (限制5个)`);
-
   } catch (error) {
     console.error('❌ 测试游戏发现功能时出错:', error.message);
   }
@@ -137,4 +138,4 @@ process.on('unhandledRejection', (error) => {
 });
 
 // 运行测试
-testGameDiscovery().catch(console.error); 
+testGameDiscovery().catch(console.error);

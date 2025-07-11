@@ -5,10 +5,7 @@ import type Phaser from 'phaser';
 import type VirtualJoyStick from 'phaser3-rex-plugins/plugins/virtualjoystick';
 
 export interface VirtualJoystickPlugin extends Phaser.Plugins.BasePlugin {
-  add(
-    scene: Phaser.Scene,
-    config?: Record<string, unknown>,
-  ): VirtualJoyStick;
+  add(scene: Phaser.Scene, config?: Record<string, unknown>): VirtualJoyStick;
 }
 
 declare global {

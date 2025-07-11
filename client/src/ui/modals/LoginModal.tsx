@@ -11,12 +11,15 @@ function LoginModal({ onSuccess }: any) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  const { addToast } = useToast()
+  const { addToast } = useToast();
 
   const onLogin = () => {
     api.post(`${api.endpoint}/auth/login`, { username, password }, (data) => {
       if (data.message) {
-        addToast('error', Array.isArray(data.message) ? data.message.join('\n') : data.message);
+        addToast(
+          'error',
+          Array.isArray(data.message) ? data.message.join('\n') : data.message,
+        );
       } else {
         data.account.secret = data.secret;
 

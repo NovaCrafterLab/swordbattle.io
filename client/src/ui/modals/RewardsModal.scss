@@ -3,7 +3,7 @@
   max-width: 700px;
   max-height: 80vh;
   overflow-y: auto;
-  
+
   .rewards-modal {
     .rewards-header {
       display: flex;
@@ -98,7 +98,7 @@
             font-size: 0.85em;
             cursor: pointer;
             transition: all 0.2s ease;
-            
+
             &:hover {
               background: rgba(255, 255, 255, 0.1);
               color: rgba(255, 255, 255, 0.9);
@@ -138,7 +138,7 @@
           font-weight: bold;
           cursor: pointer;
           transition: all 0.2s ease;
-          
+
           &:hover {
             transform: translateY(-1px);
             box-shadow: 0 3px 10px rgba(52, 199, 89, 0.4);
@@ -220,7 +220,7 @@
                 border-radius: 12px;
                 font-weight: bold;
                 text-transform: uppercase;
-                
+
                 &.blockchain {
                   background: linear-gradient(45deg, #10b981, #059669);
                   color: white;
@@ -358,7 +358,7 @@
   .rewards-modal-wrapper {
     min-width: 90vw;
     max-width: 90vw;
-    
+
     .rewards-modal {
       .rewards-header {
         flex-direction: column;
@@ -441,29 +441,35 @@
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 // 区块链数据标识动画
 @keyframes pulse-live {
-  0%, 100% { 
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
-  50% { 
+  50% {
     opacity: 0.8;
     transform: scale(1.05);
   }
 }
 
 @keyframes verified-glow {
-  0%, 100% { 
+  0%,
+  100% {
     color: #10b981;
     text-shadow: 0 0 5px rgba(16, 185, 129, 0.3);
   }
-  50% { 
+  50% {
     color: #059669;
     text-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
   }
-} 
+}

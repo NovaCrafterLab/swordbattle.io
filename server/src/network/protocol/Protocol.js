@@ -35,7 +35,9 @@ const decode = (msg) => {
     decoded = ClientMessage.decode(payload);
     decoded = makeSendable(decoded);
   } catch (e) {
-    Logger.server.error('Protocol decoding error (decode)', { error: e.message });
+    Logger.server.error('Protocol decoding error (decode)', {
+      error: e.message,
+    });
     return null;
   }
   return decoded;

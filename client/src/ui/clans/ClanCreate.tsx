@@ -1,20 +1,20 @@
 // client/src/ui/clans/ClanCreate.tsx
 // switched to module scss + sb-clans-cc-* class names
 
-import React, { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
-import { useCreateClan } from './api'
-import styles from './ClanCreate.module.scss'               // <— changed
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { useCreateClan } from './api';
+import styles from './ClanCreate.module.scss'; // <— changed
 
 interface Props {
-  open: boolean
-  onClose: () => void
-  onSuccess?: (tag: string) => void
+  open: boolean;
+  onClose: () => void;
+  onSuccess?: (tag: string) => void;
 }
 
 const ClanCreate: React.FC<Props> = ({ open, onClose, onSuccess }) => {
-  const [tag, setTag] = useState('')
-  const [name, setName] = useState('')
+  const [tag, setTag] = useState('');
+  const [name, setName] = useState('');
 
   const {
     mutate: createClan,
@@ -22,17 +22,17 @@ const ClanCreate: React.FC<Props> = ({ open, onClose, onSuccess }) => {
     error,
     isPending,
     isSuccess,
-  } = useCreateClan()
+  } = useCreateClan();
 
   /* auto-close on success */
   useEffect(() => {
     if (isSuccess && (data as any)?.clan?.tag) {
-      onSuccess?.((data as any).clan.tag)
-      onClose()
+      onSuccess?.((data as any).clan.tag);
+      onClose();
     }
-  }, [isSuccess, data, onSuccess, onClose])
+  }, [isSuccess, data, onSuccess, onClose]);
 
-  if (!open) return null
+  if (!open) return null;
 
   return createPortal(
     <div className={styles['sb-clans-cc-overlay']} onClick={onClose}>
@@ -89,7 +89,7 @@ const ClanCreate: React.FC<Props> = ({ open, onClose, onSuccess }) => {
       </div>
     </div>,
     document.body,
-  )
-}
+  );
+};
 
-export default ClanCreate
+export default ClanCreate;

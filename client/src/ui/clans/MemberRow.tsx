@@ -1,24 +1,24 @@
 // client/src/ui/clans/MemberRow.tsx
 // switched to module scss + sb-clans-cm-* class names
 
-import React from 'react'
-import { ClanMember, ClanRole } from './types'
-import styles from './MemberRow.module.scss'           // ← new import
+import React from 'react';
+import { ClanMember, ClanRole } from './types';
+import styles from './MemberRow.module.scss'; // ← new import
 
 interface Props {
-  member: ClanMember
-  selfRole: ClanRole | null
-  isSelf: boolean
-  onKick: (id: number) => void
-  onToggleAdmin: (id: number) => void
-  onTransferOwner: (id: number) => void
+  member: ClanMember;
+  selfRole: ClanRole | null;
+  isSelf: boolean;
+  onKick: (id: number) => void;
+  onToggleAdmin: (id: number) => void;
+  onTransferOwner: (id: number) => void;
 }
 
 const roleLabel: Record<ClanRole, string> = {
   owner: 'Owner',
   admin: 'Admin',
   member: 'Member',
-}
+};
 
 const MemberRow: React.FC<Props> = ({
   member,
@@ -31,11 +31,11 @@ const MemberRow: React.FC<Props> = ({
   /* permission helpers */
   const canKick =
     (selfRole === 'owner' && !isSelf) ||
-    (selfRole === 'admin' && member.clan_role === 'member')
+    (selfRole === 'admin' && member.clan_role === 'member');
   const canToggleAdmin =
-    selfRole === 'owner' && member.clan_role !== 'owner' && !isSelf
+    selfRole === 'owner' && member.clan_role !== 'owner' && !isSelf;
   const canTransfer =
-    selfRole === 'owner' && member.clan_role !== 'owner' && !isSelf
+    selfRole === 'owner' && member.clan_role !== 'owner' && !isSelf;
 
   /* render */
   return (
@@ -60,9 +60,7 @@ const MemberRow: React.FC<Props> = ({
         <button
           className={styles['sb-clans-cm-btn']}
           onClick={() => onToggleAdmin(member.id)}
-          title={
-            member.clan_role === 'admin' ? 'Remove admin' : 'Make admin'
-          }
+          title={member.clan_role === 'admin' ? 'Remove admin' : 'Make admin'}
         >
           {member.clan_role === 'admin' ? 'Demote' : 'Promote'}
         </button>
@@ -78,7 +76,7 @@ const MemberRow: React.FC<Props> = ({
         </button>
       )}
     </div>
-  )
-}
+  );
+};
 
-export default MemberRow
+export default MemberRow;

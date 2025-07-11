@@ -3,13 +3,13 @@
 /* == imports & constants == */
 import { config } from './config';
 
-const endpoint = config.apiEndpoint.startsWith('http') 
-  ? config.apiEndpoint 
+const endpoint = config.apiEndpoint.startsWith('http')
+  ? config.apiEndpoint
   : `${window.location.protocol}//${config.apiEndpoint}`;
 const backupEndpoint = config.apiEndpointBackup
-  ? (config.apiEndpointBackup.startsWith('http') 
-      ? config.apiEndpointBackup 
-      : `${window.location.protocol}//${config.apiEndpointBackup}`)
+  ? config.apiEndpointBackup.startsWith('http')
+    ? config.apiEndpointBackup
+    : `${window.location.protocol}//${config.apiEndpointBackup}`
   : null;
 
 let currentEndpoint: string | null = null;
@@ -62,7 +62,9 @@ function _request(
         const obj = JSON.parse(body);
         obj.secret ??= secret;
         body = JSON.stringify(obj);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
 
     const fetchOptions: RequestInit = {
@@ -74,19 +76,25 @@ function _request(
     };
 
     /* recaptcha wrap */
-    if (useRecaptcha && config.recaptchaClientKey && (window as any).recaptcha) {
+    if (
+      useRecaptcha &&
+      config.recaptchaClientKey &&
+      (window as any).recaptcha
+    ) {
       const endpointName = url.split('/').pop() as string;
-      (window as any).recaptcha.execute(endpointName, {}).then((token: string) => {
-        if (token) {
-          const obj = JSON.parse(body as string);
-          obj.recaptchaToken = token;
-          fetchOptions.body = JSON.stringify(obj);
-        }
-        fetch(url, fetchOptions)
-          .then((r) => r.json())
-          .then(cb)
-          .catch(() => cb({ message: unavialableMessage }));
-      });
+      (window as any).recaptcha
+        .execute(endpointName, {})
+        .then((token: string) => {
+          if (token) {
+            const obj = JSON.parse(body as string);
+            obj.recaptchaToken = token;
+            fetchOptions.body = JSON.stringify(obj);
+          }
+          fetch(url, fetchOptions)
+            .then((r) => r.json())
+            .then(cb)
+            .catch(() => cb({ message: unavialableMessage }));
+        });
       return;
     }
 
@@ -101,8 +109,23 @@ function _request(
 function get(url: string, cb?: (d: any) => void) {
   _request(url, { method: 'GET' }, false, cb);
 }
-function post(url: string, body?: any, cb?: (d: any) => void, token?: string, rec = false) {
-  _request(url, { method: 'POST', body, headers: { Authorization: token ? `Bearer ${token}` : '' } }, rec, cb);
+function post(
+  url: string,
+  body?: any,
+  cb?: (d: any) => void,
+  token?: string,
+  rec = false,
+) {
+  _request(
+    url,
+    {
+      method: 'POST',
+      body,
+      headers: { Authorization: token ? `Bearer ${token}` : '' },
+    },
+    rec,
+    cb,
+  );
 }
 function patch(url: string, body?: any, cb?: (d: any) => void) {
   _request(url, { method: 'PATCH', body }, false, cb);

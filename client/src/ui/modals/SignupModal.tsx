@@ -24,7 +24,12 @@ function SignupModal({ onSuccess }: any) {
       (data) => {
         setIsLoading(false); // Stop loading on response
         if (data.message) {
-          addToast( 'error', Array.isArray(data.message) ? data.message.join('\n') : data.message);
+          addToast(
+            'error',
+            Array.isArray(data.message)
+              ? data.message.join('\n')
+              : data.message,
+          );
         } else {
           data.account.secret = data.secret;
           dispatch(setAccount(data.account));

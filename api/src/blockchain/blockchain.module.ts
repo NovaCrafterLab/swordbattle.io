@@ -10,4 +10,4 @@ import { BlockchainController } from './blockchain.controller';
   providers: [BlockchainService],
   exports: [BlockchainService],
 })
-export class BlockchainModule {} 
+export class BlockchainModule {}

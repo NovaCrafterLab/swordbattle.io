@@ -8,8 +8,8 @@ import { getCurrentServer, getServer } from '@/ServerList';
 const VISIBLE_THRESHOLD = 600; // seconds, 10 min
 
 interface CycleInfo {
-  epochIso: string;  // ISO-8601 anchor
-  period: number;  // seconds
+  epochIso: string; // ISO-8601 anchor
+  period: number; // seconds
   tz: string;
 }
 

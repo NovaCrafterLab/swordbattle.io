@@ -18,7 +18,7 @@ import { CreateClanDto, ListClansQueryDto, UpdateClanDto } from './clans.dto';
 
 @Controller('clans')
 export class ClansController {
-  constructor(private readonly clansService: ClansService) { }
+  constructor(private readonly clansService: ClansService) {}
 
   /* == list with pagination & search == */
   @Get()
@@ -50,7 +50,9 @@ export class ClansController {
   }
 
   /* == leave == */
-  @Post('leave') @UseGuards(AccountGuard) async leave(@Req() req: AccountRequest) {
+  @Post('leave') @UseGuards(AccountGuard) async leave(
+    @Req() req: AccountRequest,
+  ) {
     return this.clansService.leave(req.account);
   }
 
@@ -79,7 +81,11 @@ export class ClansController {
     @Param('accountId') accountId: number,
     @Req() req: AccountRequest,
   ) {
-    return this.clansService.transferOwner(tag.toUpperCase(), req.account, accountId);
+    return this.clansService.transferOwner(
+      tag.toUpperCase(),
+      req.account,
+      accountId,
+    );
   }
 
   /* == kick (owner / admin) == */
@@ -88,7 +94,11 @@ export class ClansController {
     @Param('accountId') accountId: number,
     @Req() req: AccountRequest,
   ) {
-    return this.clansService.kickMember(tag.toUpperCase(), req.account, accountId);
+    return this.clansService.kickMember(
+      tag.toUpperCase(),
+      req.account,
+      accountId,
+    );
   }
 
   /* == promote (owner) == */
@@ -97,7 +107,11 @@ export class ClansController {
     @Param('accountId') accountId: number,
     @Req() req: AccountRequest,
   ) {
-    return this.clansService.toggleAdmin(tag.toUpperCase(), req.account, accountId);
+    return this.clansService.toggleAdmin(
+      tag.toUpperCase(),
+      req.account,
+      accountId,
+    );
   }
 
   /* == add member (owner/admin) == */
@@ -106,6 +120,10 @@ export class ClansController {
     @Param('accountId') accountId: number,
     @Req() req: AccountRequest,
   ) {
-    return this.clansService.addMember(tag.toUpperCase(), req.account, accountId);
+    return this.clansService.addMember(
+      tag.toUpperCase(),
+      req.account,
+      accountId,
+    );
   }
 }

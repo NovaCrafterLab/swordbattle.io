@@ -1,10 +1,10 @@
 // client/src/ui/clans/ClanDetail.tsx
 // swiched to module scss + sb-clans-cd-* / sb-clans-cm-* class names
 
-import React, { useMemo, useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
-import { useSelector } from 'react-redux'
-import { selectAccount } from '@/redux/account/selector'
+import React, { useMemo, useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { selectAccount } from '@/redux/account/selector';
 import {
   useClanDetail,
   useClanMembers,
@@ -13,66 +13,67 @@ import {
   useTransferOwner,
   useUpdateClan,
   useAddMember,
-} from './api'
-import MemberRow from './MemberRow'
-import { ClanRole } from './types'
-import styles from './ClanDetail.module.scss'            // <— changed
+} from './api';
+import MemberRow from './MemberRow';
+import { ClanRole } from './types';
+import styles from './ClanDetail.module.scss'; // <— changed
 
-type TabKey = 'overview' | 'members' | 'settings'
+type TabKey = 'overview' | 'members' | 'settings';
 
 const ClanDetail: React.FC = () => {
-  const { tag = '' } = useParams<{ tag: string }>()
-  const [tab, setTab] = useState<TabKey>('overview')
+  const { tag = '' } = useParams<{ tag: string }>();
+  const [tab, setTab] = useState<TabKey>('overview');
 
   /* data */
-  const { data: detail, isPending: loadingDetail } = useClanDetail(tag)
-  const { data: memberData, isPending: loadingMembers } = useClanMembers(tag)
+  const { data: detail, isPending: loadingDetail } = useClanDetail(tag);
+  const { data: memberData, isPending: loadingMembers } = useClanMembers(tag);
 
   /* mutations */
-  const kick = useKickMember(tag)
-  const toggleAdmin = useToggleAdmin(tag)
-  const transfer = useTransferOwner(tag)
-  const updateClan = useUpdateClan(tag)
-  const addMember = useAddMember(tag)
+  const kick = useKickMember(tag);
+  const toggleAdmin = useToggleAdmin(tag);
+  const transfer = useTransferOwner(tag);
+  const updateClan = useUpdateClan(tag);
+  const addMember = useAddMember(tag);
 
   /* viewer role */
-  const account = useSelector(selectAccount)
+  const account = useSelector(selectAccount);
   const selfRole: ClanRole | null = useMemo(() => {
-    if (detail && detail.owner_id === account.id) return 'owner'
-    const row = memberData?.members.find((m) => m.id === account.id)
-    return row?.clan_role ?? null
-  }, [detail, memberData, account.id])
+    if (detail && detail.owner_id === account.id) return 'owner';
+    const row = memberData?.members.find((m) => m.id === account.id);
+    return row?.clan_role ?? null;
+  }, [detail, memberData, account.id]);
 
   /* invite */
-  const [inviteId, setInviteId] = useState('')
+  const [inviteId, setInviteId] = useState('');
 
   /* render blocks */
   const renderOverview = () => {
-    if (loadingDetail) return <p>Loading…</p>
-    if (!detail) return <p>Clan not found</p>
+    if (loadingDetail) return <p>Loading…</p>;
+    if (!detail) return <p>Clan not found</p>;
     return (
       <div className={styles['sb-clans-cd-card']}>
         <h2>
-          {detail.name} <span className={styles['sb-clans-cd-tag']}>[{detail.tag}]</span>
+          {detail.name}{' '}
+          <span className={styles['sb-clans-cd-tag']}>[{detail.tag}]</span>
         </h2>
         <p>{detail.description || 'No description.'}</p>
         <p>Members: {detail.members}</p>
         <p>Elo: {detail.elo}</p>
         <p>Public: {detail.is_public ? 'Yes' : 'No'}</p>
       </div>
-    )
-  }
+    );
+  };
 
   const renderMembers = () => {
-    if (loadingMembers) return <p>Loading…</p>
-    if (!memberData) return <p>No data</p>
+    if (loadingMembers) return <p>Loading…</p>;
+    if (!memberData) return <p>No data</p>;
 
     if (memberData.members.length === 0) {
       return (
         <p className={styles['sb-clans-cd-empty']}>
           No members yet. Invite some friends!
         </p>
-      )
+      );
     }
 
     return (
@@ -101,7 +102,6 @@ const ClanDetail: React.FC = () => {
           </div>
         )}
 
-
         {/* member rows */}
         <div className={styles['sb-clans-cd-list']}>
           {memberData.members.map((m) => (
@@ -117,8 +117,8 @@ const ClanDetail: React.FC = () => {
           ))}
         </div>
       </div>
-    )
-  }
+    );
+  };
 
   /* settings form */
   const [form, setForm] = useState({
@@ -126,7 +126,7 @@ const ClanDetail: React.FC = () => {
     description: '',
     is_public: false,
     color: '#ffffff',
-  })
+  });
 
   useEffect(() => {
     if (detail) {
@@ -135,19 +135,19 @@ const ClanDetail: React.FC = () => {
         description: detail.description,
         is_public: detail.is_public,
         color: detail.color,
-      })
+      });
     }
-  }, [detail])
+  }, [detail]);
 
   const renderSettings = () => {
-    if (selfRole !== 'owner') return <p>Owner only.</p>
-    if (!detail) return null
+    if (selfRole !== 'owner') return <p>Owner only.</p>;
+    if (!detail) return null;
     return (
       <form
         className={styles['sb-clans-cd-form']}
         onSubmit={(e) => {
-          e.preventDefault()
-          updateClan.mutate(form)
+          e.preventDefault();
+          updateClan.mutate(form);
         }}
       >
         <label className={styles['sb-clans-cd-label']}>
@@ -167,9 +167,7 @@ const ClanDetail: React.FC = () => {
             className={styles['sb-clans-cd-input']}
             maxLength={256}
             value={form.description}
-            onChange={(e) =>
-              setForm({ ...form, description: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
           />
         </label>
 
@@ -177,9 +175,7 @@ const ClanDetail: React.FC = () => {
           <input
             type="checkbox"
             checked={form.is_public}
-            onChange={(e) =>
-              setForm({ ...form, is_public: e.target.checked })
-            }
+            onChange={(e) => setForm({ ...form, is_public: e.target.checked })}
           />
           Public clan (anyone can join)
         </label>
@@ -202,8 +198,8 @@ const ClanDetail: React.FC = () => {
           {updateClan.isPending ? 'Saving…' : 'Save'}
         </button>
       </form>
-    )
-  }
+    );
+  };
 
   return (
     <main className={styles['sb-clans-cd-page']}>
@@ -212,8 +208,9 @@ const ClanDetail: React.FC = () => {
         {(['overview', 'members', 'settings'] as TabKey[]).map((k) => (
           <div
             key={k}
-            className={`${styles['sb-clans-cd-tab']} ${tab === k ? styles['active'] : ''
-              }`}
+            className={`${styles['sb-clans-cd-tab']} ${
+              tab === k ? styles['active'] : ''
+            }`}
             onClick={() => setTab(k)}
           >
             {k[0].toUpperCase() + k.slice(1)}
@@ -228,7 +225,7 @@ const ClanDetail: React.FC = () => {
         {tab === 'settings' && renderSettings()}
       </section>
     </main>
-  )
-}
+  );
+};
 
-export default ClanDetail
+export default ClanDetail;

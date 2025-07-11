@@ -1,29 +1,29 @@
 // client/src/ui/components/Toast/Toast.tsx
 // Single toast notification with auto-dismiss + fade animation
 
-import React, { useEffect, useState } from 'react'
-import { ToastItem } from './ToastContext'
+import React, { useEffect, useState } from 'react';
+import { ToastItem } from './ToastContext';
 
 interface Props {
-  toast: ToastItem
-  onClose: (id: number) => void
+  toast: ToastItem;
+  onClose: (id: number) => void;
 }
 
 const Toast: React.FC<Props> = ({ toast, onClose }) => {
-  const [leaving, setLeaving] = useState(false)
+  const [leaving, setLeaving] = useState(false);
 
   /* auto-dismiss timer */
   useEffect(() => {
-    const timer = setTimeout(() => setLeaving(true), toast.duration)
-    return () => clearTimeout(timer)
-  }, [toast.duration])
+    const timer = setTimeout(() => setLeaving(true), toast.duration);
+    return () => clearTimeout(timer);
+  }, [toast.duration]);
 
   /* trigger real close after fade-out */
   useEffect(() => {
-    if (!leaving) return
-    const timer = setTimeout(() => onClose(toast.id), 300) // match CSS fade-out
-    return () => clearTimeout(timer)
-  }, [leaving, onClose, toast.id])
+    if (!leaving) return;
+    const timer = setTimeout(() => onClose(toast.id), 300); // match CSS fade-out
+    return () => clearTimeout(timer);
+  }, [leaving, onClose, toast.id]);
 
   return (
     <div
@@ -34,7 +34,7 @@ const Toast: React.FC<Props> = ({ toast, onClose }) => {
         ×
       </button>
     </div>
-  )
-}
+  );
+};
 
-export default Toast
+export default Toast;

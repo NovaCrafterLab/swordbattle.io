@@ -9,8 +9,10 @@ class RPCManager {
     this.failedRpcs = new Set();
     this.lastHealthCheck = 0;
     this.healthCheckInterval = 5 * 60 * 1000; // 5分钟
-    
-    console.log(`📡 RPC Manager: ${rpcPool.length} nodes available, starting with random node`);
+
+    console.log(
+      `📡 RPC Manager: ${rpcPool.length} nodes available, starting with random node`,
+    );
   }
 
   getCurrentRPC() {
@@ -32,21 +34,27 @@ class RPCManager {
   }
 
   switchToNextRPC() {
-    const availableIndices = this.rpcPool.map((_, index) => index).filter(
-      (index) => !this.failedRpcs.has(index)
-    );
-    
+    const availableIndices = this.rpcPool
+      .map((_, index) => index)
+      .filter((index) => !this.failedRpcs.has(index));
+
     if (availableIndices.length === 0) {
-      console.warn('⚠️  All RPC nodes failed, resetting and selecting random node');
+      console.warn(
+        '⚠️  All RPC nodes failed, resetting and selecting random node',
+      );
       this.failedRpcs.clear();
       this.currentIndex = Math.floor(Math.random() * this.rpcPool.length);
       return;
     }
-    
+
     // 从可用节点中随机选择一个（排除当前节点）
-    const otherAvailableIndices = availableIndices.filter(index => index !== this.currentIndex);
+    const otherAvailableIndices = availableIndices.filter(
+      (index) => index !== this.currentIndex,
+    );
     if (otherAvailableIndices.length > 0) {
-      const randomIndex = Math.floor(Math.random() * otherAvailableIndices.length);
+      const randomIndex = Math.floor(
+        Math.random() * otherAvailableIndices.length,
+      );
       this.currentIndex = otherAvailableIndices[randomIndex];
     } else {
       // 如果只有当前节点可用，保持不变
@@ -62,7 +70,7 @@ class RPCManager {
     this.lastHealthCheck = now;
 
     // 减少健康检查日志的频率
-    
+
     const healthPromises = this.rpcPool.map(async (rpc, index) => {
       try {
         const response = await fetch(rpc, {
@@ -76,7 +84,7 @@ class RPCManager {
           }),
           signal: AbortSignal.timeout(5000),
         });
-        
+
         if (response.ok) {
           const data = await response.json();
           if (data.result) {
@@ -101,19 +109,21 @@ class RPCManager {
 
     const results = await Promise.allSettled(healthPromises);
     const healthyCount = results.filter(
-      (r) => r.status === 'fulfilled' && r.value.status === 'healthy'
+      (r) => r.status === 'fulfilled' && r.value.status === 'healthy',
     ).length;
-    
+
     // 只在节点状态有变化时记录日志
     if (healthyCount !== this.rpcPool.length - this.failedRpcs.size) {
-      console.log(`📊 RPC health: ${healthyCount}/${this.rpcPool.length} nodes healthy`);
+      console.log(
+        `📊 RPC health: ${healthyCount}/${this.rpcPool.length} nodes healthy`,
+      );
     }
-    
+
     // 如果当前RPC节点不可用，自动切换
     if (this.failedRpcs.has(this.currentIndex)) {
       this.switchToNextRPC();
     }
-    
+
     return this.getStats();
   }
 
@@ -135,7 +145,9 @@ class RPCManager {
   switchToRPC(index) {
     if (index >= 0 && index < this.rpcPool.length) {
       this.currentIndex = index;
-      console.log(`🔧 Manual switch to RPC[${index}]: ${this.getCurrentRPC().split('/').pop()}`);
+      console.log(
+        `🔧 Manual switch to RPC[${index}]: ${this.getCurrentRPC().split('/').pop()}`,
+      );
       return this.getCurrentRPC();
     }
     throw new Error(`Invalid RPC index: ${index}`);
@@ -155,7 +167,7 @@ class RPCManager {
       if (this.failedRpcs.has(index)) {
         return { index, rpc, latency: Infinity };
       }
-      
+
       try {
         const startTime = Date.now();
         const response = await fetch(rpc, {
@@ -169,7 +181,7 @@ class RPCManager {
           }),
           signal: AbortSignal.timeout(3000),
         });
-        
+
         if (response.ok) {
           const latency = Date.now() - startTime;
           return { index, rpc, latency };
@@ -182,9 +194,9 @@ class RPCManager {
 
     const results = await Promise.allSettled(latencyTests);
     const validResults = results
-      .filter(r => r.status === 'fulfilled')
-      .map(r => r.value)
-      .filter(r => r.latency < Infinity)
+      .filter((r) => r.status === 'fulfilled')
+      .map((r) => r.value)
+      .filter((r) => r.latency < Infinity)
       .sort((a, b) => a.latency - b.latency);
 
     if (validResults.length > 0) {
@@ -197,4 +209,4 @@ class RPCManager {
   }
 }
 
-module.exports = RPCManager; 
+module.exports = RPCManager;

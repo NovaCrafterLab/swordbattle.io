@@ -11,7 +11,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { RaceGamesService } from './race-games.service';
-import { SaveRaceGameDTO, UpdateRaceGameDTO, GetPlayerHistoryDTO } from './race-games.dto';
+import {
+  SaveRaceGameDTO,
+  UpdateRaceGameDTO,
+  GetPlayerHistoryDTO,
+} from './race-games.dto';
 import { ServerGuard } from 'src/auth/guards/server.guard';
 
 @Controller('race-games')
@@ -59,13 +63,16 @@ export class RaceGamesController {
       const limit = limitStr ? parseInt(limitStr) : 50;
       const offset = offsetStr ? parseInt(offsetStr) : 0;
 
-      const result = await this.raceGamesService.getPlayerHistory(playerAddress, {
-        limit,
-        offset,
-      });
+      const result = await this.raceGamesService.getPlayerHistory(
+        playerAddress,
+        {
+          limit,
+          offset,
+        },
+      );
 
       // 转换为前端期望的格式
-      const games = result.games.map(game => ({
+      const games = result.games.map((game) => ({
         gameId: game.gameId,
         score: game.score,
         reward: game.rewardAmount,
@@ -99,13 +106,16 @@ export class RaceGamesController {
   @Get('players/:playerAddress/games')
   async getPlayerGames(@Param('playerAddress') playerAddress: string) {
     try {
-      const result = await this.raceGamesService.getPlayerHistory(playerAddress, {
-        limit: 50,
-        offset: 0,
-      });
+      const result = await this.raceGamesService.getPlayerHistory(
+        playerAddress,
+        {
+          limit: 50,
+          offset: 0,
+        },
+      );
 
       // 转换为前端期望的格式
-      const games = result.games.map(game => ({
+      const games = result.games.map((game) => ({
         gameId: game.gameId,
         score: game.score,
         reward: game.rewardAmount,
@@ -139,7 +149,9 @@ export class RaceGamesController {
   @Get('games/:gameId/players')
   async getGamePlayers(@Param('gameId') gameId: string) {
     try {
-      const players = await this.raceGamesService.getGamePlayers(parseInt(gameId));
+      const players = await this.raceGamesService.getGamePlayers(
+        parseInt(gameId),
+      );
       return { success: true, data: players };
     } catch (error) {
       throw new HttpException(
@@ -197,21 +209,28 @@ export class RaceGamesController {
   // 批量更新奖励信息（由游戏服务器异步调用）
   @Put('update-rewards')
   @UseGuards(ServerGuard)
-  async updateRewards(@Body() data: { games: Array<{
-    gameId: number;
-    playerAddress: string;
-    rewardAmount: string;
-    hasClaimed: boolean;
-    isWinner: boolean;
-  }> }) {
+  async updateRewards(
+    @Body()
+    data: {
+      games: Array<{
+        gameId: number;
+        playerAddress: string;
+        rewardAmount: string;
+        hasClaimed: boolean;
+        isWinner: boolean;
+      }>;
+    },
+  ) {
     try {
-      const updatedGames = await this.raceGamesService.updateRewardsBatch(data.games);
-      return { 
-        success: true, 
-        data: { 
-          games: updatedGames, 
-          count: updatedGames.length 
-        } 
+      const updatedGames = await this.raceGamesService.updateRewardsBatch(
+        data.games,
+      );
+      return {
+        success: true,
+        data: {
+          games: updatedGames,
+          count: updatedGames.length,
+        },
       };
     } catch (error) {
       throw new HttpException(
@@ -225,14 +244,17 @@ export class RaceGamesController {
   @Post('players/:playerAddress/sync-rewards')
   async syncPlayerRewards(@Param('playerAddress') playerAddress: string) {
     try {
-      const result = await this.raceGamesService.syncPlayerRewardsFromBlockchain(playerAddress);
-      return { 
-        success: true, 
+      const result =
+        await this.raceGamesService.syncPlayerRewardsFromBlockchain(
+          playerAddress,
+        );
+      return {
+        success: true,
         message: `Successfully synced ${result.updatedCount} game rewards for player ${playerAddress}`,
-        data: { 
-          updatedGames: result.updatedGames, 
-          updatedCount: result.updatedCount 
-        } 
+        data: {
+          updatedGames: result.updatedGames,
+          updatedCount: result.updatedCount,
+        },
       };
     } catch (error) {
       throw new HttpException(
@@ -252,11 +274,11 @@ export class RaceGamesController {
   @Get('debug/config')
   debugConfig() {
     const { config } = require('src/config');
-    return { 
-      success: true, 
+    return {
+      success: true,
       serverSecret: config.serverSecret,
       serverSecretLength: config.serverSecret?.length || 0,
-      isProduction: config.isProduction
+      isProduction: config.isProduction,
     };
   }
 
@@ -300,11 +322,12 @@ export class RaceGamesController {
         },
       ];
 
-      const savedGames = await this.raceGamesService.saveRaceGamesBatch(sampleGames);
-      return { 
-        success: true, 
+      const savedGames =
+        await this.raceGamesService.saveRaceGamesBatch(sampleGames);
+      return {
+        success: true,
         message: 'Sample data created successfully',
-        data: { games: savedGames, count: savedGames.length }
+        data: { games: savedGames, count: savedGames.length },
       };
     } catch (error) {
       throw new HttpException(
@@ -319,10 +342,10 @@ export class RaceGamesController {
   async addTestGame(@Body() data: SaveRaceGameDTO) {
     try {
       const savedGame = await this.raceGamesService.saveRaceGame(data);
-      return { 
-        success: true, 
+      return {
+        success: true,
         message: 'Game data added successfully',
-        data: savedGame
+        data: savedGame,
       };
     } catch (error) {
       throw new HttpException(
@@ -331,4 +354,4 @@ export class RaceGamesController {
       );
     }
   }
-} 
+}

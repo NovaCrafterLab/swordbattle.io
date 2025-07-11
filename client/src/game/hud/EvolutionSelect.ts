@@ -142,11 +142,10 @@ class EvolutionSelect extends HudComponent {
         overlay.setScale((body.width / overlay.width) * evolution[2]);
 
         const container = this.hud.scene.add
-          .container(
-            (this.spriteSize + 50) * (i - (count + 1) / 2),
-            0,
-            [body, overlay],
-          )
+          .container((this.spriteSize + 50) * (i - (count + 1) / 2), 0, [
+            body,
+            overlay,
+          ])
           .setScale(this.spriteSize / body.height)
           .setAlpha(alpha);
 

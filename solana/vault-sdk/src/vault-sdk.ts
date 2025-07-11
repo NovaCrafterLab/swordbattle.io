@@ -4,7 +4,6 @@ import {
   getAssociatedTokenAddress,
   getOrCreateAssociatedTokenAccount,
   createAssociatedTokenAccountInstruction,
-  getAccount,
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
@@ -1066,26 +1065,52 @@ export class VaultSDK {
     // Get user ticket PDA
     const userTicket = this.getUserTicketPda(params.gameId, userPublicKey);
 
-    // 🔧 Check if vault's token account exists
+    // 🔧 Check if vault's token account exists with retry logic
     let needsVaultATACreation = false;
     try {
-      await getAccount(this.connection, vaultToken);
-      console.log('✅ Vault token account exists:', vaultToken.toString());
+      const accountInfo = await this.connection.getAccountInfo(vaultToken);
+      if (accountInfo === null) {
+        console.log('⚠️ Vault token account does not exist, will create ATA');
+        needsVaultATACreation = true;
+      } else {
+        console.log('✅ Vault token account exists:', vaultToken.toString());
+      }
     } catch (error) {
-      console.log('⚠️ Vault token account does not exist, will create ATA');
+      console.log(
+        '⚠️ Error checking vault token account, will create ATA:',
+        error,
+      );
       needsVaultATACreation = true;
     }
 
-    // 🔧 Check if user's token account exists
+    // 🔧 Check if user's token account exists with retry logic
     let userTokenAccount = params.userTokenAccount;
     let needsUserATACreation = false;
 
     try {
-      // Try to get the account info
-      await getAccount(this.connection, userTokenAccount);
-      console.log('✅ User token account exists:', userTokenAccount.toString());
+      const accountInfo =
+        await this.connection.getAccountInfo(userTokenAccount);
+      if (accountInfo === null) {
+        console.log('⚠️ User token account does not exist, will create ATA');
+        needsUserATACreation = true;
+
+        // Recalculate the correct ATA address
+        userTokenAccount = await getAssociatedTokenAddress(
+          tokenMint,
+          userPublicKey,
+          false, // allowOwnerOffCurve = false for user accounts
+        );
+      } else {
+        console.log(
+          '✅ User token account exists:',
+          userTokenAccount.toString(),
+        );
+      }
     } catch (error) {
-      console.log('⚠️ User token account does not exist, will create ATA');
+      console.log(
+        '⚠️ Error checking user token account, will create ATA:',
+        error,
+      );
       needsUserATACreation = true;
 
       // Recalculate the correct ATA address
@@ -1099,32 +1124,81 @@ export class VaultSDK {
     // Create a new transaction
     const transaction = new anchor.web3.Transaction();
 
-    // 🔧 Add vault ATA creation instruction if needed
+    // 🔧 Add vault ATA creation instruction if needed (with final check)
     if (needsVaultATACreation) {
-      console.log('🔨 Adding vault ATA creation instruction');
-      const createVaultATAInstruction = createAssociatedTokenAccountInstruction(
-        userPublicKey, // payer (user pays for vault ATA creation)
-        vaultToken, // ata
-        vault, // owner (vault PDA)
-        tokenMint, // mint
-        TOKEN_PROGRAM_ID,
-        ASSOCIATED_TOKEN_PROGRAM_ID,
-      );
-      transaction.add(createVaultATAInstruction);
+      console.log('🔧 Final check: Vault ATA creation needed');
+      // Double-check right before adding instruction to avoid race conditions
+      try {
+        const finalCheck = await this.connection.getAccountInfo(vaultToken);
+        if (finalCheck === null) {
+          console.log('🔨 Adding vault ATA creation instruction');
+          const createVaultATAInstruction =
+            createAssociatedTokenAccountInstruction(
+              userPublicKey, // payer (user pays for vault ATA creation)
+              vaultToken, // ata
+              vault, // owner (vault PDA)
+              tokenMint, // mint
+              TOKEN_PROGRAM_ID,
+              ASSOCIATED_TOKEN_PROGRAM_ID,
+            );
+          transaction.add(createVaultATAInstruction);
+        } else {
+          console.log('✅ Vault ATA already exists (race condition avoided)');
+        }
+      } catch (error) {
+        console.log(
+          '🔨 Adding vault ATA creation instruction (error during final check)',
+        );
+        const createVaultATAInstruction =
+          createAssociatedTokenAccountInstruction(
+            userPublicKey, // payer (user pays for vault ATA creation)
+            vaultToken, // ata
+            vault, // owner (vault PDA)
+            tokenMint, // mint
+            TOKEN_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID,
+          );
+        transaction.add(createVaultATAInstruction);
+      }
     }
 
-    // 🔧 Add user ATA creation instruction if needed
+    // 🔧 Add user ATA creation instruction if needed (with final check)
     if (needsUserATACreation) {
-      console.log('🔨 Adding user ATA creation instruction');
-      const createUserATAInstruction = createAssociatedTokenAccountInstruction(
-        userPublicKey, // payer
-        userTokenAccount, // ata
-        userPublicKey, // owner
-        tokenMint, // mint
-        TOKEN_PROGRAM_ID,
-        ASSOCIATED_TOKEN_PROGRAM_ID,
-      );
-      transaction.add(createUserATAInstruction);
+      console.log('🔧 Final check: User ATA creation needed');
+      // Double-check right before adding instruction to avoid race conditions
+      try {
+        const finalCheck =
+          await this.connection.getAccountInfo(userTokenAccount);
+        if (finalCheck === null) {
+          console.log('🔨 Adding user ATA creation instruction');
+          const createUserATAInstruction =
+            createAssociatedTokenAccountInstruction(
+              userPublicKey, // payer
+              userTokenAccount, // ata
+              userPublicKey, // owner
+              tokenMint, // mint
+              TOKEN_PROGRAM_ID,
+              ASSOCIATED_TOKEN_PROGRAM_ID,
+            );
+          transaction.add(createUserATAInstruction);
+        } else {
+          console.log('✅ User ATA already exists (race condition avoided)');
+        }
+      } catch (error) {
+        console.log(
+          '🔨 Adding user ATA creation instruction (error during final check)',
+        );
+        const createUserATAInstruction =
+          createAssociatedTokenAccountInstruction(
+            userPublicKey, // payer
+            userTokenAccount, // ata
+            userPublicKey, // owner
+            tokenMint, // mint
+            TOKEN_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID,
+          );
+        transaction.add(createUserATAInstruction);
+      }
     }
 
     // Build the buy ticket instruction
@@ -1144,8 +1218,10 @@ export class VaultSDK {
     // Add the buy ticket instruction
     transaction.add(buyTicketInstruction);
 
-    // Get recent blockhash
-    const { blockhash } = await this.connection.getLatestBlockhash();
+    // Get the most recent blockhash with confirmed commitment
+    console.log('🔄 Getting latest blockhash for transaction...');
+    const { blockhash, lastValidBlockHeight } =
+      await this.connection.getLatestBlockhash('confirmed');
     transaction.recentBlockhash = blockhash;
     transaction.feePayer = userPublicKey;
 
@@ -1154,6 +1230,11 @@ export class VaultSDK {
       transaction.instructions.length,
       'instructions',
     );
+    console.log('🔧 Blockhash details:', {
+      blockhash: blockhash.substring(0, 8) + '...',
+      lastValidBlockHeight,
+      feePayer: userPublicKey.toString(),
+    });
 
     // Serialize transaction
     const serializedTx = transaction.serialize({

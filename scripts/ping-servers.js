@@ -12,10 +12,10 @@ const TIMEOUT_MS = 5000; // request timeout
 const ENV_ENDPOINTS = [
   { name: 'TEST', addr: process.env.REACT_APP_ENDPOINT_TEST },
   { name: 'RACE', addr: process.env.REACT_APP_ENDPOINT_RACE },
-  { name: 'EU',   addr: process.env.REACT_APP_ENDPOINT_EU },
-  { name: 'US',   addr: process.env.REACT_APP_ENDPOINT_US },
+  { name: 'EU', addr: process.env.REACT_APP_ENDPOINT_EU },
+  { name: 'US', addr: process.env.REACT_APP_ENDPOINT_US },
   { name: 'USBK', addr: process.env.REACT_APP_ENDPOINT_US_BACKUP },
-  { name: 'DEV',  addr: process.env.REACT_APP_ENDPOINT_DEV },
+  { name: 'DEV', addr: process.env.REACT_APP_ENDPOINT_DEV },
 ];
 // --------------------------
 
@@ -23,15 +23,16 @@ const ENV_ENDPOINTS = [
  * Build list: .env endpoints + CLI overrides
  */
 function buildServerList() {
-  const cliArgs = process.argv.slice(2);               // custom addresses from CLI
+  const cliArgs = process.argv.slice(2); // custom addresses from CLI
   const cliServers = cliArgs.map((addr, i) => ({
     name: `CLI${i + 1}`,
     addr,
   }));
   return [...ENV_ENDPOINTS, ...cliServers]
-    .filter(s => !!s.addr)                              // drop empty
-    .reduce((acc, cur) => {                             // deduplicate by address
-      if (!acc.find(s => s.addr === cur.addr)) acc.push(cur);
+    .filter((s) => !!s.addr) // drop empty
+    .reduce((acc, cur) => {
+      // deduplicate by address
+      if (!acc.find((s) => s.addr === cur.addr)) acc.push(cur);
       return acc;
     }, []);
 }
@@ -51,7 +52,13 @@ async function pingServer({ name, addr }) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
     clearTimeout(timeout);
-    return { name, addr, online: true, ping: ms, players: json.realPlayersCnt ?? 'N/A' };
+    return {
+      name,
+      addr,
+      online: true,
+      ping: ms,
+      players: json.realPlayersCnt ?? 'N/A',
+    };
   } catch (err) {
     clearTimeout(timeout);
     return { name, addr, online: false, ping: '∞', players: '-' };

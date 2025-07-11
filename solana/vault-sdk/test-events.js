@@ -10,7 +10,7 @@ const programId = new PublicKey('AqDb3BxQhL5wmszt3iy8qrvPJ9Mu5MeF5uoUd1e65EaV');
 const vaultSDK = new VaultSDK({
   programId,
   connection,
-  wallet
+  wallet,
 });
 
 async function testEvents() {
@@ -29,7 +29,7 @@ async function testEvents() {
       gameId: event.gameId,
       user: event.user.toString(),
       amount: event.amount,
-      totalDeposit: event.totalDeposit
+      totalDeposit: event.totalDeposit,
     });
   });
 
@@ -38,7 +38,7 @@ async function testEvents() {
     console.log(`🏆 奖励领取事件 (slot: ${slot}):`, {
       gameId: event.gameId,
       user: event.user.toString(),
-      rewardAmount: event.rewardAmount
+      rewardAmount: event.rewardAmount,
     });
   });
 
@@ -47,7 +47,7 @@ async function testEvents() {
     console.log(`🎮 游戏结束事件 (slot: ${slot}):`, {
       gameId: event.gameId,
       totalDeposit: event.totalDeposit,
-      rewardCount: event.rewardCount
+      rewardCount: event.rewardCount,
     });
   });
 
@@ -56,14 +56,14 @@ async function testEvents() {
   try {
     const recentEvents = await vaultSDK.getRecentEvents();
     console.log(`📚 最近事件数量: ${recentEvents.length}`);
-    
+
     if (recentEvents.length > 0) {
       console.log('📚 最近事件示例:');
       recentEvents.slice(0, 3).forEach((event, index) => {
         console.log(`  ${index + 1}. ${event.eventName || 'Unknown'}:`, {
           signature: event.signature,
           slot: event.slot,
-          blockTime: event.blockTime
+          blockTime: event.blockTime,
         });
       });
     }
@@ -102,13 +102,13 @@ async function testEvents() {
   console.log('\n⏰ 监听事件中... (10秒后停止)');
   setTimeout(() => {
     console.log('\n🛑 停止监听事件...');
-    
+
     // 取消所有订阅
     allEventsSubscription.unsubscribe();
     ticketSubscription.unsubscribe();
     rewardSubscription.unsubscribe();
     finalizeSubscription.unsubscribe();
-    
+
     console.log('✅ 事件监听已停止');
     process.exit(0);
   }, 10000);
@@ -121,4 +121,4 @@ process.on('unhandledRejection', (error) => {
 });
 
 // 运行测试
-testEvents().catch(console.error); 
+testEvents().catch(console.error);
