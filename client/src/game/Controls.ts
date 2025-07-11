@@ -38,8 +38,10 @@ export class Controls {
     } = this;
     if (this.game.isMobile) {
       // @ts-ignore
-      this.joystick = (this.game.plugins.get('rexVirtualJoystick') as Phaser.Plugins.JoystickPlugin)
-        ?.add(this.game.hud.scene, { radius: 130 }) as VirtualJoyStick;
+      this.joystick = (this.game.plugins.get('rexVirtualJoystick') as any)?.add(
+        this.game.hud.scene,
+        { radius: 130 },
+      ) as VirtualJoyStick;
       this.joystick.on('pointerdown', (pointer: any) => {
         this.joystickPointer = pointer;
       });

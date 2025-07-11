@@ -560,7 +560,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     if (solanaVault.txStatus === 'signing') {
       return (
         <button className="race-btn warning" disabled>
-          Confirm in Wallet
+          Confirm in Wallet (Single Popup)
         </button>
       );
     }
@@ -612,9 +612,18 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       <button
         className="race-btn primary"
         onClick={handleJoinGame}
-        disabled={isDisabled || isJoining || solanaVault.isLoading}
+        disabled={
+          isDisabled ||
+          isJoining ||
+          solanaVault.isLoading ||
+          solanaVault.isProcessing
+        }
       >
-        {isJoining || solanaVault.isLoading ? 'Joining...' : <>Join Race</>}
+        {isJoining || solanaVault.isLoading || solanaVault.isProcessing ? (
+          'Joining...'
+        ) : (
+          <>Join Race</>
+        )}
       </button>
     );
   };
@@ -804,12 +813,14 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   )}
                   {solanaVault.txStatus === 'signing' && (
                     <div className="tx-step active">
-                      💳 Please confirm transaction in your wallet...
+                      💳 Please confirm transaction in your wallet (optimized
+                      single-step)...
                     </div>
                   )}
                   {solanaVault.txStatus === 'sending' && (
                     <div className="tx-step active">
-                      📡 Sending transaction to blockchain...
+                      📡 Sending transaction directly to blockchain (no
+                      additional popup)...
                     </div>
                   )}
                   {solanaVault.txStatus === 'confirming' && (

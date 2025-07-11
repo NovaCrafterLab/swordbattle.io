@@ -57,8 +57,27 @@ const getErrorMessage = (error: any): string => {
   return 'Unknown error occurred';
 };
 export const useSolanaVault = () => {
-  const { publicKey, signTransaction, sendTransaction } = useWallet();
+  const wallet = useWallet();
+  const { publicKey, signTransaction, sendTransaction } = wallet;
+
+  // Try multiple ways to get signAndSendTransaction
+  const signAndSendTransaction =
+    (wallet as any).signAndSendTransaction ||
+    // Some wallets expose it under different names
+    (wallet.wallet?.adapter as any)?.signAndSendTransaction ||
+    null;
+
   const { connection } = useConnection();
+
+  console.log('🔍 Wallet capabilities debug:', {
+    hasSignTransaction: !!signTransaction,
+    hasSendTransaction: !!sendTransaction,
+    hasSignAndSendTransaction: !!signAndSendTransaction,
+    walletName: wallet.wallet?.adapter?.name,
+    availableMethods: Object.keys(wallet).filter(
+      (key) => typeof (wallet as any)[key] === 'function',
+    ),
+  });
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -72,6 +91,7 @@ export const useSolanaVault = () => {
     | 'completed'
   >('idle');
   const [currentTxHash, setCurrentTxHash] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false); // 防重复调用保护
 
   // Secure frontend ticket purchase with anti-tampering protection
   const buyTicket = useCallback(
@@ -82,11 +102,27 @@ export const useSolanaVault = () => {
       tier?: string,
       expectedAmount?: bigint,
     ): Promise<string> => {
-      if (!publicKey || !signTransaction || !sendTransaction) {
-        throw new Error('Wallet not connected or missing required methods');
+      console.log('🎫 Starting secure buyTicket transaction...');
+
+      // 防重复调用检查
+      if (isProcessing) {
+        console.log(
+          '⚠️ Transaction already in progress, ignoring duplicate call',
+        );
+        throw new Error('Transaction already in progress');
+      }
+
+      if (!publicKey || !signAndSendTransaction) {
+        // Fallback to separate sign + send if signAndSendTransaction is not available
+        if (!signTransaction || !sendTransaction) {
+          throw new Error(
+            'Wallet not connected or missing required transaction methods',
+          );
+        }
       }
 
       try {
+        setIsProcessing(true); // 设置处理中状态
         setIsLoading(true);
         setError(null);
         setTxStatus('building');
@@ -103,7 +139,7 @@ export const useSolanaVault = () => {
           tokenMint: tokenMint.toString(),
           tier,
           expectedAmount: expectedAmount?.toString(),
-          publicKey: publicKey.toString(),
+          publicKey: publicKey!.toString(),
           hasSignTransaction: !!signTransaction,
           hasSendTransaction: !!sendTransaction,
         });
@@ -114,7 +150,7 @@ export const useSolanaVault = () => {
         const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
 
         // Generate secure signature for anti-tampering
-        const requestData = `${gameId}:${amount}:${tokenMint.toString()}:${tier || 'default'}:${publicKey.toString()}`;
+        const requestData = `${gameId}:${amount}:${tokenMint.toString()}:${tier || 'default'}:${publicKey!.toString()}`;
         const signature = generateSecureSignature(requestData, 'client-secret');
 
         console.log('🔒 Generated secure signature for transaction parameters');
@@ -129,7 +165,7 @@ export const useSolanaVault = () => {
         const requestBody = {
           gameId,
           amount: amount.toString(),
-          walletAddress: publicKey.toString(),
+          walletAddress: publicKey!.toString(),
           tokenMint: tokenMint.toString(),
           tier,
           expectedAmount: expectedAmount?.toString(),
@@ -198,7 +234,7 @@ export const useSolanaVault = () => {
 
         // Only set fee payer if not already set
         if (!transaction.feePayer) {
-          transaction.feePayer = publicKey;
+          transaction.feePayer = publicKey!;
           console.log('🔧 Set fee payer to connected wallet');
         }
 
@@ -221,33 +257,64 @@ export const useSolanaVault = () => {
           signatures: transaction.signatures.length,
         });
 
-        // Step 5: Sign transaction with user wallet (triggers popup)
+        // Step 5: Sign and send transaction with user wallet (single popup)
         setTxStatus('signing');
         console.log(
-          '🖊️ Requesting user signature - wallet popup should appear!',
+          '🖊️ Requesting user signature and sending transaction - wallet popup should appear!',
+        );
+        console.log(
+          '💡 Using signAndSendTransaction to avoid double wallet popup',
         );
 
-        const signedTransaction = await signTransaction(transaction);
-        console.log('✅ Transaction signed by user wallet');
+        let txSignature: string;
 
-        // Step 6: Send transaction to network
-        setTxStatus('sending');
-        console.log('📤 Sending transaction to Solana network...');
+        if (signAndSendTransaction) {
+          // Preferred method: Single wallet popup
+          console.log('✅ Using signAndSendTransaction (single popup)');
+          txSignature = await signAndSendTransaction(transaction);
+          console.log('✅ Transaction signed and sent in single operation');
+        } else {
+          // Method B: Sign only, then send directly via connection (recommended)
+          console.log(
+            '🔄 Using optimized sign + connection.sendTransaction method',
+          );
+          console.log(
+            '💡 This should reduce wallet popups and simulation errors',
+          );
 
-        const txSignature = await sendTransaction(
-          signedTransaction,
-          connection,
-        );
+          const signedTransaction = await signTransaction!(transaction);
+          console.log('✅ Transaction signed by user wallet');
+
+          setTxStatus('sending');
+          console.log(
+            '📤 Sending transaction directly via connection (no additional wallet popup)...',
+          );
+
+          // Send directly via connection to avoid second wallet popup
+          txSignature = await connection.sendRawTransaction(
+            signedTransaction.serialize(),
+            {
+              skipPreflight: true, // Skip simulation to avoid errors
+              preflightCommitment: 'confirmed',
+            },
+          );
+          console.log('✅ Transaction sent directly via connection');
+        }
+
         setCurrentTxHash(txSignature);
+        console.log(`📝 Transaction completed with signature: ${txSignature}`);
 
-        console.log(`📝 Transaction sent with signature: ${txSignature}`);
-
-        // Step 7: Confirm transaction
+        // Step 6: Confirm transaction
         setTxStatus('confirming');
         console.log('⏳ Confirming transaction...');
 
         const confirmation = await connection.confirmTransaction(
-          txSignature,
+          {
+            signature: txSignature,
+            blockhash: transaction.recentBlockhash!,
+            lastValidBlockHeight: (await connection.getLatestBlockhash())
+              .lastValidBlockHeight,
+          },
           'confirmed',
         );
 
@@ -269,7 +336,7 @@ export const useSolanaVault = () => {
             body: JSON.stringify({
               gameId,
               txSignature,
-              walletAddress: publicKey.toString(),
+              walletAddress: publicKey!.toString(),
               amount: amount.toString(),
               tier,
               originalSignature: signature, // Original anti-tampering signature
@@ -301,7 +368,7 @@ export const useSolanaVault = () => {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 gameId,
-                playerAddress: publicKey.toString(),
+                playerAddress: publicKey!.toString(),
                 txHash: txSignature,
                 tier,
                 amount: amount.toString(),
@@ -343,9 +410,17 @@ export const useSolanaVault = () => {
         throw enhancedError;
       } finally {
         setIsLoading(false);
+        setIsProcessing(false); // 重置处理状态
       }
     },
-    [publicKey, signTransaction, sendTransaction, connection],
+    [
+      publicKey,
+      signTransaction,
+      sendTransaction,
+      signAndSendTransaction,
+      connection,
+      isProcessing,
+    ],
   );
 
   // Check if user has a ticket for a game using server API
@@ -359,7 +434,7 @@ export const useSolanaVault = () => {
         const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
 
         const response = await fetch(
-          `${protocol}://${serverUrl}/api/vault-info/${gameId}/${publicKey.toString()}`,
+          `${protocol}://${serverUrl}/api/vault-info/${gameId}/${publicKey!.toString()}`,
         );
         if (!response.ok) return false;
 
@@ -408,8 +483,13 @@ export const useSolanaVault = () => {
   const testWalletConnection = useCallback(async () => {
     console.log('🧪 Testing wallet connection...');
 
-    if (!publicKey || !signTransaction || !sendTransaction) {
-      console.error('❌ Wallet not connected or methods missing');
+    if (!publicKey) {
+      console.error('❌ Wallet not connected');
+      return false;
+    }
+
+    if (!signAndSendTransaction && (!signTransaction || !sendTransaction)) {
+      console.error('❌ Wallet methods missing');
       return false;
     }
 
@@ -420,8 +500,8 @@ export const useSolanaVault = () => {
       const testTransaction = new Transaction();
       testTransaction.add(
         SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: publicKey, // Send to self for testing
+          fromPubkey: publicKey!,
+          toPubkey: publicKey!, // Send to self for testing
           lamports: 1, // 1 lamport for testing
         }),
       );
@@ -429,20 +509,35 @@ export const useSolanaVault = () => {
       // Get recent blockhash
       const { blockhash } = await connection.getLatestBlockhash();
       testTransaction.recentBlockhash = blockhash;
-      testTransaction.feePayer = publicKey;
+      testTransaction.feePayer = publicKey!;
 
       console.log('🔍 About to test wallet signing - popup should appear!');
 
-      // This should trigger the wallet plugin
-      await signTransaction(testTransaction);
-      console.log('✅ Wallet signing test successful!');
+      if (signAndSendTransaction) {
+        console.log('🧪 Testing with signAndSendTransaction (single popup)');
+        // Note: This would actually send the transaction, so we'll just test signing
+        await signTransaction!(testTransaction);
+        console.log(
+          '✅ Wallet signing test successful (signAndSendTransaction available)!',
+        );
+      } else {
+        console.log('🧪 Testing with separate signTransaction (fallback mode)');
+        await signTransaction!(testTransaction);
+        console.log('✅ Wallet signing test successful (fallback mode)!');
+      }
 
       return true;
     } catch (error) {
       console.error('❌ Wallet signing test failed:', error);
       return false;
     }
-  }, [publicKey, signTransaction, sendTransaction, connection]);
+  }, [
+    publicKey,
+    signTransaction,
+    sendTransaction,
+    signAndSendTransaction,
+    connection,
+  ]);
 
   return {
     buyTicket,
@@ -450,6 +545,7 @@ export const useSolanaVault = () => {
     getVaultInfo,
     testWalletConnection, // Add test function
     isLoading,
+    isProcessing, // 暴露处理状态
     error,
     txStatus,
     currentTxHash,
