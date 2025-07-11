@@ -241,6 +241,17 @@ export class RaceGamesService {
     updatedCount: number;
   }> {
     try {
+      // 检查区块链服务是否可用 (项目已迁移到Solana，BSC服务已弃用)
+      if (!this.blockchainService.isAvailable()) {
+        this.logger.log(
+          `Blockchain service not available - skipping reward sync for player: ${playerAddress}`,
+        );
+        this.logger.log(
+          `ℹ️  Project has migrated to Solana - BSC reward sync is no longer needed`,
+        );
+        return { updatedGames: [], updatedCount: 0 };
+      }
+
       this.logger.log(
         `Starting blockchain reward sync for player: ${playerAddress}`,
       );
