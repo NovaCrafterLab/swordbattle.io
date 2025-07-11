@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import Modal from './Modal';
@@ -27,13 +27,42 @@ interface GameReward {
   timestamp?: number;
   level?: number; // 游戏级别：0=LOW, 1=MEDIUM, 2=HIGH
   fragmentReward?: bigint; // 碎片奖励
+  // Solana奖励字段
+  solanaReward?: number; // Solana奖励金额 (SOL)
+  solanaClaimed?: boolean; // Solana奖励是否已领取
+  solanaClaimable?: boolean; // Solana奖励是否可领取
+  rewardType?: 'BSC' | 'Solana'; // 奖励类型
 }
 
 const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
-  const { publicKey, connected: isConnected } = useWallet();
+  const wallet = useWallet();
+  const {
+    publicKey,
+    connected: isConnected,
+    signTransaction,
+    sendTransaction,
+  } = wallet;
+  const signAndSendTransaction = (wallet as any).signAndSendTransaction;
   const address = publicKey?.toString();
   const blockchain = useBlockchain();
   const playerData = usePlayerData();
+
+  // 调试钱包状态
+  useEffect(() => {
+    console.log('🔗 Wallet state debug:', {
+      connected: isConnected,
+      publicKey: publicKey?.toString(),
+      hasSignTransaction: !!signTransaction,
+      hasSendTransaction: !!sendTransaction,
+      hasSignAndSendTransaction: !!signAndSendTransaction,
+    });
+  }, [
+    isConnected,
+    publicKey,
+    signTransaction,
+    sendTransaction,
+    signAndSendTransaction,
+  ]);
 
   // 获取玩家仪表板数据（包含碎片余额、奖励等所有信息）
   const { data: playerDashboardRaw } = blockchain.usePlayerDashboard(
@@ -42,12 +71,21 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
   const playerDashboard = playerDashboardRaw as PlayerDashboard | null;
 
   const [gameRewards, setGameRewards] = useState<GameReward[]>([]);
+  const [solanaRewards, setSolanaRewards] = useState<GameReward[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [claimingGameId, setClaimingGameId] = useState<number | null>(null);
   const [claimingAll, setClaimingAll] = useState(false);
-  const [showFilter, setShowFilter] = useState<'all' | 'claimable'>('all');
+  const [showFilter, setShowFilter] = useState<
+    'all' | 'claimable' | 'BSC' | 'Solana'
+  >('all');
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [retryTrigger, setRetryTrigger] = useState(0);
+
+  // 使用useRef跟踪正在进行的交易，防止React严格模式导致的重复调用
+  const activeClaimRef = useRef<number | null>(null);
+
+  // 全局交易锁，防止任何形式的重复调用
+  const globalClaimLock = useRef<Set<number>>(new Set());
 
   // 重试函数
   const handleRetry = () => {
@@ -65,6 +103,60 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
       setIsLoading(false);
     }
   }, [address, isConnected]); // 依赖address和isConnected，确保钱包状态变化时重新执行
+
+  // 获取Solana游戏历史数据
+  const [solanaGameHistory, setSolanaGameHistory] = useState<any>(null);
+  const [isSolanaLoading, setIsSolanaLoading] = useState(false);
+
+  // 获取Solana奖励数据
+  const fetchSolanaRewards = useCallback(async () => {
+    if (!address) {
+      console.log('⚠️ No address provided for Solana rewards fetch');
+      return;
+    }
+
+    console.log(`🔍 Fetching Solana rewards for address: ${address}`);
+
+    try {
+      setIsSolanaLoading(true);
+      const response = await fetch(
+        `http://localhost:8080/race-games/players/${address}/games`,
+      );
+      const data = await response.json();
+
+      console.log('📊 Solana rewards API response:', data);
+
+      if (data.success) {
+        setSolanaGameHistory(data);
+        console.log('✅ Solana game history set successfully');
+      } else {
+        console.error('❌ API returned success: false', data);
+      }
+    } catch (error) {
+      console.error('❌ Failed to fetch Solana rewards:', error);
+    } finally {
+      setIsSolanaLoading(false);
+    }
+  }, [address]);
+
+  // 在组件挂载时获取Solana奖励
+  useEffect(() => {
+    console.log('🔄 Solana rewards fetch effect triggered:', {
+      address,
+      isConnected,
+      retryTrigger,
+      shouldFetch: address && isConnected,
+    });
+
+    if (address && isConnected) {
+      console.log('🚀 Calling fetchSolanaRewards...');
+      fetchSolanaRewards();
+    } else {
+      console.log(
+        '⚠️ Skipping fetchSolanaRewards - missing address or not connected',
+      );
+    }
+  }, [address, isConnected, retryTrigger, fetchSolanaRewards]);
 
   // 简化的数据获取逻辑 - 当playerData更新时同步到组件状态
   useEffect(() => {
@@ -90,12 +182,75 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
           isWinner: game.isWinner,
           timestamp: game.timestamp,
           level: game.level,
+          rewardType: 'BSC',
         }));
 
       setGameRewards(gameRewardsData);
       setIsLoading(false);
     }
   }, [playerData.isLoading, playerData.playerProfile]);
+
+  // 处理Solana游戏历史数据
+  useEffect(() => {
+    console.log('🔍 Solana game history effect triggered:', {
+      solanaGameHistory: !!solanaGameHistory,
+      success: solanaGameHistory?.success,
+      hasData: !!solanaGameHistory?.data,
+      gamesCount: solanaGameHistory?.data?.games?.length,
+    });
+
+    if (solanaGameHistory && solanaGameHistory.success) {
+      console.log('🔍 Processing Solana game history:', solanaGameHistory);
+
+      const solanaRewardsData: GameReward[] = solanaGameHistory.data.games.map(
+        (game: any) => {
+          const reward = parseFloat(game.reward || '0');
+          const claimable = !game.hasClaimed && game.gameEnded;
+
+          console.log(`🎮 Game ${game.gameId}:`, {
+            reward,
+            hasClaimed: game.hasClaimed,
+            gameEnded: game.gameEnded,
+            claimable,
+          });
+
+          return {
+            gameId: game.gameId,
+            score: game.score || 0,
+            reward: BigInt(0), // BSC字段，设为0
+            usdReward: BigInt(0), // BSC字段，设为0
+            nclabReward: BigInt(0), // BSC字段，设为0
+            hasClaimed: game.hasClaimed || false,
+            usdClaimed: false, // BSC字段
+            nclabClaimed: false, // BSC字段
+            usdClaimable: false, // BSC字段
+            nclabClaimable: false, // BSC字段
+            rank: game.rank || 1,
+            isWinner: game.isWinner || false,
+            timestamp: game.timestamp,
+            level: 0, // 默认低级别
+            // Solana特有字段
+            solanaReward: reward,
+            solanaClaimed: game.hasClaimed || false,
+            solanaClaimable: claimable,
+            rewardType: 'Solana',
+          };
+        },
+      );
+
+      setSolanaRewards(solanaRewardsData);
+      console.log(
+        `✅ Loaded ${solanaRewardsData.length} Solana rewards:`,
+        solanaRewardsData,
+      );
+    } else {
+      console.log('⚠️ Solana game history not ready or failed:', {
+        exists: !!solanaGameHistory,
+        success: solanaGameHistory?.success,
+        error: solanaGameHistory?.error,
+      });
+    }
+  }, [solanaGameHistory]);
 
   // 手动重试时重新获取数据
   useEffect(() => {
@@ -170,6 +325,211 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
       setClaimingGameId(null);
     }
   };
+
+  /**
+   * 测试钱包连接和服务器连接
+   */
+  const testWalletConnection = async () => {
+    console.log('🧪 Starting comprehensive connection test...');
+
+    // 1. 测试钱包状态
+    console.log('🔗 Wallet state:', {
+      connected: isConnected,
+      publicKey: publicKey?.toString(),
+      hasSignTransaction: !!signTransaction,
+      hasSendTransaction: !!sendTransaction,
+      hasSignAndSendTransaction: !!signAndSendTransaction,
+    });
+
+    if (!isConnected || !publicKey) {
+      console.error('❌ Wallet not connected');
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    // 2. 测试服务器连接
+    try {
+      console.log('🧪 Testing server connection...');
+      const serverUrl =
+        localStorage.getItem('selectedServer') || 'localhost:8000';
+      const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+      const pingUrl = `${protocol}://${serverUrl}/ping`;
+
+      console.log(`📡 Testing ping to: ${pingUrl}`);
+      const pingResponse = await fetch(pingUrl);
+
+      if (pingResponse.ok) {
+        const pingResult = await pingResponse.text();
+        console.log(`✅ Server ping successful: ${pingResult}`);
+      } else {
+        throw new Error(
+          `Ping failed: ${pingResponse.status} ${pingResponse.statusText}`,
+        );
+      }
+    } catch (error) {
+      console.error('❌ Server connection test failed:', error);
+      alert(
+        `Server connection failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return;
+    }
+
+    // 3. 测试Solana数据获取
+    try {
+      console.log('🧪 Testing Solana data fetch...');
+      await fetchSolanaRewards();
+      console.log('✅ Solana data fetch completed');
+    } catch (error) {
+      console.error('❌ Solana data fetch failed:', error);
+    }
+
+    // 4. 测试claim API
+    try {
+      console.log('🧪 Testing blockchain.claimGameReward function...');
+      console.log(
+        '📞 blockchain.claimGameReward type:',
+        typeof blockchain.claimGameReward,
+      );
+
+      // Test with game 518
+      await blockchain.claimGameReward(518);
+    } catch (error) {
+      console.error('❌ Claim test failed:', error);
+      alert(
+        `Claim test failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  };
+
+  /**
+   * 领取指定游戏的Solana奖励
+   */
+  const handleClaimSolanaReward = useCallback(
+    async (gameId: number) => {
+      const timestamp = Date.now();
+      const callId = `${gameId}-${timestamp}`;
+      console.log(
+        `🎯 [${callId}] handleClaimSolanaReward called for game ${gameId}`,
+      );
+      console.log(
+        `🔗 [${callId}] Address: ${address}, Connected: ${isConnected}`,
+      );
+      console.log(`🔒 [${callId}] Current claiming state: ${claimingGameId}`);
+      console.log(`📍 [${callId}] ActiveClaimRef: ${activeClaimRef.current}`);
+      console.log(
+        `🧵 [${callId}] Call stack:`,
+        new Error().stack?.split('\n').slice(1, 4),
+      );
+
+      // 三重防重复调用保护
+      if (globalClaimLock.current.has(gameId)) {
+        console.warn(
+          `⚠️ [${callId}] GLOBAL LOCK: Already claiming reward for game ${gameId}, ignoring duplicate call`,
+        );
+        return;
+      }
+
+      if (activeClaimRef.current === gameId) {
+        console.warn(
+          `⚠️ [${callId}] REF CHECK: Already claiming reward for game ${gameId}, ignoring duplicate call`,
+        );
+        return;
+      }
+
+      if (claimingGameId === gameId) {
+        console.warn(
+          `⚠️ [${callId}] STATE CHECK: Already claiming reward for game ${gameId}, ignoring duplicate call`,
+        );
+        return;
+      }
+
+      if (claimingGameId !== null || activeClaimRef.current !== null) {
+        const currentClaim = claimingGameId || activeClaimRef.current;
+        console.warn(
+          `⚠️ [${callId}] BUSY: Already claiming reward for game ${currentClaim}, please wait`,
+        );
+        alert(`Please wait, already claiming reward for game ${currentClaim}`);
+        return;
+      }
+
+      if (!address) {
+        console.error('❌ No wallet address available');
+        alert('Please connect your wallet first');
+        return;
+      }
+
+      try {
+        console.log(`🚀 [${callId}] Starting claim process for game ${gameId}`);
+
+        // 设置三重保护
+        globalClaimLock.current.add(gameId);
+        activeClaimRef.current = gameId;
+        setClaimingGameId(gameId);
+
+        console.log(`🔒 [${callId}] All locks set for game ${gameId}`);
+
+        console.log(`📞 Calling blockchain.claimGameReward(${gameId})`);
+        console.log(
+          '🔧 blockchain.claimGameReward function:',
+          blockchain.claimGameReward,
+        );
+
+        const result = await blockchain.claimGameReward(gameId);
+        console.log(`✅ Claim result:`, result);
+
+        // 刷新Solana奖励数据
+        console.log(`🔄 Refreshing Solana rewards data`);
+        await fetchSolanaRewards();
+
+        // 清除三重保护
+        globalClaimLock.current.delete(gameId);
+        activeClaimRef.current = null;
+        setClaimingGameId(null);
+        console.log(
+          `🎉 [${callId}] Claim process completed for game ${gameId}, all locks cleared`,
+        );
+
+        // 显示成功消息
+        alert(
+          `Successfully claimed reward for game ${gameId}! Transaction: ${result}`,
+        );
+      } catch (error) {
+        console.error(
+          `❌ Failed to claim Solana reward for game ${gameId}:`,
+          error,
+        );
+
+        // 提供更详细的错误信息
+        let errorMessage = 'Unknown error';
+        if (error instanceof Error) {
+          errorMessage = error.message;
+
+          // 检查常见错误类型
+          if (errorMessage.includes('User rejected')) {
+            errorMessage = 'Transaction was cancelled by user';
+          } else if (errorMessage.includes('insufficient funds')) {
+            errorMessage = 'Insufficient SOL for transaction fees';
+          } else if (errorMessage.includes('already withdrawn')) {
+            errorMessage = 'Reward has already been claimed';
+          } else if (errorMessage.includes('Network')) {
+            errorMessage =
+              'Network connection error. Please check your internet connection.';
+          }
+        }
+
+        alert(errorMessage);
+
+        // 清除三重保护
+        globalClaimLock.current.delete(gameId);
+        activeClaimRef.current = null;
+        setClaimingGameId(null);
+        console.log(
+          `💥 [${callId}] Claim failed for game ${gameId}, all locks cleared`,
+        );
+      }
+    },
+    [address, isConnected, claimingGameId, blockchain, fetchSolanaRewards],
+  );
 
   /**
    * 领取所有奖励
@@ -248,6 +608,29 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
     }
   }, [blockchain.isConfirmed, claimingGameId]);
 
+  // 合并BSC和Solana奖励，避免重复游戏ID
+  const solanaGameIds = new Set(solanaRewards.map((r) => r.gameId));
+  const filteredBscRewards = gameRewards.filter(
+    (r) => !solanaGameIds.has(r.gameId),
+  );
+  const allRewards = [...filteredBscRewards, ...solanaRewards];
+
+  console.log('🔍 Reward merge debug:', {
+    bscRewards: gameRewards.length,
+    solanaRewards: solanaRewards.length,
+    solanaGameIds: Array.from(solanaGameIds),
+    filteredBscRewards: filteredBscRewards.length,
+    totalRewards: allRewards.length,
+    // 详细的Solana奖励信息
+    solanaRewardsDetail: solanaRewards.map((r) => ({
+      gameId: r.gameId,
+      solanaReward: r.solanaReward,
+      solanaClaimable: r.solanaClaimable,
+      solanaClaimed: r.solanaClaimed,
+      rewardType: r.rewardType,
+    })),
+  });
+
   // 计算统计数据
   const totalRewards = gameRewards.reduce(
     (sum, reward) => sum + reward.reward,
@@ -259,8 +642,14 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
   const unclaimedNclabRewards = gameRewards
     .filter((reward) => reward.nclabClaimable)
     .reduce((sum, reward) => sum + reward.nclabReward, BigInt(0));
-  const totalGames = gameRewards.length;
-  const winCount = gameRewards.filter((reward) => reward.isWinner).length;
+
+  // Solana奖励统计
+  const unclaimedSolanaRewards = solanaRewards
+    .filter((reward) => reward.solanaClaimable)
+    .reduce((sum, reward) => sum + (reward.solanaReward || 0), 0);
+
+  const totalGames = allRewards.length;
+  const winCount = allRewards.filter((reward) => reward.isWinner).length;
   const winRate =
     totalGames > 0 ? ((winCount / totalGames) * 100).toFixed(1) : '0';
 
@@ -271,16 +660,52 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
   const claimableNclabCount = gameRewards.filter(
     (reward) => reward.nclabClaimable,
   ).length;
-  const claimableCount = claimableUsdCount + claimableNclabCount;
+  const claimableSolanaCount = solanaRewards.filter(
+    (reward) => reward.solanaClaimable,
+  ).length;
+  const claimableCount =
+    claimableUsdCount + claimableNclabCount + claimableSolanaCount;
   const claimableAmount = unclaimedUsdRewards + unclaimedNclabRewards;
 
   // 根据过滤条件过滤对局
-  const filteredRewards =
-    showFilter === 'claimable'
-      ? gameRewards.filter(
-          (reward) => reward.usdClaimable || reward.nclabClaimable,
-        )
-      : gameRewards;
+  const filteredRewards = (() => {
+    let result;
+    switch (showFilter) {
+      case 'claimable':
+        result = allRewards.filter(
+          (reward) =>
+            reward.usdClaimable ||
+            reward.nclabClaimable ||
+            reward.solanaClaimable,
+        );
+        break;
+      case 'BSC':
+        result = filteredBscRewards; // 使用过滤后的BSC奖励
+        break;
+      case 'Solana':
+        result = solanaRewards;
+        break;
+      default:
+        result = allRewards;
+        break;
+    }
+
+    console.log('🔍 Filtered rewards debug:', {
+      showFilter,
+      allRewardsCount: allRewards.length,
+      filteredResultCount: result.length,
+      filteredRewardsDetail: result.map((r) => ({
+        gameId: r.gameId,
+        rewardType: r.rewardType,
+        solanaReward: r.solanaReward,
+        solanaClaimable: r.solanaClaimable,
+        usdReward: r.usdReward?.toString(),
+        usdClaimable: r.usdClaimable,
+      })),
+    });
+
+    return result;
+  })();
 
   // 检查是否正在获取数据
   const isDataLoading = isLoading || playerData.isLoading;
@@ -357,13 +782,38 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
                     className={`filter-btn ${showFilter === 'all' ? 'active' : ''}`}
                     onClick={() => setShowFilter('all')}
                   >
-                    All Games ({totalGames})
+                    All ({totalGames})
                   </button>
                   <button
                     className={`filter-btn ${showFilter === 'claimable' ? 'active' : ''}`}
                     onClick={() => setShowFilter('claimable')}
                   >
                     Claimable ({claimableCount})
+                  </button>
+                  <button
+                    className={`filter-btn ${showFilter === 'BSC' ? 'active' : ''}`}
+                    onClick={() => setShowFilter('BSC')}
+                  >
+                    BSC ({filteredBscRewards.length})
+                  </button>
+                  <button
+                    className={`filter-btn ${showFilter === 'Solana' ? 'active' : ''}`}
+                    onClick={() => setShowFilter('Solana')}
+                  >
+                    Solana ({solanaRewards.length})
+                  </button>
+
+                  {/* 测试按钮 */}
+                  <button
+                    className="filter-btn"
+                    onClick={testWalletConnection}
+                    style={{
+                      backgroundColor: '#f59e0b',
+                      color: 'white',
+                      marginLeft: '10px',
+                    }}
+                  >
+                    🧪 Test Claim
                   </button>
                 </div>
 
@@ -471,33 +921,79 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
                           Score: {reward.score.toLocaleString()}
                         </span>
                         <div className="reward-amounts">
-                          <span
-                            className={`reward-amount ${reward.usdReward > BigInt(0) ? 'positive' : 'zero'}`}
-                          >
-                            💰{' '}
-                            {(
-                              Number(reward.usdReward) / LAMPORTS_PER_SOL
-                            ).toFixed(4)}{' '}
-                            SOL
-                          </span>
-                          {reward.nclabReward > BigInt(0) && (
+                          {reward.rewardType === 'Solana' ? (
+                            // Solana奖励显示
                             <span
-                              className={`reward-amount ${reward.nclabReward > BigInt(0) ? 'positive' : 'zero'}`}
+                              className={`reward-amount ${(reward.solanaReward || 0) > 0 ? 'positive' : 'zero'}`}
                             >
-                              ⚡{' '}
-                              {(
-                                Number(reward.nclabReward) / LAMPORTS_PER_SOL
-                              ).toFixed(4)}{' '}
-                              SPL
+                              🌟 {(reward.solanaReward || 0).toFixed(6)} SOL
                             </span>
+                          ) : (
+                            // BSC奖励显示
+                            <>
+                              <span
+                                className={`reward-amount ${reward.usdReward > BigInt(0) ? 'positive' : 'zero'}`}
+                              >
+                                💰{' '}
+                                {(
+                                  Number(reward.usdReward) / LAMPORTS_PER_SOL
+                                ).toFixed(4)}{' '}
+                                SOL
+                              </span>
+                              {reward.nclabReward > BigInt(0) && (
+                                <span
+                                  className={`reward-amount ${reward.nclabReward > BigInt(0) ? 'positive' : 'zero'}`}
+                                >
+                                  ⚡{' '}
+                                  {(
+                                    Number(reward.nclabReward) /
+                                    LAMPORTS_PER_SOL
+                                  ).toFixed(4)}{' '}
+                                  SPL
+                                </span>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
                     </div>
 
                     <div className="reward-actions">
-                      {reward.usdReward > BigInt(0) ||
-                      reward.nclabReward > BigInt(0) ? (
+                      {reward.rewardType === 'Solana' ? (
+                        // Solana奖励claim按钮
+                        (reward.solanaReward || 0) > 0 ? (
+                          <div className="claim-buttons">
+                            {reward.solanaClaimed ? (
+                              <span className="claimed-badge">
+                                🌟 Solana Claimed
+                              </span>
+                            ) : reward.solanaClaimable ? (
+                              <button
+                                className="claim-btn solana"
+                                onClick={() =>
+                                  handleClaimSolanaReward(reward.gameId)
+                                }
+                                disabled={
+                                  claimingGameId === reward.gameId ||
+                                  blockchain.isWritePending
+                                }
+                              >
+                                {claimingGameId === reward.gameId
+                                  ? 'Claiming...'
+                                  : '🌟 Claim SOL'}
+                              </button>
+                            ) : (
+                              <span className="not-claimable">
+                                🌟 SOL Not Claimable
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="no-reward">No reward</span>
+                        )
+                      ) : // BSC奖励claim按钮
+                      reward.usdReward > BigInt(0) ||
+                        reward.nclabReward > BigInt(0) ? (
                         <div className="claim-buttons">
                           {reward.usdReward > BigInt(0) &&
                             (reward.usdClaimed ? (

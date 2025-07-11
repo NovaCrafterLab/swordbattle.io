@@ -37,7 +37,16 @@ const validateTimestamp = (
 
 // Enhanced error messages for better user experience
 const getErrorMessage = (error: any): string => {
+  console.log('🔍 getErrorMessage processing error:', {
+    error,
+    errorType: typeof error,
+    isError: error instanceof Error,
+    errorMessage: error?.message,
+    errorToString: String(error),
+  });
+
   if (typeof error === 'string') return error;
+
   if (error instanceof Error) {
     // Common wallet errors
     if (error.message.includes('User rejected')) {
@@ -52,9 +61,29 @@ const getErrorMessage = (error: any): string => {
     if (error.message.includes('timeout')) {
       return 'Transaction timed out. Please try again';
     }
+    if (error.message.includes('Transaction failed')) {
+      return `Transaction failed: ${error.message}`;
+    }
     return error.message;
   }
-  return 'Unknown error occurred';
+
+  // Handle objects with message property
+  if (error && typeof error === 'object' && error.message) {
+    return String(error.message);
+  }
+
+  // Handle objects with err property (Solana confirmation errors)
+  if (error && typeof error === 'object' && error.err) {
+    return `Transaction confirmation failed: ${JSON.stringify(error.err)}`;
+  }
+
+  // Last resort: convert to string
+  const errorString = String(error);
+  if (errorString !== '[object Object]') {
+    return errorString;
+  }
+
+  return `Transaction error: ${JSON.stringify(error)}`;
 };
 export const useSolanaVault = () => {
   const wallet = useWallet();
@@ -68,16 +97,6 @@ export const useSolanaVault = () => {
     null;
 
   const { connection } = useConnection();
-
-  console.log('🔍 Wallet capabilities debug:', {
-    hasSignTransaction: !!signTransaction,
-    hasSendTransaction: !!sendTransaction,
-    hasSignAndSendTransaction: !!signAndSendTransaction,
-    walletName: wallet.wallet?.adapter?.name,
-    availableMethods: Object.keys(wallet).filter(
-      (key) => typeof (wallet as any)[key] === 'function',
-    ),
-  });
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -539,10 +558,304 @@ export const useSolanaVault = () => {
     connection,
   ]);
 
+  // Claim reward for a specific game
+  const claimReward = useCallback(
+    async (gameId: number): Promise<string> => {
+      console.log(`🎁 Starting claim reward for game ${gameId}...`);
+
+      if (isProcessing) {
+        console.log(
+          '⚠️ Transaction already in progress, ignoring duplicate call',
+        );
+        throw new Error('Transaction already in progress');
+      }
+
+      if (!publicKey) {
+        throw new Error('Wallet not connected');
+      }
+
+      // 检查钱包方法可用性
+      const hasSignAndSend = typeof signAndSendTransaction === 'function';
+      const hasSignAndSendSeparate =
+        typeof signTransaction === 'function' &&
+        typeof sendTransaction === 'function';
+
+      if (!hasSignAndSend && !hasSignAndSendSeparate) {
+        throw new Error('Wallet does not support required transaction methods');
+      }
+
+      console.log('🔍 Wallet methods available:', {
+        signAndSendTransaction: hasSignAndSend,
+        signTransaction: typeof signTransaction === 'function',
+        sendTransaction: typeof sendTransaction === 'function',
+        preferredMethod: hasSignAndSend
+          ? 'signAndSendTransaction'
+          : 'separate sign+send',
+      });
+
+      // 运行时验证钱包方法真的可用
+      console.log('🧪 Validating wallet methods...');
+      if (hasSignAndSend) {
+        try {
+          // 验证 signAndSendTransaction 是否真的可调用
+          if (typeof signAndSendTransaction !== 'function') {
+            throw new Error(
+              'signAndSendTransaction is not a function despite initial check',
+            );
+          }
+          console.log('✅ signAndSendTransaction validation passed');
+        } catch (validationError) {
+          console.error(
+            '❌ signAndSendTransaction validation failed:',
+            validationError,
+          );
+          throw new Error(
+            `Wallet validation failed: ${validationError instanceof Error ? validationError.message : String(validationError)}`,
+          );
+        }
+      } else {
+        try {
+          if (typeof signTransaction !== 'function') {
+            throw new Error('signTransaction is not a function');
+          }
+          if (typeof sendTransaction !== 'function') {
+            throw new Error('sendTransaction is not a function');
+          }
+          console.log('✅ signTransaction + sendTransaction validation passed');
+        } catch (validationError) {
+          console.error(
+            '❌ Separate method validation failed:',
+            validationError,
+          );
+          throw new Error(
+            `Wallet validation failed: ${validationError instanceof Error ? validationError.message : String(validationError)}`,
+          );
+        }
+      }
+
+      try {
+        // 立即设置处理状态，防止任何重复调用
+        setIsProcessing(true);
+        setError(null);
+        setTxStatus('building');
+
+        console.log(`🔒 Processing lock set for game ${gameId}`);
+
+        const serverUrl =
+          localStorage.getItem('selectedServer') || 'localhost:8000';
+        const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+        const fullUrl = `${protocol}://${serverUrl}/api/build-claim-transaction`;
+
+        console.log(`📡 Requesting claim transaction for game ${gameId}...`);
+        console.log(`🔗 Full request URL: ${fullUrl}`);
+        console.log(`📦 Request payload:`, {
+          gameId,
+          walletAddress: publicKey!.toString(),
+        });
+
+        // Step 1: Request claim transaction from server
+        const response = await fetch(fullUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
+            gameId,
+            walletAddress: publicKey!.toString(),
+          }),
+        }).catch((fetchError) => {
+          console.error(`❌ Network fetch error:`, fetchError);
+          if (
+            fetchError.name === 'TypeError' &&
+            fetchError.message.includes('fetch')
+          ) {
+            throw new Error(
+              `Network connection failed. Please check if the game server is running on ${fullUrl}`,
+            );
+          }
+          throw new Error(`Network error: ${fetchError.message}`);
+        });
+
+        console.log(
+          `📡 Response status: ${response.status} ${response.statusText}`,
+        );
+
+        if (!response.ok) {
+          let errorMessage = `Server request failed: ${response.status} ${response.statusText}`;
+          try {
+            const errorData = await response.text();
+            console.error(`❌ Server error response:`, errorData);
+            errorMessage += ` - ${errorData}`;
+          } catch (e) {
+            console.error(`❌ Could not read error response:`, e);
+          }
+          throw new Error(errorMessage);
+        }
+
+        const result = await response.json();
+        console.log(`📦 Server response data:`, result);
+        if (!result.success) {
+          throw new Error(`Claim request failed: ${result.error}`);
+        }
+
+        // Step 2: Deserialize and sign transaction
+        const transaction = Transaction.from(
+          Buffer.from(result.serializedTransaction, 'base64'),
+        );
+        setTxStatus('signing');
+
+        let txSignature: string;
+
+        // 使用预先确定的方法，避免运行时fallback导致双重弹窗
+        if (hasSignAndSend) {
+          console.log('🖊️ Using signAndSendTransaction method...');
+          try {
+            txSignature = await signAndSendTransaction!(transaction);
+            console.log('✅ Transaction signed and sent successfully');
+          } catch (error) {
+            console.error('❌ signAndSendTransaction failed with details:', {
+              error,
+              errorType: typeof error,
+              errorMessage:
+                error instanceof Error ? error.message : String(error),
+              errorStack: error instanceof Error ? error.stack : undefined,
+            });
+            // 直接抛出原始错误，不要包装
+            throw error;
+          }
+        } else {
+          console.log('🖊️ Using separate sign + send method...');
+          try {
+            console.log('📝 Step 1: Signing transaction...');
+            const signedTransaction = await signTransaction!(transaction);
+            console.log('✅ Transaction signed successfully');
+
+            console.log(
+              '📡 Step 2: Sending signed transaction via connection...',
+            );
+            setTxStatus('sending');
+
+            // 使用与buyTicket相同的发送方式：connection.sendRawTransaction + skipPreflight
+            txSignature = await connection.sendRawTransaction(
+              signedTransaction.serialize(),
+              {
+                skipPreflight: true, // Skip simulation to avoid errors
+                preflightCommitment: 'confirmed',
+              },
+            );
+            console.log('✅ Transaction sent successfully');
+          } catch (error) {
+            console.error('❌ Separate sign+send failed with details:', {
+              error,
+              errorType: typeof error,
+              errorMessage:
+                error instanceof Error ? error.message : String(error),
+              errorStack: error instanceof Error ? error.stack : undefined,
+            });
+            // 直接抛出原始错误，不要包装
+            throw error;
+          }
+        }
+
+        setCurrentTxHash(txSignature);
+        setTxStatus('confirming');
+        console.log(`✅ Claim transaction sent: ${txSignature}`);
+
+        // Step 3: Wait for confirmation
+        console.log('⏳ Waiting for transaction confirmation...');
+        try {
+          const latestBlockhash = await connection.getLatestBlockhash();
+          const confirmation = await connection.confirmTransaction(
+            {
+              signature: txSignature,
+              blockhash: latestBlockhash.blockhash,
+              lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+            },
+            'confirmed',
+          );
+
+          if (confirmation.value.err) {
+            console.error(
+              '❌ Transaction confirmation failed:',
+              confirmation.value.err,
+            );
+            throw new Error(
+              `Transaction failed on-chain: ${JSON.stringify(confirmation.value.err)}`,
+            );
+          }
+
+          console.log('✅ Transaction confirmed successfully');
+        } catch (confirmationError) {
+          console.error(
+            '❌ Transaction confirmation error:',
+            confirmationError,
+          );
+          // 即使确认失败，交易可能已经成功，所以记录transaction hash
+          console.log(`ℹ️ Transaction was sent with signature: ${txSignature}`);
+          console.log(
+            'ℹ️ You can check the transaction status on Solana Explorer',
+          );
+
+          // 重新抛出确认错误，但保留transaction signature信息
+          const confirmError =
+            confirmationError instanceof Error
+              ? confirmationError
+              : new Error(
+                  `Transaction confirmation failed: ${String(confirmationError)}`,
+                );
+
+          // 添加transaction signature到错误信息中
+          confirmError.message += ` (TX: ${txSignature})`;
+          throw confirmError;
+        }
+
+        setTxStatus('completed');
+        console.log(
+          `🎉 Reward claimed successfully for game ${gameId} - TX: ${txSignature}`,
+        );
+        return txSignature;
+      } catch (error) {
+        console.error(`❌ Failed to claim reward for game ${gameId}:`, error);
+        console.error('❌ Error details:', {
+          error,
+          errorType: typeof error,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorName: error instanceof Error ? error.name : undefined,
+          errorStack: error instanceof Error ? error.stack : undefined,
+        });
+
+        // 使用与buyTicket相同的错误处理模式
+        const userFriendlyMessage = getErrorMessage(error);
+        const enhancedError = new Error(userFriendlyMessage);
+        enhancedError.cause = error; // 保留原始错误用于调试
+
+        setError(enhancedError);
+        setTxStatus('idle');
+        console.log(
+          `🔓 Processing lock released for game ${gameId} due to error: ${enhancedError.message}`,
+        );
+        throw enhancedError;
+      } finally {
+        setIsProcessing(false);
+        console.log(`🔓 Processing lock finally released for game ${gameId}`);
+      }
+    },
+    [
+      publicKey,
+      signAndSendTransaction,
+      signTransaction,
+      sendTransaction,
+      connection,
+      isProcessing,
+    ],
+  );
+
   return {
     buyTicket,
     hasTicket,
     getVaultInfo,
+    claimReward, // Add claim reward method
     testWalletConnection, // Add test function
     isLoading,
     isProcessing, // 暴露处理状态
