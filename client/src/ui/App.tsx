@@ -393,7 +393,7 @@ function App() {
   }, [loadingProgress]);
 
   const openRewards = () => {
-    setModal(<RewardsModal onClose={closeModal} />);
+    setModal(<RewardsModal onClose={() => setModal(null)} />);
   };
 
   const isLoaded = loadingProgress === 100;
