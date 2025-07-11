@@ -811,9 +811,20 @@ export enum ClaimType {
  */
 export const useBlockchain = () => {
   // Solana hooks
-  const { publicKey, connected } = useWallet();
+  const { publicKey, connected, signTransaction, sendTransaction } =
+    useWallet();
   const { connection } = useConnection();
   const solanaVault = useSolanaVault();
+
+  // 调试钱包状态
+  useEffect(() => {
+    console.log('🔗 useBlockchain wallet state:', {
+      connected,
+      publicKey: publicKey?.toString(),
+      hasSignTransaction: !!signTransaction,
+      hasSendTransaction: !!sendTransaction,
+    });
+  }, [connected, publicKey, signTransaction, sendTransaction]);
 
   // Return Solana wallet state
   const isConnected = connected;
@@ -1023,14 +1034,38 @@ export const useBlockchain = () => {
     );
   }, []);
 
-  // Reward claiming - placeholder implementations
+  // Reward claiming - Solana implementation
   const claimGameReward = useCallback(
-    (gameId: number, claimType: ClaimType = ClaimType.ALL) => {
+    async (gameId: number, claimType: ClaimType = ClaimType.ALL) => {
+      if (!isConnected || !address || !publicKey) {
+        throw new Error('Wallet not connected');
+      }
+
       console.log(
-        `💰 Claiming Solana rewards for game ${gameId}, type ${claimType} - TODO: implement`,
+        `💰 Claiming Solana rewards for game ${gameId}, type ${claimType}`,
       );
+
+      try {
+        // Check if vault is configured
+        if (!solanaVault.isVaultConfigured) {
+          throw new Error(
+            'Vault program not configured. Please set REACT_APP_VAULT_PROGRAM_ID environment variable.',
+          );
+        }
+
+        // Use Solana vault to claim reward
+        const result = await solanaVault.claimReward(gameId);
+
+        console.log(
+          `✅ Reward claimed successfully for game ${gameId} - TX: ${result}`,
+        );
+        return result;
+      } catch (error) {
+        console.error(`❌ Failed to claim reward for game ${gameId}:`, error);
+        throw error;
+      }
     },
-    [],
+    [isConnected, address, publicKey, solanaVault],
   );
 
   const claimAllPlayerRewards = useCallback(

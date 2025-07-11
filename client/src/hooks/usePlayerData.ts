@@ -637,10 +637,10 @@ export const usePlayerData = () => {
   useEffect(() => {
     if (!address) return;
 
-    // 设置定期刷新间隔（每30秒）
+    // 设置定期刷新间隔（每120秒，减少API调用频率）
     const syncInterval = setInterval(() => {
       refreshPlayerData();
-    }, 30000); // 30秒
+    }, 120000); // 120秒 (从30秒优化为120秒)
 
     // 组件卸载时清除定时器
     return () => {

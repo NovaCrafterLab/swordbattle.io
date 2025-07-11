@@ -35,6 +35,9 @@ module.exports = {
   // API endpoint for the server to communicate with the API service
   apiEndpoint: process.env.API_ENDPOINT || 'http://localhost:8080',
 
+  // Enable/disable database save (temporary flag to bypass API issues)
+  enableDatabaseSave: process.env.ENABLE_DATABASE_SAVE !== 'false',
+
   // ReCAPTCHA secret key for verifying ReCAPTCHA responses
   recaptchaSecretKey: process.env.RECAPTCHA_SECRET_KEY,
 
@@ -48,7 +51,7 @@ module.exports = {
 
   // Server type configuration
   serverType: process.env.SERVER_TYPE || 'NORMAL',
-  isRaceServer: process.env.SERVER_TYPE === 'RACE',
+  isRaceServer: process.env.SERVER_TYPE === 'RACE' || isDev, // Enable race server in dev mode
   enableCycleRestart: process.env.ENABLE_CYCLE_RESTART === 'true',
 
   // Solana configuration - replaces BSC blockchain

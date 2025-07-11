@@ -1287,6 +1287,33 @@ class Game {
         console.log(
           `✅ Solana game finalized successfully with tier ${tier} - ${result.rewardsDistributed} rewards set`,
         );
+
+        // 🎯 新增：保存游戏结果到数据库
+        if (config.apiEndpoint) {
+          try {
+            await this.saveGameResultsToDatabase(
+              killRewards,
+              this.solanaGameId,
+            );
+            console.log(`💾 Game results saved to database successfully`);
+          } catch (dbError) {
+            console.error(
+              `⚠️ Database save failed but blockchain operations completed:`,
+              dbError.message,
+            );
+            Logger.game.error(
+              'Database save failed after successful blockchain finalization',
+              {
+                gameId: this.solanaGameId,
+                error: dbError.message,
+              },
+            );
+            // 不抛出错误，让区块链操作成功完成
+          }
+        } else {
+          console.log(`⚠️ Database save skipped - API endpoint not configured`);
+        }
+
         return result;
       } else {
         throw new Error('VaultSDK finalizeGame failed');
@@ -1692,83 +1719,11 @@ class Game {
       }, 5000);
     }
 
-    // 保存成功的游戏数据到数据库（不影响区块链操作）
-    if (gameDataForDatabase.length > 0) {
-      try {
-        console.log(
-          `💾 Attempting to save ${gameDataForDatabase.length} game records to database...`,
-        );
-        await this.saveGameDataToDatabase(gameDataForDatabase);
-        console.log(`✅ Game data saved to database successfully`);
-
-        // 🎯 新增：启动异步延迟更新任务，传递当前游戏ID
-        this.scheduleBlockchainRewardUpdate(
-          gameDataForDatabase,
-          this.blockchainGameId,
-        );
-      } catch (dbError) {
-        console.error(
-          `❌ Database save failed but blockchain operations continue:`,
-          dbError.message,
-        );
-        console.error(`   Error type: ${dbError.constructor.name}`);
-
-        // 检查特定错误类型并提供建议
-        if (dbError.message.includes('403')) {
-          console.error(
-            `   💡 Check SERVER_SECRET configuration: ${config.serverSecret ? 'SET' : 'NOT_SET'}`,
-          );
-          console.error(`   💡 Check API endpoint: ${config.apiEndpoint}`);
-        }
-
-        // 尝试在本地记录未保存的数据供后续处理
-        console.log(`📝 Unsaved game data for manual recovery:`);
-        console.log(JSON.stringify(gameDataForDatabase, null, 2));
-
-        // 不抛出错误，让区块链游戏结束流程继续
-      }
-    } else {
-      console.log(
-        `⚠️ No game data to save to database (${successfulSubmissions} successful blockchain submissions)`,
-      );
-    }
-  }
-
-  /**
-   * 保存游戏数据到数据库
-   */
-  async saveGameDataToDatabase(gameDataArray) {
-    try {
-      const response = await fetch(
-        `${config.apiEndpoint}/race-games/save-batch`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${config.serverSecret}`, // 服务器认证
-          },
-          body: JSON.stringify({
-            games: gameDataArray,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to save game data');
-      }
-
-      console.log(`💾 Database save response:`, result);
-      return result.data;
-    } catch (error) {
-      console.error('❌ Error saving game data to database:', error);
-      throw error;
-    }
+    // 🎯 注意：数据库保存现在通过Solana游戏结束流程处理
+    // 不再在BSC score submission中处理数据库保存
+    console.log(
+      `⚠️ BSC database save removed - data will be saved through Solana finalize flow`,
+    );
   }
 
   /**
@@ -2334,6 +2289,73 @@ class Game {
       tokenMint: tokenMint,
       tokenInfo: tokenInfo,
     };
+  }
+
+  /**
+   * 保存Solana游戏结果到数据库
+   * @param {Map} killRewards - 玩家击杀奖励Map
+   * @param {number} gameId - 游戏ID
+   */
+  async saveGameResultsToDatabase(killRewards, gameId) {
+    const config = require('../config');
+
+    console.log(
+      `💾 Saving ${killRewards.size} game records to database for game ${gameId}`,
+    );
+
+    // 转换killRewards Map为API期望的格式
+    const gameRecords = Array.from(killRewards.values()).map((reward) => ({
+      gameId: parseInt(gameId),
+      playerAddress: reward.walletAddress,
+      score: reward.kills * 100, // 简单的分数计算
+      rewardAmount: reward.rewardSOL.toString(),
+      hasClaimed: false,
+      rank: 1, // TODO: 实现真实排名逻辑
+      isWinner: reward.kills > 0,
+      gameEnded: true,
+      gameEndedAt: new Date().toISOString(),
+    }));
+
+    // 动态导入fetch (Node.js 18+兼容性)
+    let fetch;
+    try {
+      fetch = (await import('node-fetch')).default;
+    } catch (error) {
+      // Node.js 18+ 内置fetch
+      fetch = globalThis.fetch;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+
+    try {
+      const response = await fetch(
+        `${config.apiEndpoint}/race-games/save-batch`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${config.serverSecret}`,
+          },
+          body: JSON.stringify({ games: gameRecords }),
+          signal: controller.signal,
+        },
+      );
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ Database save response:`, result);
+
+      return result;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
   }
 }
 

@@ -76,6 +76,9 @@ async function bootstrap() {
   const game = new Game();
   const server = new Server(game);
 
+  // Make game instance globally accessible
+  global.currentGame = game;
+
   // Attach Solana vault service to game instance (might be null if init failed)
   game.solanaVaultService = global.solanaVaultService;
 
@@ -2537,11 +2540,21 @@ async function processVerifyBuyTicketTransaction(
 }
 
 // Build claim reward transaction API
+app.options('/api/build-claim-transaction', (res) => {
+  res.onAborted(() => {
+    console.warn('Build-claim-transaction OPTIONS request aborted by client');
+  });
+  setCors(res);
+  res.end();
+});
 app.post('/api/build-claim-transaction', async (res, req) => {
   // Register abort handler FIRST
   res.onAborted(() => {
     console.warn('Build claim transaction request aborted by client');
   });
+
+  setCors(res);
+  res.writeHeader('Content-Type', 'application/json');
 
   let hasResponded = false;
   const timeout = setTimeout(() => {
@@ -2578,6 +2591,11 @@ app.post('/api/build-claim-transaction', async (res, req) => {
     }
   }
 });
+
+// Helper function to get current game instance
+function getCurrentGame() {
+  return global.currentGame || null;
+}
 
 async function handleClaimTransactionRequest(body, res, hasResponded, timeout) {
   try {
@@ -2665,255 +2683,3 @@ async function handleClaimTransactionRequest(body, res, hasResponded, timeout) {
     }
   }
 }
-
-// Get Solana game history API
-app.get('/api/solana-game-history/:walletAddress', async (res, req) => {
-  // Register abort handler FIRST
-  res.onAborted(() => {
-    console.warn('Solana game history request aborted by client');
-  });
-
-  try {
-    const walletAddress = req.getParameter(0);
-
-    if (!walletAddress) {
-      res.writeStatus('400 Bad Request').end(
-        JSON.stringify({
-          success: false,
-          error: 'Wallet address is required',
-        }),
-      );
-      return;
-    }
-
-    console.log(`🔍 Getting Solana game history for wallet: ${walletAddress}`);
-
-    // Get game instance
-    const game = getGameInstance();
-    if (
-      !game ||
-      !game.solanaVaultService ||
-      !game.solanaVaultService.vaultSDK
-    ) {
-      res.writeStatus('503 Service Unavailable').end(
-        JSON.stringify({
-          success: false,
-          error: 'Solana vault service not available',
-        }),
-      );
-      return;
-    }
-
-    const gameHistory = [];
-
-    try {
-      // Get all finalized games
-      const allGames =
-        await game.solanaVaultService.vaultSDK.getFinalizedGames();
-
-      for (const gameInfo of allGames) {
-        try {
-          const gameId = parseInt(gameInfo.gameId);
-
-          // Check if this player has a ticket for this game
-          const playerTicket =
-            await game.solanaVaultService.vaultSDK.getUserTicketAccount(
-              gameId,
-              new (await import('@solana/web3.js')).PublicKey(walletAddress),
-            );
-
-          if (playerTicket) {
-            // Get reward map to see if player has rewards
-            const rewardMap =
-              await game.solanaVaultService.vaultSDK.getRewardMapAccount(
-                gameId,
-              );
-
-            let playerReward = null;
-            if (rewardMap && rewardMap.rewards) {
-              playerReward = rewardMap.rewards.find(
-                (reward) => reward.user.toString() === walletAddress,
-              );
-            }
-
-            const gameHistoryEntry = {
-              gameId: gameId,
-              ticketAmount: playerTicket.amount,
-              hasWithdrawn: playerTicket.hasWithdrawn,
-              hasReward: !!playerReward,
-              rewardAmount: playerReward ? playerReward.amount : '0',
-              rewardSOL: playerReward
-                ? (parseInt(playerReward.amount) / 1e9).toFixed(6)
-                : '0.000000',
-              canClaim: !!playerReward && !playerTicket.hasWithdrawn,
-              gameFinalized: gameInfo.finalized,
-              tokenMint: gameInfo.tokenMint.toString(),
-            };
-
-            gameHistory.push(gameHistoryEntry);
-          }
-        } catch (gameError) {
-          console.warn(
-            `Error processing game ${gameInfo.gameId}:`,
-            gameError.message,
-          );
-          // Continue with other games
-        }
-      }
-
-      // Sort by game ID descending (newest first)
-      gameHistory.sort((a, b) => b.gameId - a.gameId);
-
-      console.log(
-        `✅ Found ${gameHistory.length} games for wallet ${walletAddress}`,
-      );
-
-      res.writeStatus('200 OK').end(
-        JSON.stringify({
-          success: true,
-          gameHistory,
-          walletAddress,
-          totalGames: gameHistory.length,
-          claimableGames: gameHistory.filter((game) => game.canClaim).length,
-          totalClaimableSOL: gameHistory
-            .filter((game) => game.canClaim)
-            .reduce((sum, game) => sum + parseFloat(game.rewardSOL), 0)
-            .toFixed(6),
-        }),
-      );
-    } catch (serviceError) {
-      console.error('Error querying Solana game history:', serviceError);
-      res.writeStatus('500 Internal Server Error').end(
-        JSON.stringify({
-          success: false,
-          error: 'Failed to query game history: ' + serviceError.message,
-        }),
-      );
-    }
-  } catch (error) {
-    console.error('Error in Solana game history API:', error);
-    res.writeStatus('500 Internal Server Error').end(
-      JSON.stringify({
-        success: false,
-        error: 'Internal server error: ' + error.message,
-      }),
-    );
-  }
-});
-
-// Check single game reward status API
-app.get('/api/solana-game-reward/:gameId/:walletAddress', async (res, req) => {
-  // Register abort handler FIRST
-  res.onAborted(() => {
-    console.warn('Solana game reward check request aborted by client');
-  });
-
-  try {
-    const gameId = parseInt(req.getParameter(0));
-    const walletAddress = req.getParameter(1);
-
-    if (!gameId || !walletAddress) {
-      res.writeStatus('400 Bad Request').end(
-        JSON.stringify({
-          success: false,
-          error: 'Game ID and wallet address are required',
-        }),
-      );
-      return;
-    }
-
-    console.log(
-      `🔍 Checking reward for game ${gameId}, wallet: ${walletAddress}`,
-    );
-
-    // Get game instance
-    const game = getGameInstance();
-    if (
-      !game ||
-      !game.solanaVaultService ||
-      !game.solanaVaultService.vaultSDK
-    ) {
-      res.writeStatus('503 Service Unavailable').end(
-        JSON.stringify({
-          success: false,
-          error: 'Solana vault service not available',
-        }),
-      );
-      return;
-    }
-
-    try {
-      // Check if player has a ticket for this game
-      const playerTicket =
-        await game.solanaVaultService.vaultSDK.getUserTicketAccount(
-          gameId,
-          new (await import('@solana/web3.js')).PublicKey(walletAddress),
-        );
-
-      if (!playerTicket) {
-        res.writeStatus('404 Not Found').end(
-          JSON.stringify({
-            success: false,
-            error: 'No ticket found for this game',
-            hasTicket: false,
-          }),
-        );
-        return;
-      }
-
-      // Get reward map to see if player has rewards
-      const rewardMap =
-        await game.solanaVaultService.vaultSDK.getRewardMapAccount(gameId);
-
-      let playerReward = null;
-      if (rewardMap && rewardMap.rewards) {
-        playerReward = rewardMap.rewards.find(
-          (reward) => reward.user.toString() === walletAddress,
-        );
-      }
-
-      const rewardStatus = {
-        gameId: gameId,
-        walletAddress: walletAddress,
-        hasTicket: true,
-        ticketAmount: playerTicket.amount,
-        hasWithdrawn: playerTicket.hasWithdrawn,
-        hasReward: !!playerReward,
-        rewardAmount: playerReward ? playerReward.amount : '0',
-        rewardSOL: playerReward
-          ? (parseInt(playerReward.amount) / 1e9).toFixed(6)
-          : '0.000000',
-        canClaim: !!playerReward && !playerTicket.hasWithdrawn,
-      };
-
-      console.log(`✅ Reward status for game ${gameId}:`, {
-        hasReward: rewardStatus.hasReward,
-        canClaim: rewardStatus.canClaim,
-        rewardSOL: rewardStatus.rewardSOL,
-      });
-
-      res.writeStatus('200 OK').end(
-        JSON.stringify({
-          success: true,
-          rewardStatus,
-        }),
-      );
-    } catch (serviceError) {
-      console.error('Error checking game reward:', serviceError);
-      res.writeStatus('500 Internal Server Error').end(
-        JSON.stringify({
-          success: false,
-          error: 'Failed to check game reward: ' + serviceError.message,
-        }),
-      );
-    }
-  } catch (error) {
-    console.error('Error in Solana game reward API:', error);
-    res.writeStatus('500 Internal Server Error').end(
-      JSON.stringify({
-        success: false,
-        error: 'Internal server error: ' + error.message,
-      }),
-    );
-  }
-});

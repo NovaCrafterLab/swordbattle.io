@@ -1,9 +1,10 @@
 import * as anchor from '@coral-xyz/anchor';
-import { PublicKey, SystemProgram } from '@solana/web3.js';
+import { PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
 import {
   getAssociatedTokenAddress,
   getOrCreateAssociatedTokenAccount,
   createAssociatedTokenAccountInstruction,
+  getAccount,
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
@@ -274,14 +275,6 @@ export class VaultSDK {
     const { vault } = this.getVaultPdas(params.gameId);
     const rewardMap = this.getRewardMapPda(params.gameId);
 
-    console.log('🔧 Finalizing game with accounts:', {
-      gameId: params.gameId,
-      vault: vault.toString(),
-      rewardMap: rewardMap.toString(),
-      authority: this.wallet.publicKey.toString(),
-      rewardCount: params.rewards.length,
-    });
-
     const tx = await this.program.methods
       .finalizeGame(
         params.rewards.map((reward: RewardEntry) => ({
@@ -291,13 +284,10 @@ export class VaultSDK {
       )
       .accounts({
         vault: vault,
-        rewardMap: rewardMap,
         authority: this.wallet.publicKey,
-        systemProgram: anchor.web3.SystemProgram.programId,
       })
       .rpc();
 
-    console.log('✅ Game finalized successfully, tx:', tx);
     return tx;
   }
 
@@ -1344,67 +1334,59 @@ export class VaultSDK {
    */
   async buildClaimTransaction(params: {
     gameId: number;
-    walletAddress: string;
-  }): Promise<{ transaction: string }> {
+    userPublicKey: PublicKey;
+  }): Promise<Transaction> {
     console.log('🔧 Building claim reward transaction:', params);
 
-    const userPublicKey = new PublicKey(params.walletAddress);
     const { vault, vaultSigner } = this.getVaultPdas(params.gameId);
-    const userTicket = this.getUserTicketPda(params.gameId, userPublicKey);
+    const userTicket = this.getUserTicketPda(
+      params.gameId,
+      params.userPublicKey,
+    );
     const rewardMap = this.getRewardMapPda(params.gameId);
 
     // Get vault account to determine token mint
     const vaultAccount = await this.program.account.gameVault.fetch(vault);
     const tokenMint = vaultAccount.tokenMint as PublicKey;
 
-    console.log('🪙 Token mint:', tokenMint.toString());
+    console.log('🪙 Token mint for claim:', tokenMint.toString());
 
     // Get vault token account
     const vaultToken = await getAssociatedTokenAddress(
       tokenMint,
       vault,
-      true, // allowOwnerOffCurve
+      true, // allowOwnerOffCurve for PDA
     );
 
     // Get user token account
     const userTokenAccount = await getAssociatedTokenAddress(
       tokenMint,
-      userPublicKey,
-      false, // allowOwnerOffCurve = false for user accounts
+      params.userPublicKey,
+      false,
     );
 
-    // Check if user's token account exists
-    let needsUserATACreation = false;
+    console.log('🔧 Claim transaction accounts:', {
+      vault: vault.toString(),
+      userTicket: userTicket.toString(),
+      rewardMap: rewardMap.toString(),
+      vaultToken: vaultToken.toString(),
+      userTokenAccount: userTokenAccount.toString(),
+      user: params.userPublicKey.toString(),
+    });
+
+    // Create transaction
+    const transaction = new Transaction();
+
+    // Check if user token account exists, create if needed
     try {
-      const accountInfo =
-        await this.connection.getAccountInfo(userTokenAccount);
-      if (accountInfo === null) {
-        console.log('⚠️ User token account does not exist, will create ATA');
-        needsUserATACreation = true;
-      } else {
-        console.log(
-          '✅ User token account exists:',
-          userTokenAccount.toString(),
-        );
-      }
+      await getAccount(this.connection, userTokenAccount);
+      console.log('✅ User token account exists');
     } catch (error) {
-      console.log(
-        '⚠️ Error checking user token account, will create ATA:',
-        error,
-      );
-      needsUserATACreation = true;
-    }
-
-    // Create a new transaction
-    const transaction = new anchor.web3.Transaction();
-
-    // Add user ATA creation instruction if needed
-    if (needsUserATACreation) {
-      console.log('🔨 Adding user ATA creation instruction');
+      console.log('🔨 Adding user ATA creation instruction for claim');
       const createUserATAInstruction = createAssociatedTokenAccountInstruction(
-        userPublicKey, // payer
+        params.userPublicKey, // payer
         userTokenAccount, // ata
-        userPublicKey, // owner
+        params.userPublicKey, // owner
         tokenMint, // mint
         TOKEN_PROGRAM_ID,
         ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -1421,115 +1403,27 @@ export class VaultSDK {
         rewardMap: rewardMap,
         vaultToken: vaultToken,
         userToken: userTokenAccount,
-        user: userPublicKey,
+        vaultSigner: vaultSigner,
+        user: params.userPublicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
       } as any)
       .instruction();
 
     // Add the claim reward instruction
     transaction.add(claimRewardInstruction);
 
-    // Get the most recent blockhash with confirmed commitment
-    console.log('🔄 Getting latest blockhash for transaction...');
-    const { blockhash, lastValidBlockHeight } =
-      await this.connection.getLatestBlockhash('confirmed');
+    // Get the most recent blockhash
+    console.log('🔄 Getting latest blockhash for claim transaction...');
+    const { blockhash } = await this.connection.getLatestBlockhash('confirmed');
     transaction.recentBlockhash = blockhash;
-    transaction.feePayer = userPublicKey;
+    transaction.feePayer = params.userPublicKey;
 
     console.log(
       '🔧 Claim transaction built with',
       transaction.instructions.length,
       'instructions',
     );
-    console.log('🔧 Blockhash details:', {
-      blockhash: blockhash.substring(0, 8) + '...',
-      lastValidBlockHeight,
-      feePayer: userPublicKey.toString(),
-    });
 
-    // Serialize transaction
-    const serializedTx = transaction.serialize({
-      requireAllSignatures: false,
-      verifySignatures: false,
-    });
-
-    return {
-      transaction: serializedTx.toString('base64'),
-    };
-  }
-
-  /**
-   * Verify claim reward transaction for secure frontend flow
-   */
-  async verifyClaimTransaction(params: {
-    gameId: number;
-    txSignature: string;
-    walletAddress: string;
-  }): Promise<{ success: boolean; details: any }> {
-    console.log('🔍 Verifying claim reward transaction:', params);
-
-    try {
-      // Get transaction details from blockchain
-      const txInfo = await this.connection.getTransaction(params.txSignature, {
-        commitment: 'confirmed',
-        maxSupportedTransactionVersion: 0,
-      });
-
-      if (!txInfo) {
-        return {
-          success: false,
-          details: { error: 'Transaction not found on blockchain' },
-        };
-      }
-
-      if (txInfo.meta?.err) {
-        return {
-          success: false,
-          details: { error: 'Transaction failed', txError: txInfo.meta.err },
-        };
-      }
-
-      // Verify transaction contains expected program interaction
-      const { vault } = this.getVaultPdas(params.gameId);
-
-      // Check if transaction interacted with our program and vault
-      const programInteraction = txInfo.transaction.message.accountKeys.some(
-        (key: any) => key.equals(this.program.programId),
-      );
-
-      const vaultInteraction = txInfo.transaction.message.accountKeys.some(
-        (key: any) => key.equals(vault),
-      );
-
-      if (!programInteraction || !vaultInteraction) {
-        return {
-          success: false,
-          details: {
-            error: 'Transaction does not interact with expected program/vault',
-            programInteraction,
-            vaultInteraction,
-          },
-        };
-      }
-
-      return {
-        success: true,
-        details: {
-          txSignature: params.txSignature,
-          slot: txInfo.slot,
-          blockTime: txInfo.blockTime,
-          fee: txInfo.meta?.fee,
-        },
-      };
-    } catch (error) {
-      console.error('Error verifying claim transaction:', error);
-      return {
-        success: false,
-        details: {
-          error: error instanceof Error ? error.message : String(error),
-        },
-      };
-    }
+    return transaction;
   }
 }
