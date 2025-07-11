@@ -1,13 +1,12 @@
 // Solana blockchain interaction hook
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { LAMPORTS_PER_SOL, PublicKey, Transaction } from '@solana/web3.js';
+import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import {
   getAssociatedTokenAddress,
   getAccount,
   getMint,
 } from '@solana/spl-token';
-import { useQueryClient } from '@tanstack/react-query';
 import { useSolanaVault } from './useSolanaVault';
 
 // Separate custom hooks to avoid rules of hooks violations
@@ -812,11 +811,9 @@ export enum ClaimType {
  */
 export const useBlockchain = () => {
   // Solana hooks
-  const { publicKey, connected, signTransaction, sendTransaction } =
-    useWallet();
+  const { publicKey, connected } = useWallet();
   const { connection } = useConnection();
   const solanaVault = useSolanaVault();
-  const queryClient = useQueryClient();
 
   // Return Solana wallet state
   const isConnected = connected;
@@ -1026,78 +1023,21 @@ export const useBlockchain = () => {
     );
   }, []);
 
-  // Solana reward claiming implementations
+  // Reward claiming - placeholder implementations
   const claimGameReward = useCallback(
-    async (gameId: number, claimType: ClaimType = ClaimType.ALL) => {
-      if (!publicKey || !signTransaction || !sendTransaction) {
-        throw new Error('Wallet not connected');
-      }
-
-      try {
-        console.log(`💰 Claiming Solana rewards for game ${gameId}...`);
-
-        // Call server to build claim transaction
-        const serverUrl =
-          localStorage.getItem('selectedServer') || 'localhost:8000';
-        const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
-
-        const response = await fetch(
-          `${protocol}://${serverUrl}/api/build-claim-transaction`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              gameId,
-              walletAddress: publicKey.toString(),
-            }),
-          },
-        );
-
-        if (!response.ok) {
-          throw new Error(
-            `Failed to build claim transaction: ${response.statusText}`,
-          );
-        }
-
-        const { serializedTransaction } = await response.json();
-
-        // Deserialize and sign transaction
-        const transaction = Transaction.from(
-          Buffer.from(serializedTransaction, 'base64'),
-        );
-        const signedTransaction = await signTransaction(transaction);
-
-        // Send transaction
-        const txSignature = await sendTransaction(
-          signedTransaction,
-          connection,
-        );
-
-        console.log(`✅ Claim transaction sent: ${txSignature}`);
-
-        // Wait for confirmation
-        await connection.confirmTransaction(txSignature, 'confirmed');
-
-        console.log(`🎉 Successfully claimed rewards for game ${gameId}`);
-
-        // Refresh player data
-        queryClient.invalidateQueries({ queryKey: ['playerDashboard'] });
-
-        return txSignature;
-      } catch (error) {
-        console.error('Failed to claim game reward:', error);
-        throw error;
-      }
+    (gameId: number, claimType: ClaimType = ClaimType.ALL) => {
+      console.log(
+        `💰 Claiming Solana rewards for game ${gameId}, type ${claimType} - TODO: implement`,
+      );
     },
-    [publicKey, signTransaction, sendTransaction, connection, queryClient],
+    [],
   );
 
   const claimAllPlayerRewards = useCallback(
-    async (claimType: ClaimType = ClaimType.ALL, maxGames: number = 25) => {
+    (claimType: ClaimType = ClaimType.ALL, maxGames: number = 25) => {
       console.log(
-        `💰 Claiming all Solana rewards - feature not yet implemented for batch claims`,
+        `💰 Claiming all Solana rewards, type ${claimType}, max ${maxGames} games - TODO: implement`,
       );
-      // TODO: Implement batch claiming if needed
     },
     [],
   );
@@ -1128,99 +1068,6 @@ export const useBlockchain = () => {
       claimAllPlayerRewards(ClaimType.SPL_ONLY, maxGames);
     },
     [claimAllPlayerRewards],
-  );
-
-  // Solana game history and rewards query hooks
-  const useSolanaGameHistory = useCallback((walletAddress: string) => {
-    // Create a custom hook that can be used by components
-    return {
-      queryKey: ['solanaGameHistory', walletAddress],
-      queryFn: async () => {
-        if (!walletAddress) {
-          throw new Error('Wallet address is required');
-        }
-
-        const serverUrl =
-          localStorage.getItem('selectedServer') || 'localhost:8000';
-        const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
-
-        console.log(`🔍 Fetching Solana game history for: ${walletAddress}`);
-
-        const response = await fetch(
-          `${protocol}://${serverUrl}/api/solana-game-history/${walletAddress}`,
-        );
-
-        if (!response.ok) {
-          throw new Error(
-            `Failed to fetch game history: ${response.statusText}`,
-          );
-        }
-
-        const data = await response.json();
-
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to fetch game history');
-        }
-
-        console.log(
-          `✅ Loaded ${data.gameHistory.length} Solana games for ${walletAddress}`,
-        );
-
-        return data;
-      },
-      enabled: !!walletAddress,
-      staleTime: 30000, // 30 seconds
-      retry: 2,
-    };
-  }, []);
-
-  const useSolanaGameReward = useCallback(
-    (gameId: number, walletAddress: string) => {
-      // Create a custom hook that can be used by components
-      return {
-        queryKey: ['solanaGameReward', gameId, walletAddress],
-        queryFn: async () => {
-          if (!gameId || !walletAddress) {
-            throw new Error('Game ID and wallet address are required');
-          }
-
-          const serverUrl =
-            localStorage.getItem('selectedServer') || 'localhost:8000';
-          const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
-
-          console.log(
-            `🔍 Checking Solana reward for game ${gameId}, wallet: ${walletAddress}`,
-          );
-
-          const response = await fetch(
-            `${protocol}://${serverUrl}/api/solana-game-reward/${gameId}/${walletAddress}`,
-          );
-
-          if (!response.ok) {
-            if (response.status === 404) {
-              // No ticket found - return null instead of throwing
-              return { success: false, hasTicket: false, rewardStatus: null };
-            }
-            throw new Error(
-              `Failed to check game reward: ${response.statusText}`,
-            );
-          }
-
-          const data = await response.json();
-
-          console.log(
-            `✅ Reward status for game ${gameId}:`,
-            data.rewardStatus,
-          );
-
-          return data;
-        },
-        enabled: !!gameId && !!walletAddress,
-        staleTime: 15000, // 15 seconds
-        retry: 1,
-      };
-    },
-    [],
   );
 
   // Compatibility methods (keeping backward compatibility)
@@ -1388,10 +1235,6 @@ export const useBlockchain = () => {
     claimSplRewards,
     claimAllSolRewards,
     claimAllSplRewards,
-
-    // Solana game history and rewards
-    useSolanaGameHistory,
-    useSolanaGameReward,
 
     // SPL Token operations
     useGameProgramAddress,
