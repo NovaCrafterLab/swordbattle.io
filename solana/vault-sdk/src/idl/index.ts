@@ -1,3 +1,3 @@
-// pump-fun.json should be a valid JSON file
-export const IDL = require("./vault.json");
-export * from "./vault";
+// Export the IDL and types
+export const IDL = require('./vault.json');
+export * from './vault';

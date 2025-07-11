@@ -612,9 +612,9 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       <button
         className="race-btn primary"
         onClick={handleJoinGame}
-        disabled={isDisabled}
+        disabled={isDisabled || isJoining || solanaVault.isLoading}
       >
-        {isJoining ? 'Joining...' : <>Join Race</>}
+        {isJoining || solanaVault.isLoading ? 'Joining...' : <>Join Race</>}
       </button>
     );
   };

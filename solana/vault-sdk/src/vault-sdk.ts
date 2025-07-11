@@ -1,9 +1,12 @@
 import * as anchor from '@coral-xyz/anchor';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, SystemProgram } from '@solana/web3.js';
 import {
   getAssociatedTokenAddress,
   getOrCreateAssociatedTokenAccount,
+  createAssociatedTokenAccountInstruction,
+  getAccount,
   TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 import {
   VaultConfig,
@@ -1032,7 +1035,7 @@ export class VaultSDK {
   }
 
   /**
-   * Build buy ticket transaction for secure frontend flow
+   * Build buy ticket transaction for secure frontend flow with ATA creation
    */
   async buildBuyTicketTransaction(params: {
     gameId: number;
@@ -1042,46 +1045,118 @@ export class VaultSDK {
     expectedAmount: bigint;
     walletAddress: string;
   }): Promise<{ transaction: string }> {
-    console.log('🔧 Building buy ticket transaction:', params);
+    console.log('🔧 Building buy ticket transaction with ATA checks:', params);
 
+    const userPublicKey = new PublicKey(params.walletAddress);
     const { vault } = this.getVaultPdas(params.gameId);
 
     // Get vault account to determine token mint
     const vaultAccount = await this.program.account.gameVault.fetch(vault);
+    const tokenMint = vaultAccount.tokenMint as PublicKey;
+
+    console.log('🪙 Token mint:', tokenMint.toString());
 
     // Get vault token account
     const vaultToken = await getAssociatedTokenAddress(
-      vaultAccount.tokenMint as PublicKey,
+      tokenMint,
       vault,
       true, // allowOwnerOffCurve
     );
 
     // Get user ticket PDA
-    const userTicket = this.getUserTicketPda(
-      params.gameId,
-      new PublicKey(params.walletAddress),
-    );
+    const userTicket = this.getUserTicketPda(params.gameId, userPublicKey);
 
-    // Build the transaction using correct IDL method signature
-    const tx = await this.program.methods
+    // 🔧 Check if vault's token account exists
+    let needsVaultATACreation = false;
+    try {
+      await getAccount(this.connection, vaultToken);
+      console.log('✅ Vault token account exists:', vaultToken.toString());
+    } catch (error) {
+      console.log('⚠️ Vault token account does not exist, will create ATA');
+      needsVaultATACreation = true;
+    }
+
+    // 🔧 Check if user's token account exists
+    let userTokenAccount = params.userTokenAccount;
+    let needsUserATACreation = false;
+
+    try {
+      // Try to get the account info
+      await getAccount(this.connection, userTokenAccount);
+      console.log('✅ User token account exists:', userTokenAccount.toString());
+    } catch (error) {
+      console.log('⚠️ User token account does not exist, will create ATA');
+      needsUserATACreation = true;
+
+      // Recalculate the correct ATA address
+      userTokenAccount = await getAssociatedTokenAddress(
+        tokenMint,
+        userPublicKey,
+        false, // allowOwnerOffCurve = false for user accounts
+      );
+    }
+
+    // Create a new transaction
+    const transaction = new anchor.web3.Transaction();
+
+    // 🔧 Add vault ATA creation instruction if needed
+    if (needsVaultATACreation) {
+      console.log('🔨 Adding vault ATA creation instruction');
+      const createVaultATAInstruction = createAssociatedTokenAccountInstruction(
+        userPublicKey, // payer (user pays for vault ATA creation)
+        vaultToken, // ata
+        vault, // owner (vault PDA)
+        tokenMint, // mint
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+      );
+      transaction.add(createVaultATAInstruction);
+    }
+
+    // 🔧 Add user ATA creation instruction if needed
+    if (needsUserATACreation) {
+      console.log('🔨 Adding user ATA creation instruction');
+      const createUserATAInstruction = createAssociatedTokenAccountInstruction(
+        userPublicKey, // payer
+        userTokenAccount, // ata
+        userPublicKey, // owner
+        tokenMint, // mint
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+      );
+      transaction.add(createUserATAInstruction);
+    }
+
+    // Build the buy ticket instruction
+    const buyTicketInstruction = await this.program.methods
       .buyTicket(new anchor.BN(params.amount.toString()))
       .accounts({
         vault: vault,
         userTicket: userTicket,
-        userToken: params.userTokenAccount,
+        userToken: userTokenAccount,
         vaultToken: vaultToken,
-        user: new PublicKey(params.walletAddress),
+        user: userPublicKey,
         tokenProgram: TOKEN_PROGRAM_ID,
-      })
-      .transaction();
+        systemProgram: SystemProgram.programId,
+      } as any)
+      .instruction();
+
+    // Add the buy ticket instruction
+    transaction.add(buyTicketInstruction);
 
     // Get recent blockhash
     const { blockhash } = await this.connection.getLatestBlockhash();
-    tx.recentBlockhash = blockhash;
-    tx.feePayer = new PublicKey(params.walletAddress);
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = userPublicKey;
+
+    console.log(
+      '🔧 Transaction built with',
+      transaction.instructions.length,
+      'instructions',
+    );
 
     // Serialize transaction
-    const serializedTx = tx.serialize({
+    const serializedTx = transaction.serialize({
       requireAllSignatures: false,
       verifySignatures: false,
     });

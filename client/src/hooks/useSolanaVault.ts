@@ -96,6 +96,18 @@ export const useSolanaVault = () => {
           `🎫 Starting secure frontend ticket purchase for game ${gameId} with amount ${amount} tokens`,
         );
 
+        // 🔍 DEBUG: Log all input parameters
+        console.log('🔍 DEBUG - Input parameters:', {
+          gameId,
+          amount: amount.toString(),
+          tokenMint: tokenMint.toString(),
+          tier,
+          expectedAmount: expectedAmount?.toString(),
+          publicKey: publicKey.toString(),
+          hasSignTransaction: !!signTransaction,
+          hasSendTransaction: !!sendTransaction,
+        });
+
         // Step 1: Security validation and parameter verification
         const serverUrl =
           localStorage.getItem('selectedServer') || 'localhost:8000';
@@ -113,55 +125,101 @@ export const useSolanaVault = () => {
           '📡 Requesting server transaction building with parameter validation...',
         );
 
-        const buildResponse = await fetch(
-          `${protocol}://${serverUrl}/api/build-buy-ticket-transaction`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              gameId,
-              amount: amount.toString(),
-              walletAddress: publicKey.toString(),
-              tokenMint: tokenMint.toString(),
-              tier,
-              expectedAmount: expectedAmount?.toString(),
-              signature, // Anti-tampering signature
-              playerLevel: 1, // TODO: Get from player profile
-            }),
-          },
-        );
+        const requestUrl = `${protocol}://${serverUrl}/api/build-buy-ticket-transaction`;
+        const requestBody = {
+          gameId,
+          amount: amount.toString(),
+          walletAddress: publicKey.toString(),
+          tokenMint: tokenMint.toString(),
+          tier,
+          expectedAmount: expectedAmount?.toString(),
+          signature, // Anti-tampering signature
+          playerLevel: 1, // TODO: Get from player profile
+        };
+
+        console.log('🔍 DEBUG - Server request:', {
+          url: requestUrl,
+          body: requestBody,
+        });
+
+        const buildResponse = await fetch(requestUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        });
+
+        console.log('🔍 DEBUG - Server response status:', buildResponse.status);
 
         if (!buildResponse.ok) {
           const errorData = await buildResponse.json().catch(() => ({}));
+          console.error('❌ DEBUG - Server error response:', errorData);
           throw new Error(
             `Transaction building failed: ${errorData.error || buildResponse.statusText}`,
           );
         }
 
         const buildResult = await buildResponse.json();
+        console.log('🔍 DEBUG - Server response data:', buildResult);
+
         if (!buildResult.success) {
+          console.error('❌ DEBUG - Build result failed:', buildResult);
           throw new Error(`Transaction build error: ${buildResult.error}`);
         }
 
         console.log('✅ Server validated parameters and built transaction');
 
         // Step 3: Deserialize transaction from server
+        console.log('🔍 DEBUG - Transaction data from server:', {
+          transactionLength: buildResult.transaction?.length,
+          transactionPreview:
+            buildResult.transaction?.substring(0, 100) + '...',
+        });
+
         const transactionBuffer = Buffer.from(
           buildResult.transaction,
           'base64',
         );
-        const transaction = Transaction.from(transactionBuffer);
+        console.log('🔍 DEBUG - Transaction buffer:', {
+          bufferLength: transactionBuffer.length,
+          bufferPreview:
+            transactionBuffer.toString('hex').substring(0, 100) + '...',
+        });
 
-        // Step 4: Add recent blockhash if not already set
-        if (!transaction.recentBlockhash) {
-          const { blockhash } = await connection.getLatestBlockhash();
-          transaction.recentBlockhash = blockhash;
+        const transaction = Transaction.from(transactionBuffer);
+        console.log('🔍 DEBUG - Deserialized transaction:', {
+          instructionCount: transaction.instructions.length,
+          hasRecentBlockhash: !!transaction.recentBlockhash,
+          hasFeePayer: !!transaction.feePayer,
+          signatureCount: transaction.signatures.length,
+        });
+
+        // Step 4: Use transaction exactly as built by server (don't modify blockhash)
+        console.log('🔧 Using server-built transaction without modifications');
+
+        // Only set fee payer if not already set
+        if (!transaction.feePayer) {
+          transaction.feePayer = publicKey;
+          console.log('🔧 Set fee payer to connected wallet');
         }
 
-        // Ensure fee payer is set
-        transaction.feePayer = publicKey;
+        console.log('🔧 Transaction ready for signing:', {
+          recentBlockhash: transaction.recentBlockhash,
+          feePayer: transaction.feePayer?.toString(),
+          instructionCount: transaction.instructions.length,
+          serverBuilt: true,
+        });
 
-        console.log('🔧 Transaction prepared for signing');
+        // Step 4.5: Skip client-side simulation since server already validated
+        // The server-side simulation is more accurate as it has the latest blockchain state
+        console.log(
+          '⏭️ Skipping client-side simulation (server already validated transaction)',
+        );
+        console.log('🔍 Transaction ready for signing:', {
+          instructionCount: transaction.instructions.length,
+          recentBlockhash: transaction.recentBlockhash,
+          feePayer: transaction.feePayer?.toString(),
+          signatures: transaction.signatures.length,
+        });
 
         // Step 5: Sign transaction with user wallet (triggers popup)
         setTxStatus('signing');

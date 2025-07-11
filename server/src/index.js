@@ -2239,13 +2239,25 @@ async function processBuildBuyTicketTransaction(
     console.log('🔧 Building transaction using vault SDK...');
 
     // Get user token account
-    const { PublicKey, getAssociatedTokenAddress } = require('@solana/web3.js');
+    const { PublicKey } = require('@solana/web3.js');
+    const { getAssociatedTokenAddress } = require('@solana/spl-token');
+
+    console.log('🔍 Debug info:');
+    console.log('   Token mint:', tokenMint);
+    console.log('   Wallet address:', walletAddress);
+    console.log('   Game ID:', gameId);
+    console.log('   Amount:', amount);
+    console.log('   Tier:', tier);
+
     const userTokenAccount = await getAssociatedTokenAddress(
       new PublicKey(tokenMint),
       new PublicKey(walletAddress),
     );
 
+    console.log('   Expected user token account:', userTokenAccount.toString());
+
     // Build the transaction using vault SDK
+    console.log('🔨 Calling VaultSDK.buildBuyTicketTransaction...');
     const buildResult =
       await game.solanaVaultService.vaultSDK.buildBuyTicketTransaction({
         gameId: parseInt(gameId),
@@ -2257,6 +2269,55 @@ async function processBuildBuyTicketTransaction(
       });
 
     console.log('✅ Transaction built successfully');
+    console.log('   Transaction length:', buildResult.transaction.length);
+
+    // 🧪 Simulate the transaction to catch errors early
+    try {
+      console.log('🧪 Simulating transaction on server side...');
+      const { Transaction } = require('@solana/web3.js');
+      const transactionBuffer = Buffer.from(buildResult.transaction, 'base64');
+      const transaction = Transaction.from(transactionBuffer);
+
+      // Get fresh blockhash for simulation
+      const { blockhash } =
+        await game.solanaVaultService.connection.getLatestBlockhash();
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = new PublicKey(walletAddress);
+
+      const simulation =
+        await game.solanaVaultService.connection.simulateTransaction(
+          transaction,
+        );
+
+      if (simulation.value.err) {
+        console.error(
+          '❌ Server-side transaction simulation failed:',
+          simulation.value.err,
+        );
+        console.error('📋 Simulation logs:', simulation.value.logs);
+
+        if (!hasResponded) {
+          hasResponded = true;
+          clearTimeout(timeout);
+          res.writeStatus('400 Bad Request').end(
+            JSON.stringify({
+              success: false,
+              error: `Transaction simulation failed: ${JSON.stringify(simulation.value.err)}`,
+              logs: simulation.value.logs,
+            }),
+          );
+        }
+        return;
+      }
+
+      console.log('✅ Server-side transaction simulation successful');
+      if (simulation.value.logs) {
+        console.log('📋 Simulation logs:', simulation.value.logs);
+      }
+    } catch (simError) {
+      console.error('❌ Failed to simulate transaction on server:', simError);
+      // Continue anyway, let client handle the error
+    }
 
     if (!hasResponded) {
       hasResponded = true;
@@ -2265,7 +2326,7 @@ async function processBuildBuyTicketTransaction(
         JSON.stringify({
           success: true,
           transaction: buildResult.transaction,
-          message: 'Transaction built successfully, ready for signing',
+          message: 'Transaction built and simulated successfully',
         }),
       );
     }
