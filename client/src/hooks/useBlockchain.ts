@@ -2,7 +2,7 @@
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
-import { createRobustRPCConnection } from '../blockchain';
+
 import {
   getAssociatedTokenAddress,
   getAccount,
@@ -285,6 +285,7 @@ export const useTokenMetadata = (tokenMintAddress: string) => {
  * 优化：直接从 /serverinfo 获取 token 信息，避免额外的 API 调用
  */
 export const useCurrentGameToken = () => {
+  const { connection } = useConnection();
   const [tokenInfo, setTokenInfo] = useState<{
     tokenMint: string;
     tokenSymbol: string;
@@ -344,17 +345,12 @@ export const useCurrentGameToken = () => {
       // Try to get mint info for decimals and better metadata
       try {
         const mintPubkey = new PublicKey(tokenMint);
-        // Use robust RPC connection with automatic retry on network failures
-        const mintInfo = await createRobustRPCConnection((connection) =>
-          getMint(connection, mintPubkey),
-        );
+        // Use stable connection instead of random RPC to avoid API key issues
+        const mintInfo = await getMint(connection, mintPubkey);
         tokenDecimals = mintInfo.decimals;
       } catch (error) {
         // Silent failure - use default decimals
-        console.warn(
-          'Failed to get mint info after retries, using default decimals:',
-          error,
-        );
+        console.warn('Failed to get mint info, using default decimals:', error);
       }
 
       // 使用 tokenInfo 中的信息，或基于 tokenMint 地址判断
@@ -409,7 +405,7 @@ export const useCurrentGameToken = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [connection]);
 
   useEffect(() => {
     fetchCurrentGameToken();

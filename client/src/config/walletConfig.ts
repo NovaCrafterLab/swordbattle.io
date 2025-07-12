@@ -73,9 +73,8 @@ export const SOLANA_DEVNET_RPC_POOL =
     ? RPC_API_KEYS.map((key) => `https://devnet.helius-rpc.com/?api-key=${key}`)
     : ([
         'https://api.devnet.solana.com',
-        'https://devnet.helius-rpc.com/?api-key=demo',
         'https://rpc.ankr.com/solana_devnet',
-        'https://solana-devnet.g.alchemy.com/v2/demo',
+        // Removed invalid demo endpoints that cause 401 errors
       ] as const);
 
 // Solana Mainnet RPC池配置 (使用Helius API密钥)
@@ -86,9 +85,8 @@ export const SOLANA_MAINNET_RPC_POOL =
       )
     : ([
         'https://api.mainnet-beta.solana.com',
-        'https://mainnet.helius-rpc.com/?api-key=demo',
         'https://rpc.ankr.com/solana',
-        'https://solana-mainnet.g.alchemy.com/v2/demo',
+        // Removed invalid demo endpoints that cause 401 errors
       ] as const);
 
 // RPC池配置
@@ -148,9 +146,6 @@ export class SolanaRPCManager {
   constructor() {
     // 随机选择初始RPC节点，避免所有客户端都使用同一个RPC
     this.currentRpcIndex = Math.floor(Math.random() * CURRENT_RPC_POOL.length);
-    console.log(
-      `📡 Solana RPC Manager: ${CURRENT_RPC_POOL.length} nodes available, starting with random node [${this.currentRpcIndex}]: ${this.getCurrentRPC().split('/').pop()}`,
-    );
   }
 
   static getInstance(): SolanaRPCManager {
@@ -169,14 +164,9 @@ export class SolanaRPCManager {
   }
 
   markCurrentRPCFailed(): string {
-    const currentRpc = this.getCurrentRPC();
-    console.warn(
-      `🔄 Solana RPC ${currentRpc.split('/').pop()} 标记为失败，随机切换到下一个节点`,
-    );
     this.failedRpcs.add(this.currentRpcIndex);
     this.switchToNextRPC();
     const newRpc = this.getCurrentRPC();
-    console.log(`✅ 已切换到: ${newRpc.split('/').pop()}`);
     return newRpc;
   }
 
@@ -208,7 +198,6 @@ export class SolanaRPCManager {
     );
 
     if (availableIndices.length === 0) {
-      console.warn('⚠️ 所有Solana RPC节点都失败，重置失败列表并随机选择');
       this.failedRpcs.clear();
       this.currentRpcIndex = Math.floor(
         Math.random() * CURRENT_RPC_POOL.length,
@@ -226,9 +215,6 @@ export class SolanaRPCManager {
         Math.random() * otherAvailableIndices.length,
       );
       this.currentRpcIndex = otherAvailableIndices[randomIndex];
-      console.log(
-        `🔄 Solana RPC随机切换到节点 [${this.currentRpcIndex}]: ${this.getCurrentRPC().split('/').pop()}`,
-      );
     } else {
       // 如果只有当前节点可用，保持不变
       this.currentRpcIndex = availableIndices[0];
@@ -260,7 +246,6 @@ export class SolanaRPCManager {
           const data = await response.json();
           if (data.result === 'ok') {
             if (this.failedRpcs.has(index)) {
-              console.log(`Solana RPC ${rpc} 已恢复健康`);
               this.failedRpcs.delete(index);
             }
             return { index, status: 'healthy', rpc };
@@ -268,21 +253,12 @@ export class SolanaRPCManager {
         }
         throw new Error('Invalid response');
       } catch (error) {
-        console.warn(`Solana RPC ${rpc} 健康检查失败:`, error);
         this.failedRpcs.add(index);
         return { index, status: 'failed', rpc };
       }
     });
 
-    const results = await Promise.allSettled(healthPromises);
-    const healthyCount = results.filter(
-      (r) => r.status === 'fulfilled' && r.value.status === 'healthy',
-    ).length;
-
-    console.log(
-      `Solana RPC健康检查完成: ${healthyCount}/${CURRENT_RPC_POOL.length} 节点正常`,
-    );
-    console.log(`Helius API密钥数量: ${RPC_API_KEYS.length}`);
+    await Promise.allSettled(healthPromises);
   }
 
   getStats() {
