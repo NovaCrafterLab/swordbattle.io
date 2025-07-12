@@ -1,6 +1,7 @@
 const { Connection, PublicKey, Keypair } = require('@solana/web3.js');
 const { getAssociatedTokenAddress } = require('@solana/spl-token');
 const Logger = require('../utils/Logger');
+const { getInstance: getRPCManager } = require('../utils/SolanaRPCManager');
 
 // Import official VaultSDK with Anchor 0.31.1 support
 const path = require('path');
@@ -19,6 +20,7 @@ class SolanaVaultService {
     this.wallet = null;
     this.vaultSDK = null;
     this.isInitialized = false;
+    this.rpcManager = null;
 
     Logger.server.info('Solana Vault Service initializing', {
       rpcUrl: config.rpcUrl,
@@ -30,11 +32,15 @@ class SolanaVaultService {
     try {
       Logger.server.info('🔗 Initializing Solana vault service');
 
-      // Create connection to Solana cluster
-      this.connection = new Connection(
-        this.config.rpcUrl || 'https://api.devnet.solana.com',
-        'confirmed',
-      );
+      // Initialize RPC manager for load balancing
+      this.rpcManager = getRPCManager();
+
+      // Create connection using RPC manager
+      this.connection = this.rpcManager.getCurrentConnection('confirmed');
+
+      Logger.server.info('✅ Using RPC manager for Solana connections', {
+        stats: this.rpcManager.getStats(),
+      });
 
       // Initialize wallet from private key
       if (this.config.privateKey) {
@@ -63,12 +69,43 @@ class SolanaVaultService {
         }
       }
 
-      // Test connection
-      const latestBlockhash = await this.connection.getLatestBlockhash();
-      Logger.server.info(
-        '✅ Solana connected, blockhash:',
-        latestBlockhash.blockhash.slice(0, 8) + '...',
-      );
+      // Test connection with retry logic for RPC failures
+      let connectionTested = false;
+      let retryCount = 0;
+      const maxRetries = 3;
+
+      while (!connectionTested && retryCount < maxRetries) {
+        try {
+          const latestBlockhash = await this.connection.getLatestBlockhash();
+          Logger.server.info(
+            '✅ Solana connected, blockhash:',
+            latestBlockhash.blockhash.slice(0, 8) + '...',
+          );
+          connectionTested = true;
+        } catch (error) {
+          retryCount++;
+          Logger.server.warn(
+            `RPC connection test failed (attempt ${retryCount}/${maxRetries}):`,
+            {
+              error: error.message,
+              currentRpc: this.rpcManager.getCurrentRPC(),
+            },
+          );
+
+          if (retryCount < maxRetries) {
+            // Mark current RPC as failed and switch to next one
+            this.rpcManager.markCurrentRPCFailed();
+            this.connection = this.rpcManager.getCurrentConnection('confirmed');
+            Logger.server.info('Switched to next RPC for retry', {
+              newRpc: this.rpcManager.getCurrentRPC(),
+            });
+          } else {
+            throw new Error(
+              `All RPC endpoints failed after ${maxRetries} attempts: ${error.message}`,
+            );
+          }
+        }
+      }
 
       // Initialize VaultSDK
       if (
@@ -112,6 +149,33 @@ class SolanaVaultService {
         stack: error.stack,
       });
       throw error;
+    }
+  }
+
+  /**
+   * Create a random RPC connection for load balancing
+   */
+  createRandomConnection(commitment = 'confirmed') {
+    if (!this.rpcManager) {
+      // Fallback to current connection if RPC manager not available
+      return this.connection;
+    }
+    return this.rpcManager.createRandomConnection(commitment);
+  }
+
+  /**
+   * Get RPC manager statistics
+   */
+  getRPCStats() {
+    return this.rpcManager ? this.rpcManager.getStats() : null;
+  }
+
+  /**
+   * Perform RPC health check
+   */
+  async performRPCHealthCheck() {
+    if (this.rpcManager) {
+      await this.rpcManager.healthCheck();
     }
   }
 

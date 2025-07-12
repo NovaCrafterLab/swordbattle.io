@@ -140,10 +140,18 @@ export const SOLANA_ENVIRONMENT = {
 // Solana RPC健康检查和故障转移工具
 export class SolanaRPCManager {
   private static instance: SolanaRPCManager;
-  private currentRpcIndex = 0;
+  private currentRpcIndex: number;
   private failedRpcs = new Set<number>();
   private lastHealthCheck = 0;
   private readonly healthCheckInterval = 5 * 60 * 1000; // 5分钟
+
+  constructor() {
+    // 随机选择初始RPC节点，避免所有客户端都使用同一个RPC
+    this.currentRpcIndex = Math.floor(Math.random() * CURRENT_RPC_POOL.length);
+    console.log(
+      `📡 Solana RPC Manager: ${CURRENT_RPC_POOL.length} nodes available, starting with random node [${this.currentRpcIndex}]: ${this.getCurrentRPC().split('/').pop()}`,
+    );
+  }
 
   static getInstance(): SolanaRPCManager {
     if (!SolanaRPCManager.instance) {
@@ -161,11 +169,36 @@ export class SolanaRPCManager {
   }
 
   markCurrentRPCFailed(): string {
+    const currentRpc = this.getCurrentRPC();
     console.warn(
-      `Solana RPC ${this.getCurrentRPC()} 标记为失败，切换到下一个节点`,
+      `🔄 Solana RPC ${currentRpc.split('/').pop()} 标记为失败，随机切换到下一个节点`,
     );
     this.failedRpcs.add(this.currentRpcIndex);
     this.switchToNextRPC();
+    const newRpc = this.getCurrentRPC();
+    console.log(`✅ 已切换到: ${newRpc.split('/').pop()}`);
+    return newRpc;
+  }
+
+  /**
+   * 获取随机可用的RPC节点
+   */
+  getRandomAvailableRPC(): string {
+    const availableIndices = CURRENT_RPC_POOL.map((_, index) => index).filter(
+      (index) => !this.failedRpcs.has(index),
+    );
+
+    if (availableIndices.length === 0) {
+      console.warn('⚠️ 没有可用的RPC节点，重置失败列表');
+      this.failedRpcs.clear();
+      this.currentRpcIndex = Math.floor(
+        Math.random() * CURRENT_RPC_POOL.length,
+      );
+      return this.getCurrentRPC();
+    }
+
+    const randomIndex = Math.floor(Math.random() * availableIndices.length);
+    this.currentRpcIndex = availableIndices[randomIndex];
     return this.getCurrentRPC();
   }
 
@@ -173,17 +206,33 @@ export class SolanaRPCManager {
     const availableIndices = CURRENT_RPC_POOL.map((_, index) => index).filter(
       (index) => !this.failedRpcs.has(index),
     );
+
     if (availableIndices.length === 0) {
-      console.warn('所有Solana RPC节点都失败，重置失败列表');
+      console.warn('⚠️ 所有Solana RPC节点都失败，重置失败列表并随机选择');
       this.failedRpcs.clear();
-      this.currentRpcIndex = 0;
+      this.currentRpcIndex = Math.floor(
+        Math.random() * CURRENT_RPC_POOL.length,
+      );
       return;
     }
-    const currentAvailableIndex = availableIndices.indexOf(
-      this.currentRpcIndex,
+
+    // 从可用节点中随机选择一个（排除当前节点）
+    const otherAvailableIndices = availableIndices.filter(
+      (index) => index !== this.currentRpcIndex,
     );
-    const nextIndex = (currentAvailableIndex + 1) % availableIndices.length;
-    this.currentRpcIndex = availableIndices[nextIndex];
+
+    if (otherAvailableIndices.length > 0) {
+      const randomIndex = Math.floor(
+        Math.random() * otherAvailableIndices.length,
+      );
+      this.currentRpcIndex = otherAvailableIndices[randomIndex];
+      console.log(
+        `🔄 Solana RPC随机切换到节点 [${this.currentRpcIndex}]: ${this.getCurrentRPC().split('/').pop()}`,
+      );
+    } else {
+      // 如果只有当前节点可用，保持不变
+      this.currentRpcIndex = availableIndices[0];
+    }
   }
 
   async healthCheck(): Promise<void> {

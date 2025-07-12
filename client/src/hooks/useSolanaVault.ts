@@ -1,7 +1,8 @@
 // Secure frontend Solana vault interaction with anti-tampering protection
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useState, useCallback } from 'react';
 import { PublicKey, Transaction } from '@solana/web3.js';
+import { createRandomRPCConnection } from '../blockchain';
 
 /**
  * Hook for Solana vault operations using secure frontend transaction building
@@ -95,8 +96,6 @@ export const useSolanaVault = () => {
     // Some wallets expose it under different names
     (wallet.wallet?.adapter as any)?.signAndSendTransaction ||
     null;
-
-  const { connection } = useConnection();
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -310,8 +309,22 @@ export const useSolanaVault = () => {
           );
 
           // Send directly via connection to avoid second wallet popup
-          txSignature = await connection.sendRawTransaction(
-            signedTransaction.serialize(),
+          // Use random RPC connection for better load balancing
+          const rpcConnection = createRandomRPCConnection();
+
+          // Ensure proper serialization format for sendRawTransaction
+          const serializedTransaction = signedTransaction.serialize();
+          console.log(
+            '🔍 DEBUG - Serialized transaction type:',
+            typeof serializedTransaction,
+          );
+          console.log(
+            '🔍 DEBUG - Serialized transaction constructor:',
+            serializedTransaction.constructor.name,
+          );
+
+          txSignature = await rpcConnection.sendRawTransaction(
+            serializedTransaction,
             {
               skipPreflight: true, // Skip simulation to avoid errors
               preflightCommitment: 'confirmed',
@@ -327,12 +340,14 @@ export const useSolanaVault = () => {
         setTxStatus('confirming');
         console.log('⏳ Confirming transaction...');
 
-        const confirmation = await connection.confirmTransaction(
+        // Use random RPC connection for confirmation
+        const rpcConnection = createRandomRPCConnection();
+        const latestBlockhash = await rpcConnection.getLatestBlockhash();
+        const confirmation = await rpcConnection.confirmTransaction(
           {
             signature: txSignature,
             blockhash: transaction.recentBlockhash!,
-            lastValidBlockHeight: (await connection.getLatestBlockhash())
-              .lastValidBlockHeight,
+            lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
           },
           'confirmed',
         );
@@ -437,7 +452,6 @@ export const useSolanaVault = () => {
       signTransaction,
       sendTransaction,
       signAndSendTransaction,
-      connection,
       isProcessing,
     ],
   );
@@ -525,8 +539,9 @@ export const useSolanaVault = () => {
         }),
       );
 
-      // Get recent blockhash
-      const { blockhash } = await connection.getLatestBlockhash();
+      // Get recent blockhash using random RPC connection
+      const rpcConnection = createRandomRPCConnection();
+      const { blockhash } = await rpcConnection.getLatestBlockhash();
       testTransaction.recentBlockhash = blockhash;
       testTransaction.feePayer = publicKey!;
 
@@ -550,13 +565,7 @@ export const useSolanaVault = () => {
       console.error('❌ Wallet signing test failed:', error);
       return false;
     }
-  }, [
-    publicKey,
-    signTransaction,
-    sendTransaction,
-    signAndSendTransaction,
-    connection,
-  ]);
+  }, [publicKey, signTransaction, sendTransaction, signAndSendTransaction]);
 
   // Claim reward for a specific game
   const claimReward = useCallback(
@@ -737,7 +746,9 @@ export const useSolanaVault = () => {
             setTxStatus('sending');
 
             // 使用与buyTicket相同的发送方式：connection.sendRawTransaction + skipPreflight
-            txSignature = await connection.sendRawTransaction(
+            // Use random RPC connection for better load balancing
+            const rpcConnection = createRandomRPCConnection();
+            txSignature = await rpcConnection.sendRawTransaction(
               signedTransaction.serialize(),
               {
                 skipPreflight: true, // Skip simulation to avoid errors
@@ -765,8 +776,10 @@ export const useSolanaVault = () => {
         // Step 3: Wait for confirmation
         console.log('⏳ Waiting for transaction confirmation...');
         try {
-          const latestBlockhash = await connection.getLatestBlockhash();
-          const confirmation = await connection.confirmTransaction(
+          // Use random RPC connection for confirmation
+          const rpcConnection = createRandomRPCConnection();
+          const latestBlockhash = await rpcConnection.getLatestBlockhash();
+          const confirmation = await rpcConnection.confirmTransaction(
             {
               signature: txSignature,
               blockhash: latestBlockhash.blockhash,
@@ -846,7 +859,6 @@ export const useSolanaVault = () => {
       signAndSendTransaction,
       signTransaction,
       sendTransaction,
-      connection,
       isProcessing,
     ],
   );

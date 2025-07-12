@@ -2,6 +2,7 @@
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
+import { createRobustRPCConnection } from '../blockchain';
 import {
   getAssociatedTokenAddress,
   getAccount,
@@ -155,13 +156,15 @@ export const useSPLTokenBalance = (
     } catch (err) {
       const error = err as Error;
 
-      // Check if it's specifically a TokenAccountNotFoundError
+      // Check for various error types
       if (
         error.message.includes('could not find account') ||
         error.message.includes('TokenAccountNotFoundError') ||
-        error.message.includes('Account does not exist')
+        error.message.includes('Account does not exist') ||
+        error.message.includes('StructError') ||
+        error.message.includes('Expected the value to satisfy a union')
       ) {
-        setError(null); // Don't treat missing token account as error
+        setError(null); // Don't treat these as errors, just set balance to 0
       } else {
         setError(error);
       }
@@ -341,15 +344,17 @@ export const useCurrentGameToken = () => {
       // Try to get mint info for decimals and better metadata
       try {
         const mintPubkey = new PublicKey(tokenMint);
-        const mintInfo = await getMint(
-          new (await import('@solana/web3.js')).Connection(
-            'https://api.devnet.solana.com',
-          ),
-          mintPubkey,
+        // Use robust RPC connection with automatic retry on network failures
+        const mintInfo = await createRobustRPCConnection((connection) =>
+          getMint(connection, mintPubkey),
         );
         tokenDecimals = mintInfo.decimals;
       } catch (error) {
         // Silent failure - use default decimals
+        console.warn(
+          'Failed to get mint info after retries, using default decimals:',
+          error,
+        );
       }
 
       // 使用 tokenInfo 中的信息，或基于 tokenMint 地址判断
@@ -555,13 +560,12 @@ export const useDynamicTokenBalance = (walletAddress: string) => {
  * Hook to check if player has a ticket for current game
  */
 export const usePlayerTicket = (gameId: number, playerAddress: string) => {
-  const { connection } = useConnection();
   const [ticket, setTicket] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   const fetchTicket = useCallback(async () => {
-    if (!gameId || !playerAddress || !connection) {
+    if (!gameId || !playerAddress) {
       setTicket(null);
       return;
     }
@@ -587,7 +591,7 @@ export const usePlayerTicket = (gameId: number, playerAddress: string) => {
     } finally {
       setIsLoading(false);
     }
-  }, [gameId, playerAddress, connection]);
+  }, [gameId, playerAddress]);
 
   useEffect(() => {
     fetchTicket();
@@ -606,13 +610,12 @@ export const usePlayerTicket = (gameId: number, playerAddress: string) => {
  * Hook to get game vault information including entry fee
  */
 export const useGameVault = (gameId: number) => {
-  const { connection } = useConnection();
   const [vault, setVault] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   const fetchVault = useCallback(async () => {
-    if (!gameId || !connection) {
+    if (!gameId) {
       setVault(null);
       return;
     }
@@ -638,7 +641,7 @@ export const useGameVault = (gameId: number) => {
     } finally {
       setIsLoading(false);
     }
-  }, [gameId, connection]);
+  }, [gameId]);
 
   useEffect(() => {
     fetchVault();
@@ -737,7 +740,6 @@ export const useBlockchain = () => {
   // Solana hooks
   const { publicKey, connected, signTransaction, sendTransaction } =
     useWallet();
-  const { connection } = useConnection();
   const solanaVault = useSolanaVault();
 
   // 调试钱包状态
@@ -756,7 +758,7 @@ export const useBlockchain = () => {
 
   // Placeholder implementations for backward compatibility
   const useGameFullInfo = useCallback(
-    (gameId: number) => ({
+    (_gameId: number) => ({
       data: null,
       isLoading: false,
       error: null,
@@ -766,7 +768,7 @@ export const useBlockchain = () => {
   );
 
   const useActiveGames = useCallback(
-    (level: number = 0, limit: number = 10) => ({
+    (_level: number = 0, _limit: number = 10) => ({
       data: [],
       isLoading: false,
       error: null,
@@ -776,7 +778,7 @@ export const useBlockchain = () => {
   );
 
   const usePlayerCurrentGames = useCallback(
-    (playerAddress: string) => ({
+    (_playerAddress: string) => ({
       data: [],
       isLoading: false,
       error: null,
@@ -786,7 +788,7 @@ export const useBlockchain = () => {
   );
 
   const useGameStats = useCallback(
-    (startTime: number, endTime: number) => ({
+    (_startTime: number, _endTime: number) => ({
       data: null,
       isLoading: false,
       error: null,
@@ -796,7 +798,7 @@ export const useBlockchain = () => {
   );
 
   const usePlayerStats = useCallback(
-    (playerAddress: string) => ({
+    (_playerAddress: string) => ({
       data: null,
       isLoading: false,
       error: null,
@@ -806,7 +808,7 @@ export const useBlockchain = () => {
   );
 
   const usePlayerCompleteRewards = useCallback(
-    (gameId: number, playerAddress: string) => ({
+    (_gameId: number, _playerAddress: string) => ({
       data: null,
       isLoading: false,
       error: null,
@@ -816,7 +818,7 @@ export const useBlockchain = () => {
   );
 
   const usePlayerAllRewards = useCallback(
-    (playerAddress: string) => ({
+    (_playerAddress: string) => ({
       data: null,
       isLoading: false,
       error: null,
@@ -826,7 +828,7 @@ export const useBlockchain = () => {
   );
 
   const usePlayerDashboard = useCallback(
-    (playerAddress: string) => ({
+    (_playerAddress: string) => ({
       data: null,
       isLoading: false,
       error: null,
@@ -836,7 +838,7 @@ export const useBlockchain = () => {
   );
 
   const usePlayerClaimableGames = useCallback(
-    (playerAddress: string, maxGames: number = 25) => ({
+    (_playerAddress: string, _maxGames: number = 25) => ({
       data: null,
       isLoading: false,
       error: null,
@@ -847,7 +849,7 @@ export const useBlockchain = () => {
 
   // Game operations - Direct Solana vault implementation using vault-sdk pattern
   const buyTicket = useCallback(
-    async (gameId: number, tier: string = 'low', playerLevel: number = 1) => {
+    async (gameId: number, tier: string = 'low', _playerLevel: number = 1) => {
       if (!isConnected || !address || !publicKey) {
         throw new Error('Wallet not connected');
       }
@@ -874,16 +876,25 @@ export const useBlockchain = () => {
         const response = await fetch(`${protocol}://${serverUrl}/serverinfo`);
         const serverInfo = await response.json();
 
+        console.log('🔍 DEBUG - Server info:', serverInfo);
+
         let tokenMint: PublicKey;
 
         if (serverInfo.gameStatus?.tokenMint) {
+          console.log(
+            '🪙 Using token mint from server:',
+            serverInfo.gameStatus.tokenMint,
+          );
           tokenMint = new PublicKey(serverInfo.gameStatus.tokenMint);
         } else {
+          console.log('⚠️ No token mint in server info, using default USDC');
           // Default to USDC if no token mint specified
           tokenMint = new PublicKey(
             'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
           );
         }
+
+        console.log('🔍 Final token mint:', tokenMint.toString());
 
         // Check if vault is configured
         if (!solanaVault.isVaultConfigured) {

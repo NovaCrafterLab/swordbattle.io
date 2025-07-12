@@ -187,7 +187,21 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             dynamicBalance.refetch(),
           ]);
         } catch (error) {
-          // Silent failure - no console output
+          // Handle specific errors that might occur during data refresh
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          if (
+            errorMessage.includes('StructError') ||
+            errorMessage.includes('failed to get info about account')
+          ) {
+            // This is likely a token account structure error, show user-friendly message
+            addToast(
+              'info',
+              'Token account data loading issue. This is normal for new accounts.',
+              3000,
+            );
+          }
+          // Other errors are silently handled
         }
       };
 
@@ -241,7 +255,18 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
         // 直接调用方法，不依赖回调函数
         Promise.allSettled([gameToken.refetch(), tierPricing.refetch()]).catch(
           (error: any) => {
-            // Silent failure - no console output
+            // Handle token/pricing data refresh errors
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            if (
+              errorMessage.includes('StructError') ||
+              errorMessage.includes('failed to get info about account')
+            ) {
+              console.warn(
+                'Token data refresh issue (normal for new accounts):',
+                errorMessage,
+              );
+            }
           },
         );
       }, 500);
@@ -332,10 +357,22 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
         const tokenMintAddress =
           process.env.REACT_APP_TOKEN_MINT ||
           'Hk4BerAoKbemG277HShrk8DSHiMEUKbm6D23RKhLDLKq';
+        console.log('🔍 DEBUG - Token mint address:', tokenMintAddress);
         tokenMint = new PublicKey(tokenMintAddress);
+        console.log('🔍 DEBUG - Token mint PublicKey:', tokenMint.toString());
       } catch (error) {
+        console.error('❌ Invalid token mint configuration:', error);
         throw new Error('Invalid token mint configuration');
       }
+
+      // 🔍 DEBUG - Log all parameters before calling buyTicket
+      console.log('🔍 DEBUG - buyTicket parameters:', {
+        gameId: gameState.gameId,
+        amount: config.entranceFee?.toString(),
+        tokenMint: tokenMint?.toString(),
+        tier: currentTier,
+        expectedAmount: config.entranceFee?.toString(),
+      });
 
       // 🔒 Use secure frontend transaction flow
       const txResult = await solanaVault.buyTicket(
