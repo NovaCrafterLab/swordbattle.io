@@ -19,6 +19,7 @@ RUN corepack enable && corepack prepare yarn@4.9.2 --activate
 # 2. deps-prod —— install production deps only
 ###########################################################
 FROM builder-base AS deps-prod
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 # root manifests
 COPY package.json yarn.lock .yarnrc.yml ./
 # workspace manifest
@@ -31,6 +32,8 @@ RUN yarn workspaces focus @swordbattle/server --production
 ###########################################################
 FROM node:22-slim AS runtime
 WORKDIR /app
+
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 
 # create unified user: swordbattle (uid/gid 1001)
 RUN addgroup --system --gid 1001 swordbattle \
@@ -50,7 +53,7 @@ COPY server/package.json ./server/package.json
 COPY server/src          ./src
 
 # GameAggregator
-COPY server/abis/GameAggregator.json ./abis/GameAggregator.json
+# COPY server/abis/GameAggregator.json ./abis/GameAggregator.json
 
 USER swordbattle
 EXPOSE 8000

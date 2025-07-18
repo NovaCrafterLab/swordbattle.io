@@ -6123,6 +6123,7 @@ __metadata:
     "@pmmmwh/react-refresh-webpack-plugin": "npm:^0.5.3"
     "@popperjs/core": "npm:^2.11.8"
     "@reduxjs/toolkit": "npm:^1.9.7"
+    "@solana/spl-token": "npm:^0.4.13"
     "@solana/wallet-adapter-base": "npm:^0.9.23"
     "@solana/wallet-adapter-phantom": "npm:^0.9.24"
     "@solana/wallet-adapter-react": "npm:^0.15.35"
@@ -6228,7 +6229,7 @@ __metadata:
     protobufjs: "npm:^7.2.5"
     rimraf: "npm:^6.0.1"
     sat: "npm:^0.9.0"
-    uWebSockets.js: "github:uNetworking/uWebSockets.js#v20.44.0"
+    uWebSockets.js: "git+https://github.com/uNetworking/uWebSockets.js.git#v20.44.0"
     uuid: "npm:^9.0.0"
     winston: "npm:^3.17.0"
   languageName: unknown
@@ -25767,9 +25768,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"uWebSockets.js@github:uNetworking/uWebSockets.js#v20.44.0":
+"uWebSockets.js@git+https://github.com/uNetworking/uWebSockets.js.git#v20.44.0":
   version: 20.44.0
-  resolution: "uWebSockets.js@git+ssh://git@github.com/uNetworking/uWebSockets.js.git#commit=8fa05571bf6ea95be8966ad313d9d39453e381ae"
+  resolution: "uWebSockets.js@https://github.com/uNetworking/uWebSockets.js.git#commit=8fa05571bf6ea95be8966ad313d9d39453e381ae"
   checksum: 10c0/48c64a0da5c92caf7e982fc61f937b7a93db346b4c9006f1f01e62b8da410bb72abf03b108ea11d2089d01bf82a2ff385a88d7a5ccdc3cc3943b73bf189ffe16
   languageName: node
   linkType: hard

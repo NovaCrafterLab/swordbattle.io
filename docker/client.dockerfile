@@ -19,6 +19,7 @@ RUN corepack enable && corepack prepare yarn@4.9.2 --activate
 # 2. deps-dev
 ###########################################################
 FROM builder-base AS deps-dev
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 # root manifests
 COPY package.json yarn.lock .yarnrc.yml ./
 # workspace manifest
