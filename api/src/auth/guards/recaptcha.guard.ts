@@ -6,7 +6,6 @@ export class RecaptchaGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const body = request.body;
-    console.log('body', body);
     const recaptchaToken = body.recaptchaToken;
     const secret = process.env.RECAPTCHA_SECRET_KEY;
 

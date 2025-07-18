@@ -1,7 +1,6 @@
 // Load environment variables from a .env file
 require('dotenv').config();
 
-// 环境判断逻辑与前端保持一致
 const ENV = process.env.BUILD_ENV || 'development';
 const isDev = ENV === 'development';
 const isRelease = ENV === 'production';
