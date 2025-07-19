@@ -338,17 +338,14 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       setIsJoining(true);
       setTxStep('joining');
 
-      // Get tier pricing to determine the correct amount
-      const tierConfigs = {
-        low: { entranceFee: BigInt(Math.floor(0.01 * LAMPORTS_PER_SOL)) },
-        medium: { entranceFee: BigInt(Math.floor(0.05 * LAMPORTS_PER_SOL)) },
-        high: { entranceFee: BigInt(Math.floor(0.1 * LAMPORTS_PER_SOL)) },
-      };
-
-      const config = tierConfigs[currentTier as keyof typeof tierConfigs];
-      if (!config) {
-        throw new Error(`Invalid tier: ${currentTier}`);
+      // Use dynamic tier pricing instead of hardcoded values
+      if (!tierPricing.data) {
+        throw new Error(`Tier pricing not available for ${currentTier}`);
       }
+
+      const config = {
+        entranceFee: tierPricing.data.entranceFee,
+      };
 
       // Get token mint from game token data
       let tokenMint;
