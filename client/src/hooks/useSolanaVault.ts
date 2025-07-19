@@ -726,9 +726,30 @@ export const useSolanaVault = () => {
         }
 
         // Step 2: Deserialize and sign transaction
-        const transaction = Transaction.from(
-          Buffer.from(result.serializedTransaction, 'base64'),
+        console.log('🔍 DEBUG - Claim transaction data:', {
+          serializedTransactionLength: result.serializedTransaction.length,
+          serializedTransactionPreview:
+            result.serializedTransaction.substring(0, 100) + '...',
+        });
+
+        const transactionBuffer = Buffer.from(
+          result.serializedTransaction,
+          'base64',
         );
+        console.log('🔍 DEBUG - Claim transaction buffer:', {
+          bufferLength: transactionBuffer.length,
+          bufferPreview:
+            transactionBuffer.toString('hex').substring(0, 100) + '...',
+        });
+
+        const transaction = Transaction.from(transactionBuffer);
+        console.log('🔍 DEBUG - Deserialized claim transaction:', {
+          instructionCount: transaction.instructions.length,
+          hasRecentBlockhash: !!transaction.recentBlockhash,
+          hasFeePayer: !!transaction.feePayer,
+          signatureCount: transaction.signatures.length,
+        });
+
         setTxStatus('signing');
 
         let txSignature: string;

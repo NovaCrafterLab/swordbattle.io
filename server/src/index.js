@@ -2380,7 +2380,6 @@ async function processBuildBuyTicketTransaction(
     console.log('   Expected user token account:', userTokenAccount.toString());
 
     // Build the transaction using vault SDK
-    console.log('🔨 Calling VaultSDK.buildBuyTicketTransaction...');
     const buildResult =
       await game.solanaVaultService.vaultSDK.buildBuyTicketTransaction({
         gameId: parseInt(gameId),
@@ -2392,11 +2391,9 @@ async function processBuildBuyTicketTransaction(
       });
 
     console.log('✅ Transaction built successfully');
-    console.log('   Transaction length:', buildResult.transaction.length);
 
     // 🧪 Simulate the transaction to catch errors early
     try {
-      console.log('🧪 Simulating transaction on server side...');
       const { Transaction } = require('@solana/web3.js');
       const transactionBuffer = Buffer.from(buildResult.transaction, 'base64');
       const transaction = Transaction.from(transactionBuffer);
@@ -2434,9 +2431,6 @@ async function processBuildBuyTicketTransaction(
       }
 
       console.log('✅ Server-side transaction simulation successful');
-      if (simulation.value.logs) {
-        console.log('📋 Simulation logs:', simulation.value.logs);
-      }
     } catch (simError) {
       console.error('❌ Failed to simulate transaction on server:', simError);
       // Continue anyway, let client handle the error
@@ -2769,7 +2763,7 @@ async function handleClaimTransactionRequest(body, res, hasResponded, timeout) {
         ),
       });
 
-    // Serialize transaction for frontend
+    // Serialize transaction for frontend (buildClaimTransaction returns Transaction object)
     const serializedTransaction = transaction
       .serialize({
         requireAllSignatures: false,
