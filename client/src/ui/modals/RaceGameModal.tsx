@@ -97,10 +97,14 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
   >('idle');
   const [lastRefreshTime, setLastRefreshTime] = useState(0);
 
-  // Get entry fee from tier pricing (dynamic) or fallback to default
-  const entryFeeAmount =
-    tierPricing.data?.entranceFee ||
-    BigInt(Math.floor(0.01 * LAMPORTS_PER_SOL));
+  // Get entry fee from tier pricing (dynamic) - no fallback, must come from server
+  const entryFeeAmount = tierPricing.data?.entranceFee;
+
+  // Helper function to safely format entry fee amount
+  const formatEntryFee = (amount?: bigint) => {
+    if (!amount) return 'Loading...';
+    return (Number(amount) / LAMPORTS_PER_SOL).toFixed(4);
+  };
 
   // Get level display name from tier
   const getLevelDisplayName = (tier: string) => {
@@ -132,7 +136,9 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
 
   // Check balance using dynamic token balance
   const hasSufficientBalance =
-    dynamicBalance.data && dynamicBalance.data >= entryFeeAmount;
+    dynamicBalance.data &&
+    entryFeeAmount &&
+    dynamicBalance.data >= entryFeeAmount;
   const needsApproval = !gameToken.data?.isSOL && !hasSufficientBalance; // Only for non-SOL tokens
 
   // 🔧 修复：固定一次挂载执行，移除回调依赖
@@ -297,7 +303,10 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
    * 授权USD1代币
    */
   const handleApproval = async () => {
-    if (!address || !entryFeeAmount) return;
+    if (!address || !entryFeeAmount) {
+      addToast('error', 'Entry fee information not available');
+      return;
+    }
 
     try {
       setIsApproving(true);
@@ -324,8 +333,12 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       return;
     }
 
-    if (gameState.gameId === null || gameState.gameId === undefined) {
-      addToast('error', 'No game ID available');
+    if (
+      gameState.gameId === null ||
+      gameState.gameId === undefined ||
+      typeof gameState.gameId !== 'number'
+    ) {
+      addToast('error', 'No valid game ID available');
       return;
     }
 
@@ -371,9 +384,19 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
         expectedAmount: config.entranceFee?.toString(),
       });
 
-      // 🔒 Use secure frontend transaction flow
+      // � DEBUG - Log tier pricing data
+      console.log('🔍 DEBUG - tierPricing data:', {
+        tierPricingData: tierPricing.data,
+        entranceFee: tierPricing.data?.entranceFee?.toString(),
+        entryFeeAmount: entryFeeAmount?.toString(),
+        currentTier,
+      });
+
+      // �🔒 Use secure frontend transaction flow
+      // TypeScript assertion: we've already checked gameId is a valid number above
+      const gameIdNumber = gameState.gameId as number;
       const txResult = await solanaVault.buyTicket(
-        gameState.gameId,
+        gameIdNumber,
         config.entranceFee,
         tokenMint,
         currentTier,
@@ -517,7 +540,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             'Approving...'
           ) : (
             <>
-              Approve {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}{' '}
+              Approve {formatEntryFee(entryFeeAmount)}{' '}
               {gameToken.data?.tokenSymbol || 'Tokens'}
             </>
           )}
@@ -740,11 +763,13 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   </div>
                   <div className="stat-label">Prize Pool</div>
                   <div className="stat-value">
-                    {(
-                      (Number(entryFeeAmount) *
-                        gameState.gameState.registeredCount) /
-                      LAMPORTS_PER_SOL
-                    ).toFixed(4)}{' '}
+                    {entryFeeAmount
+                      ? (
+                          (Number(entryFeeAmount) *
+                            gameState.gameState.registeredCount) /
+                          LAMPORTS_PER_SOL
+                        ).toFixed(4)
+                      : 'Loading...'}{' '}
                     {gameToken.data.tokenSymbol}
                   </div>
                 </div>
@@ -766,7 +791,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   </div>
                   <div className="stat-label">Entry Fee</div>
                   <div className="stat-value">
-                    {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}{' '}
+                    {formatEntryFee(entryFeeAmount)}{' '}
                     {gameToken.data.tokenSymbol}
                   </div>
                 </div>
@@ -914,9 +939,13 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                     <span className="balance-label">Required</span>
                     <span
                       className="balance-value"
-                      title={`${(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(6)} ${gameToken.data?.tokenSymbol || ''}`}
+                      title={
+                        entryFeeAmount
+                          ? `${(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(6)} ${gameToken.data?.tokenSymbol || ''}`
+                          : 'Loading...'
+                      }
                     >
-                      {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}{' '}
+                      {formatEntryFee(entryFeeAmount)}{' '}
                       {gameToken.data?.tokenSymbol || ''}
                     </span>
                   </div>
@@ -925,7 +954,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                 {!hasSufficientBalance && gameToken.data && (
                   <div className="insufficient-warning">
                     ⚠️ Insufficient balance! Need at least{' '}
-                    {(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(4)}{' '}
+                    {formatEntryFee(entryFeeAmount)}{' '}
                     {gameToken.data.tokenSymbol}
                   </div>
                 )}

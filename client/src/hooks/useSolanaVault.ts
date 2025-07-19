@@ -49,6 +49,11 @@ const getErrorMessage = (error: any): string => {
   if (typeof error === 'string') return error;
 
   if (error instanceof Error) {
+    // Handle StructError specifically
+    if (error.name === 'StructError' || error.message.includes('StructError')) {
+      return 'Transaction format error. Please refresh the page and try again';
+    }
+
     // Common wallet errors
     if (error.message.includes('User rejected')) {
       return 'Transaction was cancelled by user';
@@ -64,6 +69,9 @@ const getErrorMessage = (error: any): string => {
     }
     if (error.message.includes('Transaction failed')) {
       return `Transaction failed: ${error.message}`;
+    }
+    if (error.message.includes('Expected the value to satisfy a union')) {
+      return 'Transaction parameter error. Please refresh the page and try again';
     }
     return error.message;
   }
@@ -322,9 +330,18 @@ export const useSolanaVault = () => {
             '🔍 DEBUG - Serialized transaction constructor:',
             serializedTransaction.constructor.name,
           );
+          console.log(
+            '🔍 DEBUG - Serialized transaction length:',
+            serializedTransaction.length,
+          );
+
+          // Ensure we have a proper Buffer/Uint8Array for sendRawTransaction
+          const transactionBuffer = Buffer.isBuffer(serializedTransaction)
+            ? serializedTransaction
+            : Buffer.from(serializedTransaction);
 
           txSignature = await rpcConnection.sendRawTransaction(
-            serializedTransaction,
+            transactionBuffer,
             {
               skipPreflight: true, // Skip simulation to avoid errors
               preflightCommitment: 'confirmed',
@@ -748,8 +765,14 @@ export const useSolanaVault = () => {
             // 使用与buyTicket相同的发送方式：connection.sendRawTransaction + skipPreflight
             // Use random RPC connection for better load balancing
             const rpcConnection = createRandomRPCConnection();
+            // Ensure proper serialization format for sendRawTransaction
+            const serializedTransaction = signedTransaction.serialize();
+            const transactionBuffer = Buffer.isBuffer(serializedTransaction)
+              ? serializedTransaction
+              : Buffer.from(serializedTransaction);
+
             txSignature = await rpcConnection.sendRawTransaction(
-              signedTransaction.serialize(),
+              transactionBuffer,
               {
                 skipPreflight: true, // Skip simulation to avoid errors
                 preflightCommitment: 'confirmed',

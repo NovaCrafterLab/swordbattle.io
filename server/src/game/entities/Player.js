@@ -393,7 +393,6 @@ class Player extends Entity {
     this.tamedEntities.clear();
 
     super.remove();
-    if (this.client) this.client.player = null;
 
     if (this.evolutions) {
       this.evolutions.possibleEvols.clear();
@@ -408,14 +407,17 @@ class Player extends Entity {
     ) {
       const drop = this.calculateDropAmount();
       if (drop > 0) {
-        this.game.map.spawnCoinsInShape(
-          this.shape, drop, c?.account?.id,
-        );
+        this.game.map.spawnCoinsInShape(this.shape, drop, c?.account?.id);
+        // Logger.game.debug('Coins dropped on player death', {
+        //   playerId: this.id,
+        //   playerName: this.name,
+        //   coinsDrop: drop
+        // });
       }
     }
 
     if (!this.isBot) {
-      Logger.game.debug('Player removed', {
+      Logger.game.info('Player removed', {
         playerId: this.id,
         playerName: this.name,
         message,
@@ -425,6 +427,9 @@ class Player extends Entity {
         playtime: this.playtime,
         hasClient: !!this.client,
       });
+
+      // 移除自动游戏结束检查 - 游戏只能通过手动结束、超时、周期重启或服务器关闭来结束
+      // 玩家死亡不再触发游戏结束
     }
   }
 
