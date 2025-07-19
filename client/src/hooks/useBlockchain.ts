@@ -439,38 +439,50 @@ export const useTierPricing = (tier: string = 'low') => {
       setIsLoading(true);
       setError(null);
 
-      // Default tier configurations (can be fetched from server later)
-      const tierConfigs = {
-        low: {
-          entranceFee: BigInt(Math.floor(0.01 * LAMPORTS_PER_SOL)), // 0.01 SOL
-          killReward: BigInt(Math.floor(0.001 * LAMPORTS_PER_SOL)), // 0.001 SOL
-          tierName: 'Low Tier Arena',
-          minLevel: 1,
-          maxLevel: 10,
-          description: 'Beginner-friendly arena with basic rewards',
-        },
-        medium: {
-          entranceFee: BigInt(Math.floor(0.05 * LAMPORTS_PER_SOL)), // 0.05 SOL
-          killReward: BigInt(Math.floor(0.005 * LAMPORTS_PER_SOL)), // 0.005 SOL
-          tierName: 'Medium Tier Arena',
-          minLevel: 11,
-          maxLevel: 25,
-          description: 'Intermediate arena with enhanced rewards',
-        },
-        high: {
-          entranceFee: BigInt(Math.floor(0.1 * LAMPORTS_PER_SOL)), // 0.1 SOL
-          killReward: BigInt(Math.floor(0.01 * LAMPORTS_PER_SOL)), // 0.01 SOL
-          tierName: 'High Tier Arena',
-          minLevel: 26,
-          maxLevel: 999,
-          description: 'Advanced arena with premium rewards',
-        },
+      // Get server URL from localStorage or default
+      const serverUrl =
+        localStorage.getItem('selectedServer') || 'localhost:8000';
+      const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+
+      // Fetch tier configuration from server
+      const response = await fetch(`${protocol}://${serverUrl}/serverinfo`);
+      const serverInfo = await response.json();
+
+      // Extract tier configuration from server info
+      const solanaConfig = serverInfo.solana || {};
+      const tiers = solanaConfig.tiers || {};
+
+      // Get the specific tier configuration
+      const tierConfig = tiers[tier];
+      if (!tierConfig) {
+        throw new Error(
+          `Invalid tier: ${tier}. Available tiers: ${Object.keys(tiers).join(', ')}`,
+        );
+      }
+
+      // Convert entrance fee and kill reward to lamports (assuming they're in token units)
+      // Note: The server config uses token decimals, we need to convert to the smallest unit
+      const tokenDecimals = serverInfo.gameStatus?.tokenDecimals || 9; // Default to 9 decimals
+      const multiplier = Math.pow(10, tokenDecimals);
+
+      const config = {
+        entranceFee: BigInt(Math.floor(tierConfig.entranceFee * multiplier)),
+        killReward: BigInt(Math.floor(tierConfig.killReward * multiplier)),
+        tierName:
+          tierConfig.name ||
+          `${tier.charAt(0).toUpperCase() + tier.slice(1)} Tier Arena`,
+        minLevel: tierConfig.minLevel || 1,
+        maxLevel: tierConfig.maxLevel || 999,
+        description: tierConfig.description || `${tier} tier arena`,
       };
 
-      const config = tierConfigs[tier as keyof typeof tierConfigs];
-      if (!config) {
-        throw new Error(`Invalid tier: ${tier}`);
-      }
+      console.log(`🎯 Tier ${tier} pricing from server:`, {
+        entranceFee: tierConfig.entranceFee,
+        killReward: tierConfig.killReward,
+        entranceFeeWei: config.entranceFee.toString(),
+        killRewardWei: config.killReward.toString(),
+        tokenDecimals,
+      });
 
       setPricing(config);
     } catch (err) {
@@ -851,26 +863,41 @@ export const useBlockchain = () => {
       }
 
       try {
-        // Get tier pricing to determine the correct amount
-        const tierConfigs = {
-          low: { entranceFee: BigInt(Math.floor(0.01 * LAMPORTS_PER_SOL)) },
-          medium: { entranceFee: BigInt(Math.floor(0.05 * LAMPORTS_PER_SOL)) },
-          high: { entranceFee: BigInt(Math.floor(0.1 * LAMPORTS_PER_SOL)) },
-        };
-
-        const config = tierConfigs[tier as keyof typeof tierConfigs];
-        if (!config) {
-          throw new Error(`Invalid tier: ${tier}`);
-        }
-
-        // Get current game token info to determine token mint
+        // Get server configuration (single fetch for both tier and token info)
         const serverUrl =
           localStorage.getItem('selectedServer') || 'localhost:8000';
         const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
 
-        // Fetch game token info
+        // Fetch server info once
         const response = await fetch(`${protocol}://${serverUrl}/serverinfo`);
         const serverInfo = await response.json();
+
+        // Extract tier configuration from server info
+        const solanaConfig = serverInfo.solana || {};
+        const tiers = solanaConfig.tiers || {};
+        const tierConfig = tiers[tier];
+
+        if (!tierConfig) {
+          throw new Error(
+            `Invalid tier: ${tier}. Available tiers: ${Object.keys(tiers).join(', ')}`,
+          );
+        }
+
+        // Convert entrance fee to the smallest unit (considering token decimals)
+        const tokenDecimals = serverInfo.gameStatus?.tokenDecimals || 9;
+        const multiplier = Math.pow(10, tokenDecimals);
+        const entranceFee = BigInt(
+          Math.floor(tierConfig.entranceFee * multiplier),
+        );
+
+        const config = { entranceFee };
+
+        console.log(`🎯 Using tier ${tier} configuration from server:`, {
+          entranceFeeFromServer: tierConfig.entranceFee,
+          entranceFeeWei: entranceFee.toString(),
+          tokenDecimals,
+          multiplier,
+        });
 
         console.log('🔍 DEBUG - Server info:', serverInfo);
 

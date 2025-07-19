@@ -907,11 +907,13 @@ function buildServerInfo(game) {
     solanaEnabled: config.solana.enabled,
     blockchainEnabled: config.solana.enabled,
 
-    solanaConfig: config.solana.enabled
+    solana: config.solana.enabled
       ? {
           cluster: config.solana.environment.cluster,
           killReward: config.solana.killReward,
           programId: config.solana.programId,
+          tokenMint: config.solana.tokenMint,
+          tiers: config.solana.tiers, // Include tier configuration
         }
       : null,
 

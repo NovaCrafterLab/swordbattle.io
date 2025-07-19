@@ -2,8 +2,8 @@
 .race-game-modal-wrapper {
   // 移除固定定位，让外层Modal组件处理
   width: 100%;
-  min-width: 650px;
-  max-width: 50rem;
+  min-width: 1000px;
+  max-width: 75rem;
 
   .race-game-modal {
     position: relative;
@@ -390,8 +390,8 @@
       // Two-column grid container
       .race-content-grid {
         display: grid;
-        grid-template-columns: 1.2fr 1fr;
-        gap: 2rem;
+        grid-template-columns: 1.3fr 1.2fr;
+        gap: 2.5rem;
         align-items: start;
         min-height: 300px;
 
@@ -415,15 +415,16 @@
       .stats-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 1rem;
+        gap: 1.25rem;
 
         .stat-card {
           text-align: center;
-          padding: 1.25rem 1rem;
+          padding: 1.25rem 1.5rem;
           border-radius: 0.75rem;
           background: rgba(255, 255, 255, 0.03);
           border: 1px solid rgba(255, 255, 255, 0.08);
           transition: all 0.2s ease;
+          min-width: 0; // 防止内容溢出
 
           &:hover {
             background: rgba(255, 255, 255, 0.05);
@@ -468,10 +469,12 @@
           }
 
           .stat-value {
-            font-size: 1.1rem;
+            font-size: 1.25rem;
             font-weight: 700;
             color: white;
-            line-height: 1;
+            line-height: 1.2;
+            word-break: break-word; // 允许长数字换行
+            min-width: 0; // 防止溢出
           }
         }
       }
@@ -481,13 +484,15 @@
         background: rgba(16, 185, 129, 0.05);
         border: 1px solid rgba(16, 185, 129, 0.15);
         border-radius: 0.75rem;
-        padding: 1.5rem;
-        min-width: 0; // 防止内容溢出
+        padding: 1.75rem;
+        min-width: 280px; // 给钱包区域最小宽度
+        width: 100%; // 确保占满可用空间
 
         .wallet-header {
           display: flex;
           align-items: center;
-          gap: 0.75rem;
+          justify-content: space-between;
+          gap: 1rem;
           margin-bottom: 1rem;
           flex-wrap: wrap; // 允许换行
 
@@ -507,13 +512,14 @@
 
           .wallet-address {
             font-family: 'SF Mono', Consolas, monospace;
-            font-size: 0.75rem;
-            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.6);
             background: rgba(255, 255, 255, 0.05);
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.25rem;
+            padding: 0.4rem 0.75rem;
+            border-radius: 0.375rem;
             word-break: break-all; // 允许地址换行
             min-width: 0; // 防止溢出
+            flex-shrink: 0; // 防止地址被压缩
           }
         }
 
@@ -526,25 +532,29 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.75rem;
+            padding: 1.1rem 1.5rem;
             background: rgba(255, 255, 255, 0.03);
             border-radius: 0.5rem;
             border: 1px solid rgba(255, 255, 255, 0.08);
             min-width: 0; // 防止溢出
+            gap: 1rem; // 在标签和数值之间添加间距
 
             .balance-label {
-              font-size: 0.875rem;
+              font-size: 0.9rem;
               color: rgba(255, 255, 255, 0.7);
               flex-shrink: 0;
+              min-width: 70px; // 减少标签宽度，给数值更多空间
             }
 
             .balance-value {
               font-family: 'SF Mono', Consolas, monospace;
               font-weight: 600;
-              font-size: 0.8rem;
+              font-size: 1.05rem;
               text-align: right;
-              word-break: break-all; // 允许长数字换行
-              min-width: 0;
+              word-break: break-word; // 允许长数字换行
+              min-width: 120px; // 给数值区域最小宽度
+              flex: 1; // 让数值区域占用剩余空间
+              overflow-wrap: break-word; // 确保长数字能够换行
 
               &.sufficient {
                 color: #10b981;

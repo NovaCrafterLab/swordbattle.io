@@ -313,79 +313,8 @@ export const usePlayerData = () => {
     }
   }, [address, getPlayerGameDataFromBlockchain]);
 
-  /**
-   * 从区块链获取特定游戏的奖励信息（通过API而不是直接调用hooks）
-   */
-  const getGameRewardFromBlockchain = useCallback(
-    async (
-      gameId: number,
-    ): Promise<{
-      reward: bigint;
-      hasClaimed: boolean;
-      usdReward?: bigint;
-      nclabReward?: bigint;
-      usdClaimed?: boolean;
-      nclabClaimed?: boolean;
-      usdClaimable?: boolean;
-      nclabClaimable?: boolean;
-      nclabClaimableTime?: number;
-    }> => {
-      if (!address) return { reward: BigInt(0), hasClaimed: false };
-
-      try {
-        // 通过API端点获取区块链数据，而不是直接调用hooks
-        const apiUrl = api(`/blockchain/games/${gameId}/players/${address}`);
-
-        const response = await fetch(apiUrl);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const result = await response.json();
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to fetch blockchain data');
-        }
-
-        // 解析API返回的数据
-        const playerInfo = result.data;
-
-        // 使用新的API字段
-        const usdAmount = BigInt(
-          Math.floor(
-            parseFloat(playerInfo.usdAmount || playerInfo.totalReward || '0') *
-              1e18,
-          ),
-        );
-        const nclabAmount = BigInt(
-          Math.floor(parseFloat(playerInfo.nclabAmount || '0') * 1e18),
-        );
-        const totalReward = usdAmount + nclabAmount;
-
-        // 获取准确的领取状态
-        const usdClaimed = Boolean(playerInfo.usdClaimed);
-        const nclabClaimed = Boolean(playerInfo.nclabClaimed);
-        const hasClaimed =
-          usdClaimed || nclabClaimed || Boolean(playerInfo.claimed);
-
-        return {
-          reward: totalReward,
-          hasClaimed,
-          // 扩展返回信息以支持分离的USD/NCLab状态
-          usdReward: usdAmount,
-          nclabReward: nclabAmount,
-          usdClaimed,
-          nclabClaimed,
-          usdClaimable: Boolean(playerInfo.usdClaimable),
-          nclabClaimable: Boolean(playerInfo.nclabClaimable),
-          nclabClaimableTime: Number(playerInfo.claimableTime || 0),
-        };
-      } catch (err) {
-        console.error(`Failed to get reward info for game ${gameId}:`, err);
-        return { reward: BigInt(0), hasClaimed: false };
-      }
-    },
-    [address],
-  );
+  // 移除getGameRewardFromBlockchain函数，避免频繁的链上查询
+  // 链上奖励状态验证应该在RewardsModal中按需进行
 
   /**
    * 从数据库API获取玩家游戏历史（仅基础数据，不包含准确的奖励信息）
@@ -457,110 +386,25 @@ export const usePlayerData = () => {
     }
   }, [address]);
 
-  /**
-   * 混合查询：从数据库获取游戏列表，从区块链获取奖励信息
-   */
-  const fetchPlayerGameHistoryMixed = useCallback(async (): Promise<
-    PlayerGameData[]
-  > => {
-    try {
-      // 步骤1：从数据库获取游戏基础数据
-      const databaseGames = await fetchPlayerGameHistoryFromDatabase();
+  // 移除fetchPlayerGameHistoryMixed函数，避免频繁的链上查询
+  // 链上奖励状态验证应该在RewardsModal中按需进行
 
-      if (databaseGames.length === 0) {
-        return [];
-      }
-
-      // 步骤2：从区块链获取奖励信息
-      const rewardPromises = databaseGames.map((game) =>
-        getGameRewardFromBlockchain(game.gameId),
-      );
-
-      const rewardResults = await Promise.all(rewardPromises);
-
-      // 步骤3：合并数据
-      const mergedGames: PlayerGameData[] = databaseGames.map((game, index) => {
-        const rewardInfo = rewardResults[index];
-
-        // 如果区块链查询失败或返回0奖励，使用数据库中的奖励数据
-        let finalReward = rewardInfo.reward;
-        let finalHasClaimed = rewardInfo.hasClaimed;
-
-        if (rewardInfo.reward === BigInt(0) && game.reward > BigInt(0)) {
-          finalReward = game.reward;
-          finalHasClaimed = game.hasClaimed;
-        }
-
-        return {
-          ...game,
-          reward: finalReward,
-          hasClaimed: finalHasClaimed,
-          // 添加新的奖励状态字段
-          usdReward: rewardInfo.usdReward || BigInt(0),
-          nclabReward: rewardInfo.nclabReward || BigInt(0),
-          usdClaimed: rewardInfo.usdClaimed || false,
-          nclabClaimed: rewardInfo.nclabClaimed || false,
-          usdClaimable: rewardInfo.usdClaimable || false,
-          nclabClaimable: rewardInfo.nclabClaimable || false,
-          nclabClaimableTime: rewardInfo.nclabClaimableTime || 0,
-          isWinner: finalReward > BigInt(0) || game.isWinner,
-        };
-      });
-
-      // 异步同步区块链奖励数据到数据库
-      if (mergedGames.length > 0) {
-        syncRewardsToDatabase().catch((error) => {
-          console.error('Failed to sync rewards to database:', error);
-        });
-      }
-
-      return mergedGames.sort((a, b) => b.gameId - a.gameId);
-    } catch (err) {
-      console.error('Mixed query failed:', err);
-      return [];
-    }
-  }, [fetchPlayerGameHistoryFromDatabase, getGameRewardFromBlockchain]);
+  // 移除syncRewardsToDatabase函数，同步逻辑应该在RewardsModal中按需进行
 
   /**
-   * 同步区块链奖励数据到数据库
-   */
-  const syncRewardsToDatabase = useCallback(async (): Promise<void> => {
-    if (!address) return;
-
-    try {
-      const apiUrl = api(`/race-games/players/${address}/sync-rewards`);
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        console.warn(
-          'Sync API call failed:',
-          response.status,
-          response.statusText,
-        );
-      }
-    } catch (error) {
-      console.error('Failed to sync blockchain rewards:', error);
-    }
-  }, [address]);
-
-  /**
-   * 主要的数据获取方法 - 默认使用混合查询
+   * 主要的数据获取方法 - 默认使用数据库查询，避免频繁的链上请求
    */
   const fetchPlayerGameHistory = useCallback(
     async (useBlockchain: boolean = false): Promise<PlayerGameData[]> => {
       if (useBlockchain) {
         return await fetchPlayerGameHistoryFromBlockchain();
       } else {
-        return await fetchPlayerGameHistoryMixed();
+        // 直接使用数据库数据，避免频繁的链上查询
+        // 链上奖励状态验证应该在RewardsModal中按需进行
+        return await fetchPlayerGameHistoryFromDatabase();
       }
     },
-    [fetchPlayerGameHistoryFromBlockchain, fetchPlayerGameHistoryMixed],
+    [fetchPlayerGameHistoryFromBlockchain, fetchPlayerGameHistoryFromDatabase],
   );
 
   /**
@@ -581,8 +425,8 @@ export const usePlayerData = () => {
       refetchAllowance();
       refetchNonce();
 
-      // 使用混合查询获取玩家游戏历史（数据库 + 区块链）
-      const gameHistory = await fetchPlayerGameHistory(false); // false = 使用混合查询
+      // 使用数据库查询获取玩家游戏历史（避免频繁的链上查询）
+      const gameHistory = await fetchPlayerGameHistory(false); // false = 使用数据库查询
       // 计算统计数据
       const totalRewards = gameHistory.reduce(
         (sum, game) => sum + game.reward,

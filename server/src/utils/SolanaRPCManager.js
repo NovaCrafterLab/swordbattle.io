@@ -19,9 +19,8 @@ const SOLANA_DEVNET_RPC_POOL =
     ? RPC_API_KEYS.map((key) => `https://devnet.helius-rpc.com/?api-key=${key}`)
     : [
         'https://api.devnet.solana.com',
-        'https://devnet.helius-rpc.com/?api-key=demo',
         'https://rpc.ankr.com/solana_devnet',
-        'https://solana-devnet.g.alchemy.com/v2/demo',
+        // Removed invalid demo endpoints that cause 401/429 errors
       ];
 
 // Solana Mainnet RPC池配置 (使用Helius API密钥)
@@ -32,9 +31,8 @@ const SOLANA_MAINNET_RPC_POOL =
       )
     : [
         'https://api.mainnet-beta.solana.com',
-        'https://mainnet.helius-rpc.com/?api-key=demo',
         'https://rpc.ankr.com/solana',
-        'https://solana-mainnet.g.alchemy.com/v2/demo',
+        // Removed invalid demo endpoints that cause 401/429 errors
       ];
 
 // RPC池配置
