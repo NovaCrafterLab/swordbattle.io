@@ -59,9 +59,6 @@ const SolanaWalletProviders: React.FC<{ children: React.ReactNode }> = ({
     return endpoint || clusterApiUrl(network);
   }, []);
 
-  // 显示区块链信息
-  console.log(`🔗 Solana Blockchain Configuration:`, BLOCKCHAIN_INFO);
-
   return (
     <ConnectionProvider endpoint={rpcEndpoint}>
       <WalletProvider wallets={wallets} autoConnect>

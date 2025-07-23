@@ -69,10 +69,6 @@ export const createRandomRPCConnection = () => {
     ? selectedRpc.split('api-key=')[1]?.substring(0, 8) + '...'
     : 'N/A';
 
-  console.log(
-    `🚀 Using ${isHelius ? 'Helius' : 'fallback'} RPC: ${rpcEndpoint}${isHelius ? ` (key: ${apiKey})` : ''}`,
-  );
-
   try {
     // 🔧 添加超时保护：为 Connection 对象添加默认超时配置
     const connection = new Connection(selectedRpc, {
@@ -82,9 +78,7 @@ export const createRandomRPCConnection = () => {
       },
       // 设置 15 秒超时
       fetch: (url, options) => {
-        const timeoutId = setTimeout(() => {
-          console.warn(`⚠️ RPC request timeout for ${rpcEndpoint}`);
-        }, 15000);
+        const timeoutId = setTimeout(() => {}, 15000);
 
         return fetch(url, {
           ...options,
@@ -93,12 +87,10 @@ export const createRandomRPCConnection = () => {
       },
     });
 
-    console.log(`✅ RPC connection created with 15s timeout protection`);
     return connection;
   } catch (error) {
     console.error(`❌ Failed to create RPC connection: ${error}`);
     const fallbackRpc = rpcManager.markCurrentRPCFailed();
-    console.log(`🔄 Switched to fallback RPC: ${fallbackRpc.split('/').pop()}`);
 
     // 尝试创建备用连接，同样带超时保护
     return new Connection(fallbackRpc, {
@@ -162,17 +154,11 @@ export const createRobustRPCConnection = async <T>(
       ]);
 
       const result = await operationWithTimeout;
-      console.log(
-        `✅ Robust RPC operation succeeded on attempt ${attempt + 1}`,
-      );
 
       // If successful, return the result
       return result;
     } catch (error) {
       lastError = error as Error;
-      console.warn(
-        `⚠️ RPC operation failed on attempt ${attempt + 1}/${maxRetries}: ${lastError.message}`,
-      );
 
       // If this is a network error and we have more retries, try next RPC
       if (
@@ -185,7 +171,6 @@ export const createRobustRPCConnection = async <T>(
           (error as any).message?.includes('network'))
       ) {
         const newRpc = rpcManager.markCurrentRPCFailed();
-        console.log(`🔄 Switching to next RPC: ${newRpc.split('/').pop()}`);
 
         // Wait a bit before retrying with exponential backoff
         const backoffDelay = Math.min(1000 * Math.pow(2, attempt), 5000);
@@ -195,7 +180,6 @@ export const createRobustRPCConnection = async <T>(
     }
   }
 
-  console.error(`❌ All ${maxRetries} RPC attempts failed`);
   throw (
     lastError ||
     new Error(`All RPC attempts failed after ${maxRetries} retries`)

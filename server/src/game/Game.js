@@ -1095,7 +1095,7 @@ class Game {
     Logger.game.info('Collected player kill rewards', {
       gameId: this.solanaGameId,
       rewardCount: this.finalKillRewards.size,
-      totalRewardSOL: Array.from(this.finalKillRewards.values())
+      totalTokenRewards: Array.from(this.finalKillRewards.values())
         .reduce((sum, r) => sum + r.rewardSOL, 0)
         .toFixed(6),
     });
@@ -1134,18 +1134,21 @@ class Game {
   }
 
   /**
-   * Calculate kill-based rewards for Solana
+   * Calculate kill-based rewards for Solana using tier-based configuration
    * Simplified from complex BSC scoring system
    */
   calculatePlayerKillRewards(player) {
     // Only kills matter for Solana rewards
     const kills = player.kills || 0;
-    const killReward = config.solana.killReward || 0.001; // SOL per kill
+
+    // Use tier-based configuration instead of deprecated killReward
+    const tierConfig = config.solana.tiers[this.gameTier || 'low'];
+    const killReward = tierConfig.killReward; // Use tier-specific kill reward
 
     return {
       kills,
-      rewardSOL: kills * killReward,
-      rewardLamports: Math.floor(kills * killReward * 1e9), // Convert to lamports
+      rewardSOL: kills * killReward, // This will be converted by SolanaVaultService with proper decimals
+      rewardLamports: Math.floor(kills * killReward * 1e9), // Temporary lamports (will be corrected by SolanaVaultService)
     };
   }
 
@@ -1268,11 +1271,11 @@ class Game {
 
       console.log(`💰 Distributing pre-calculated rewards:`, {
         playerCount: rewardArray.length,
-        totalSOL: rewardArray
+        totalTokens: rewardArray
           .reduce((sum, r) => sum + r.rewardSOL, 0)
           .toFixed(6),
         rewards: rewardArray.map(
-          (r) => `${r.playerName}: ${r.kills} kills = ${r.rewardSOL} SOL`,
+          (r) => `${r.playerName}: ${r.kills} kills = ${r.rewardSOL} LBG`,
         ),
       });
 
@@ -1342,13 +1345,13 @@ class Game {
 
     const playerCount = this.players.size;
     const rewardCount = killRewards.size;
-    const totalSOL = Array.from(killRewards.values()).reduce(
+    const totalTokens = Array.from(killRewards.values()).reduce(
       (sum, r) => sum + r.rewardSOL,
       0,
     );
 
     console.log(
-      `🔄 Scheduled ${playerCount} players to be kicked, ${rewardCount} rewards distributed (${totalSOL.toFixed(6)} SOL total)`,
+      `🔄 Scheduled ${playerCount} players to be kicked, ${rewardCount} rewards distributed (${totalTokens.toFixed(6)} LBG total)`,
     );
   }
 
@@ -2077,7 +2080,7 @@ class Game {
       gameStartTime: this.gameStartTime,
       gameEndTime: this.gameEndTime,
       killRewardsCount: this.finalKillRewards.size,
-      totalRewardSOL: Array.from(this.finalKillRewards.values()).reduce(
+      totalTokenRewards: Array.from(this.finalKillRewards.values()).reduce(
         (sum, r) => sum + r.rewardSOL,
         0,
       ),
@@ -2280,7 +2283,7 @@ class Game {
       gameStartTime: this.gameStartTime,
       gameEndTime: this.gameEndTime,
       killRewardsCount: this.finalKillRewards.size,
-      totalRewardSOL: Array.from(this.finalKillRewards.values()).reduce(
+      totalTokenRewards: Array.from(this.finalKillRewards.values()).reduce(
         (sum, r) => sum + r.rewardSOL,
         0,
       ),

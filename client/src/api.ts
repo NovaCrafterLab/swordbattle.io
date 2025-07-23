@@ -23,7 +23,6 @@ async function ensureEndpoint() {
   try {
     await fetch(`${currentEndpoint}/games/ping`, { method: 'GET' });
   } catch {
-    console.log('Endpoint down, switching to backup');
     currentEndpoint = backupEndpoint;
   }
 }

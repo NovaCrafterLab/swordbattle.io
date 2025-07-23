@@ -673,7 +673,6 @@ export const useSolanaVault = () => {
 
           // 🚀 实现多重发送机制，提高交易成功率
           console.log('🔄 Starting multi-retry transaction sending...');
-          let txSignature: string | null = null;
           let lastError: Error | null = null;
           const maxRetries = 3;
           const retryDelays = [0, 2000, 5000]; // 0ms, 2s, 5s
@@ -1352,7 +1351,6 @@ export const useSolanaVault = () => {
 
             // 🚀 实现多重发送机制，提高交易成功率（与buyTicket保持一致）
             console.log('🔄 Starting multi-retry claim transaction sending...');
-            let txSignature: string | null = null;
             let lastError: Error | null = null;
             const maxRetries = 3;
             const retryDelays = [0, 2000, 5000]; // 0ms, 2s, 5s
@@ -1447,13 +1445,48 @@ export const useSolanaVault = () => {
 
         // Step 3: Wait for confirmation
         console.log('⏳ Waiting for transaction confirmation...');
+
+        // 🚨 关键修复：验证交易签名有效性，防止空签名传入确认函数
+        if (
+          !txSignature ||
+          typeof txSignature !== 'string' ||
+          txSignature.trim().length === 0
+        ) {
+          console.error(
+            '❌ Invalid transaction signature before confirmation:',
+            {
+              txSignature,
+              type: typeof txSignature,
+              length: txSignature?.length || 0,
+            },
+          );
+          throw new Error(
+            `Invalid transaction signature for confirmation: "${txSignature}". This indicates a transaction sending failure.`,
+          );
+        }
+
+        // 基本的Solana交易签名格式验证（与buyTicket保持一致）
+        const trimmedSignature = txSignature.trim();
+        if (trimmedSignature.length < 80 || trimmedSignature.length > 95) {
+          console.warn(
+            `⚠️ Claim transaction signature length unusual: ${trimmedSignature.length} characters`,
+          );
+          console.warn(
+            `⚠️ Signature: ${trimmedSignature.slice(0, 10)}...${trimmedSignature.slice(-10)}`,
+          );
+        }
+
+        console.log(
+          `🔍 Confirming transaction with signature: ${trimmedSignature.slice(0, 8)}...${trimmedSignature.slice(-8)}`,
+        );
+
         try {
           // Use random RPC connection for confirmation
           const rpcConnection = createRandomRPCConnection();
           const latestBlockhash = await rpcConnection.getLatestBlockhash();
           const confirmation = await rpcConnection.confirmTransaction(
             {
-              signature: txSignature,
+              signature: trimmedSignature,
               blockhash: latestBlockhash.blockhash,
               lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
             },
@@ -1477,7 +1510,9 @@ export const useSolanaVault = () => {
             confirmationError,
           );
           // 即使确认失败，交易可能已经成功，所以记录transaction hash
-          console.log(`ℹ️ Transaction was sent with signature: ${txSignature}`);
+          console.log(
+            `ℹ️ Transaction was sent with signature: ${trimmedSignature}`,
+          );
           console.log(
             'ℹ️ You can check the transaction status on Solana Explorer',
           );
@@ -1491,15 +1526,15 @@ export const useSolanaVault = () => {
                 );
 
           // 添加transaction signature到错误信息中
-          confirmError.message += ` (TX: ${txSignature})`;
+          confirmError.message += ` (TX: ${trimmedSignature})`;
           throw confirmError;
         }
 
         setTxStatus('completed');
         console.log(
-          `🎉 Reward claimed successfully for game ${gameId} - TX: ${txSignature}`,
+          `🎉 Reward claimed successfully for game ${gameId} - TX: ${trimmedSignature}`,
         );
-        return txSignature;
+        return trimmedSignature;
       } catch (error) {
         console.error(`❌ Failed to claim reward for game ${gameId}:`, error);
         console.error('❌ Error details:', {
