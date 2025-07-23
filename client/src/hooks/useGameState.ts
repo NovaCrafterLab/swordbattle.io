@@ -71,20 +71,6 @@ export const useGameState = (serverUrl?: string) => {
   // 获取当前游戏ID - 使用稳定的服务器获取方式
   const { data: gameCounter } = blockchain.useGameCounter();
 
-  // 添加gameCounter调试信息
-  logger.debug('🎯 GameCounter debug:', {
-    gameCounter,
-    gameCounterType: typeof gameCounter,
-    gameCounterValue: gameCounter,
-    isNumber: typeof gameCounter === 'number',
-    isBigInt: typeof gameCounter === 'bigint',
-    isGreaterEqualZero:
-      (typeof gameCounter === 'number' && gameCounter >= 0) ||
-      (typeof gameCounter === 'bigint' && gameCounter >= 0n),
-    condition: gameCounter !== null && gameCounter !== undefined,
-    serverGameId: serverInfo?.gameStatus?.gameId,
-  });
-
   // 获取入场费
   const { data: entryFee } = blockchain.useEntryFee();
 

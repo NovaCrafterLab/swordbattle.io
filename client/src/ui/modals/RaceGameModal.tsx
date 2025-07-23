@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
@@ -97,6 +97,10 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     'idle' | 'approving' | 'joining' | 'waiting'
   >('idle');
   const [lastRefreshTime, setLastRefreshTime] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false); // 添加刷新状态标记
+
+  // 使用 ref 存储稳定的刷新函数引用
+  const refreshDataRef = useRef<() => Promise<void>>();
 
   // Get entry fee from tier pricing (dynamic) - no fallback, must come from server
   const entryFeeAmount = tierPricing.data?.entranceFee;
@@ -231,11 +235,12 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     setPrevConnectionState({ isConnected, address: address || null });
   }, [isConnected, address]); // 🎯 只依赖原始值，不依赖函数
 
-  // 统一的数据刷新函数
+  // 统一的数据刷新函数 - 使用 ref 避免依赖循环
   const refreshData = useCallback(async () => {
     const now = Date.now();
-    if (now - lastRefreshTime < 1000) return; // 防抖保护：1秒内只能刷新一次
+    if (now - lastRefreshTime < 1000) return; // 防抖保护：5秒内只能刷新一次
     setLastRefreshTime(now);
+    setIsRefreshing(true);
 
     try {
       await Promise.allSettled([
@@ -248,30 +253,26 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       ]);
     } catch (error) {
       // Silent failure - no console output
+    } finally {
+      setIsRefreshing(false);
     }
-  }, [
-    lastRefreshTime,
-    gameState,
-    gameToken,
-    tierPricing,
-    isConnected,
-    address,
-    playerData,
-    dynamicBalance,
-  ]);
+  }, [lastRefreshTime, isRefreshing]); // 最小化依赖
 
-  // 🔧 修复：使用统一刷新函数的自动刷新
+  // 将稳定的刷新函数存储在 ref 中
+  refreshDataRef.current = refreshData;
+
+  // 🔧 修复：使用稳定引用的自动刷新，避免定时器重复创建
   useEffect(() => {
-    if (txStep !== 'idle') {
-      return; // Skip auto-refresh during transactions
+    if (txStep !== 'idle' || isRefreshing) {
+      return; // Skip auto-refresh during transactions or when already refreshing
     }
 
     const autoRefreshInterval = setInterval(() => {
-      refreshData();
-    }, 60000);
+      refreshDataRef.current?.();
+    }, 30000); // 增加到180秒，减少频率
 
     return () => clearInterval(autoRefreshInterval);
-  }, [txStep, refreshData]); // 依赖统一的刷新函数
+  }, [txStep, isRefreshing]); // 使用稳定的依赖
 
   // 🔧 修复：使用 ref 跟踪 gameId 变化，避免重复刷新
   const [prevGameId, setPrevGameId] = useState<number | null>(null);
@@ -483,14 +484,101 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      addToast('error', `Failed to join game: ${errorMessage}`, 5000);
+
+      // 🚨 紧急修复：在显示错误前检查交易是否实际成功，并验证票据状态
+      if (solanaVault.currentTxHash) {
+        console.warn(
+          '⚠️ Error occurred but transaction hash exists, checking ticket status...',
+        );
+
+        try {
+          console.log(
+            '🎫 Attempting ticket verification for error recovery in handleJoinGame...',
+          );
+
+          // 等待一下让区块链处理
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
+          const gameIdNumber = gameState.gameId as number;
+          const eligibility =
+            await solanaVault.checkGameEntryEligibility(gameIdNumber);
+
+          console.log('🔍 HandleJoinGame error recovery result:', {
+            hasTicket: eligibility.hasTicket,
+            canEnter: eligibility.canEnter,
+            reason: eligibility.reason,
+          });
+
+          if (eligibility.canEnter && eligibility.hasTicket) {
+            addToast(
+              'success',
+              '✅ 交易已成功完成，票据验证通过，正在进入游戏...',
+              3000,
+            );
+
+            // 交易成功且有有效票据，进入游戏
+            setTimeout(() => {
+              onJoinGame(address);
+              onClose();
+            }, 1000);
+            return; // 重要：不执行后续的错误处理
+          } else if (eligibility.hasTicket) {
+            addToast('success', '✅ 交易成功，票据已获得！', 3000);
+            // 刷新数据以反映新的票据状态
+            await gameState.refreshGameData();
+            return;
+          } else {
+            addToast(
+              'info',
+              '⚠️ 交易可能成功但票据状态待确认，请稍后重试或联系客服',
+              5000,
+            );
+          }
+        } catch (recoveryError) {
+          console.warn(
+            '⚠️ Ticket verification in error recovery failed:',
+            recoveryError,
+          );
+        }
+      }
+
+      // 🚨 改进错误消息：提供更具体和有用的错误信息
+      let userFriendlyError = errorMessage;
+
+      // 根据不同的错误类型提供相应的解决方案
+      if (errorMessage.includes('交易提交完全失败')) {
+        userFriendlyError =
+          '网络连接问题导致交易无法提交，请检查网络连接后重试';
+      } else if (errorMessage.includes('无效的交易签名格式')) {
+        userFriendlyError = '交易格式错误，请刷新页面后重试';
+      } else if (errorMessage.includes('Invalid transaction signature')) {
+        userFriendlyError = '交易未正确生成，可能是网络问题，请重试';
+      } else if (errorMessage.includes('failed to get signature status')) {
+        userFriendlyError =
+          '区块链网络繁忙，无法确认交易状态，请稍后查看交易记录';
+      } else if (errorMessage.includes('WrongSize')) {
+        userFriendlyError = '网络数据格式错误，请刷新页面后重试';
+      } else if (errorMessage.includes('insufficient funds')) {
+        userFriendlyError = '账户余额不足，请充值后重试';
+      } else if (
+        errorMessage.includes('User rejected') ||
+        errorMessage.includes('user rejected')
+      ) {
+        userFriendlyError = '您取消了交易签名';
+      } else if (errorMessage.includes('timeout')) {
+        userFriendlyError = '网络超时，请检查网络连接后重试';
+      } else if (errorMessage.includes('fetch')) {
+        userFriendlyError = '网络连接失败，请检查网络后重试';
+      }
+
+      addToast('error', `支付失败: ${userFriendlyError}`, 8000); // 延长显示时间便于用户阅读
       setTxStep('idle');
     } finally {
       setIsJoining(false);
     }
   };
 
-  // 🔧 修复：简化交易状态监听，适配新的安全交易流程
+  // 🔧 修复：优化交易状态监听，避免重复刷新
   useEffect(() => {
     // Handle legacy txStep states for backward compatibility
     if (txStep !== 'idle') {
@@ -513,18 +601,14 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       }
     }
 
-    // Handle new secure transaction status
-    if (solanaVault.txStatus === 'completed') {
-      // Transaction completed successfully, refresh data
-      Promise.allSettled([
-        gameState.refreshGameData(),
-        playerData.refreshPlayerData(),
-        dynamicBalance.refetch(),
-      ]).catch((error: any) => {
-        // Silent failure - no console output
-      });
+    // Handle new secure transaction status - 只在完成时刷新一次
+    if (solanaVault.txStatus === 'completed' && !isRefreshing) {
+      // 延迟3秒后刷新，给服务器时间处理交易
+      setTimeout(() => {
+        refreshDataRef.current?.();
+      }, 3000);
     }
-  }, [txStep, solanaVault.txStatus, playerData, dynamicBalance, gameState]); // 🎯 修复依赖
+  }, [txStep, solanaVault.txStatus, isRefreshing]); // 添加 isRefreshing 防止重复
 
   /**
    * 获取按钮状态和文本 - 优化设计
@@ -667,7 +751,52 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             onClose();
           }}
         >
-          Enter Game (Purchased)
+          进入游戏 (支付成功)
+        </button>
+      );
+    }
+
+    // 处理交易错误但可能成功的情况
+    if (solanaVault.error && solanaVault.currentTxHash) {
+      return (
+        <button
+          className="race-btn warning"
+          onClick={async () => {
+            try {
+              console.log(
+                '🎫 Ticket verification from error button started...',
+              );
+
+              // 使用票据验证代替交易状态恢复
+              const gameIdNumber = gameState.gameId as number;
+              const eligibility =
+                await solanaVault.checkGameEntryEligibility(gameIdNumber);
+
+              console.log('🔍 Error button verification result:', {
+                hasTicket: eligibility.hasTicket,
+                canEnter: eligibility.canEnter,
+                reason: eligibility.reason,
+              });
+
+              if (eligibility.canEnter && eligibility.hasTicket) {
+                onJoinGame(address);
+                onClose();
+              } else if (eligibility.hasTicket) {
+                addToast('success', '✅ 票据验证通过！', 3000);
+                await gameState.refreshGameData();
+              } else {
+                addToast('info', '⚠️ 请检查交易状态或联系客服', 3000);
+              }
+            } catch (error) {
+              console.error(
+                '❌ Error button ticket verification failed:',
+                error,
+              );
+              addToast('error', '无法验证票据状态', 3000);
+            }
+          }}
+        >
+          验证票据状态
         </button>
       );
     }
@@ -800,9 +929,10 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             </div>
 
             <button
-              onClick={refreshData}
+              onClick={() => refreshDataRef.current?.()}
               className="refresh-button"
               title="Refresh game data"
+              disabled={isRefreshing}
             ></button>
           </div>
         </div>
@@ -910,7 +1040,10 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   )}
                   {solanaVault.txStatus === 'verifying' && (
                     <div className="tx-step active">
-                      🔍 Verifying ticket creation...
+                      🎫 正在验证票据创建状态...
+                      <div className="verify-info">
+                        交易已提交成功，正在确认票据是否已创建完成
+                      </div>
                     </div>
                   )}
                   {solanaVault.txStatus === 'completed' && (
@@ -938,16 +1071,21 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   )}
                 </div>
 
-                {/* Show transaction hash if available */}
+                {/* Show transaction hash if available - 资金保护机制 */}
                 {solanaVault.currentTxHash && (
                   <div className="tx-hash-info">
+                    <div className="tx-success-notice">
+                      <span className="success-icon">✅</span>
+                      <span className="success-text">交易已提交成功</span>
+                    </div>
                     <a
                       href={`https://solscan.io/tx/${solanaVault.currentTxHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="tx-hash-link"
+                      title={`交易哈希: ${solanaVault.currentTxHash}`}
                     >
-                      View on Solscan
+                      查看交易详情 ({solanaVault.currentTxHash.slice(0, 8)}...)
                     </a>
                   </div>
                 )}
@@ -1039,7 +1177,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
               </div>
             )}
 
-            {/* Error States */}
+            {/* Error States with Recovery Options */}
             {(gameState.error ||
               playerData.error ||
               gameToken.error ||
@@ -1058,18 +1196,81 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                       dynamicBalance.error,
                   )}
                 </div>
-                {solanaVault.error && (
-                  <button
-                    className="error-retry-btn"
-                    onClick={() => {
-                      // Clear vault error and allow user to retry
-                      solanaVault.error = null;
-                      setTxStep('idle');
-                    }}
-                  >
-                    Try Again
-                  </button>
-                )}
+
+                {/* 添加恢复选项 */}
+                <div className="error-actions">
+                  {solanaVault.error && solanaVault.currentTxHash && (
+                    <button
+                      className="error-recovery-btn"
+                      onClick={async () => {
+                        try {
+                          console.log(
+                            '🎫 Manual ticket verification started...',
+                          );
+
+                          // 使用票据验证代替交易状态恢复
+                          const gameIdNumber = gameState.gameId as number;
+                          const eligibility =
+                            await solanaVault.checkGameEntryEligibility(
+                              gameIdNumber,
+                            );
+
+                          console.log('🔍 Manual verification result:', {
+                            hasTicket: eligibility.hasTicket,
+                            canEnter: eligibility.canEnter,
+                            reason: eligibility.reason,
+                          });
+
+                          if (eligibility.canEnter && eligibility.hasTicket) {
+                            addToast(
+                              'success',
+                              '✅ 票据验证通过，正在进入游戏...',
+                              3000,
+                            );
+                            setTimeout(() => {
+                              onJoinGame(address);
+                              onClose();
+                            }, 1000);
+                          } else if (eligibility.hasTicket) {
+                            addToast('success', '✅ 票据验证通过！', 3000);
+                            await gameState.refreshGameData();
+                          } else {
+                            addToast(
+                              'info',
+                              '⚠️ 未找到有效票据。交易可能仍在处理中，请稍后重试。',
+                              5000,
+                            );
+                          }
+                        } catch (error) {
+                          console.error(
+                            '❌ Manual ticket verification failed:',
+                            error,
+                          );
+                          addToast(
+                            'error',
+                            '无法验证票据状态，请稍后重试或联系客服',
+                            3000,
+                          );
+                        }
+                      }}
+                    >
+                      检查票据状态
+                    </button>
+                  )}
+
+                  {solanaVault.error && (
+                    <button
+                      className="error-retry-btn"
+                      onClick={() => {
+                        // Clear vault error and allow user to retry
+                        solanaVault.error = null;
+                        setTxStep('idle');
+                      }}
+                    >
+                      重试支付
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 

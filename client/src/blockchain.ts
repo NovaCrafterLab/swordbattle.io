@@ -57,22 +57,62 @@ export { WalletAdapterNetwork };
 // Export RPC manager for advanced usage
 export const getRPCManager = () => SolanaRPCManager.getInstance();
 
-// Create a random RPC connection for blockchain operations
+// Create a random RPC connection for blockchain operations with timeout protection
 export const createRandomRPCConnection = () => {
   const rpcManager = SolanaRPCManager.getInstance();
   const selectedRpc = rpcManager.getCurrentRPC();
 
-  console.log(`📡 Using random RPC: ${selectedRpc.split('/').pop()}`);
+  // Enhanced logging to show Helius endpoint usage
+  const rpcEndpoint = selectedRpc.split('/').pop() || selectedRpc;
+  const isHelius = selectedRpc.includes('helius-rpc.com');
+  const apiKey = isHelius
+    ? selectedRpc.split('api-key=')[1]?.substring(0, 8) + '...'
+    : 'N/A';
+
+  console.log(
+    `🚀 Using ${isHelius ? 'Helius' : 'fallback'} RPC: ${rpcEndpoint}${isHelius ? ` (key: ${apiKey})` : ''}`,
+  );
 
   try {
-    return new Connection(selectedRpc, 'confirmed');
+    // 🔧 添加超时保护：为 Connection 对象添加默认超时配置
+    const connection = new Connection(selectedRpc, {
+      commitment: 'confirmed',
+      httpHeaders: {
+        'Content-Type': 'application/json',
+      },
+      // 设置 15 秒超时
+      fetch: (url, options) => {
+        const timeoutId = setTimeout(() => {
+          console.warn(`⚠️ RPC request timeout for ${rpcEndpoint}`);
+        }, 15000);
+
+        return fetch(url, {
+          ...options,
+          signal: AbortSignal.timeout(15000), // 15秒超时
+        }).finally(() => clearTimeout(timeoutId));
+      },
+    });
+
+    console.log(`✅ RPC connection created with 15s timeout protection`);
+    return connection;
   } catch (error) {
+    console.error(`❌ Failed to create RPC connection: ${error}`);
     const fallbackRpc = rpcManager.markCurrentRPCFailed();
-    return new Connection(fallbackRpc, 'confirmed');
+    console.log(`🔄 Switched to fallback RPC: ${fallbackRpc.split('/').pop()}`);
+
+    // 尝试创建备用连接，同样带超时保护
+    return new Connection(fallbackRpc, {
+      commitment: 'confirmed',
+      fetch: (url, options) =>
+        fetch(url, {
+          ...options,
+          signal: AbortSignal.timeout(15000),
+        }),
+    });
   }
 };
 
-// Create a robust RPC connection with automatic retry on network failures
+// Create a robust RPC connection with automatic retry on network failures and timeout
 export const createRobustRPCConnection = async <T>(
   operation: (connection: Connection) => Promise<T>,
   maxRetries: number = 3,
@@ -84,29 +124,78 @@ export const createRobustRPCConnection = async <T>(
     try {
       const selectedRpc = rpcManager.getCurrentRPC();
 
-      const connection = new Connection(selectedRpc, 'confirmed');
-      const result = await operation(connection);
+      // 🔧 添加超时保护和增强错误处理
+      const connection = new Connection(selectedRpc, {
+        commitment: 'confirmed',
+        fetch: (url, options) => {
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            setTimeout(() => {
+              reject(
+                new Error(
+                  `RPC connection timeout after 15 seconds for ${selectedRpc.split('/').pop()}`,
+                ),
+              );
+            }, 15000);
+          });
+
+          const fetchPromise = fetch(url, {
+            ...options,
+            signal: AbortSignal.timeout(15000),
+          });
+
+          return Promise.race([fetchPromise, timeoutPromise]);
+        },
+      });
+
+      // 添加操作超时保护，防止操作本身卡死
+      const operationWithTimeout = Promise.race([
+        operation(connection),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(
+              new Error(
+                `Operation timeout after 20 seconds (attempt ${attempt + 1}/${maxRetries})`,
+              ),
+            );
+          }, 20000); // 20秒操作超时
+        }),
+      ]);
+
+      const result = await operationWithTimeout;
+      console.log(
+        `✅ Robust RPC operation succeeded on attempt ${attempt + 1}`,
+      );
 
       // If successful, return the result
       return result;
     } catch (error) {
       lastError = error as Error;
+      console.warn(
+        `⚠️ RPC operation failed on attempt ${attempt + 1}/${maxRetries}: ${lastError.message}`,
+      );
+
       // If this is a network error and we have more retries, try next RPC
       if (
         attempt < maxRetries - 1 &&
         (error instanceof TypeError ||
           (error as any).message?.includes('Failed to fetch') ||
-          (error as any).message?.includes('fetch'))
+          (error as any).message?.includes('fetch') ||
+          (error as any).message?.includes('timeout') ||
+          (error as any).message?.includes('Connection timeout') ||
+          (error as any).message?.includes('network'))
       ) {
         const newRpc = rpcManager.markCurrentRPCFailed();
         console.log(`🔄 Switching to next RPC: ${newRpc.split('/').pop()}`);
 
-        // Wait a bit before retrying
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        // Wait a bit before retrying with exponential backoff
+        const backoffDelay = Math.min(1000 * Math.pow(2, attempt), 5000);
+        console.log(`⏱️ Waiting ${backoffDelay}ms before retrying...`);
+        await new Promise((resolve) => setTimeout(resolve, backoffDelay));
       }
     }
   }
 
+  console.error(`❌ All ${maxRetries} RPC attempts failed`);
   throw (
     lastError ||
     new Error(`All RPC attempts failed after ${maxRetries} retries`)

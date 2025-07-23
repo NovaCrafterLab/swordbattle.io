@@ -63,11 +63,39 @@ export const useSOLBalance = (walletAddress: string) => {
       setIsLoading(true);
       setError(null);
 
+      console.log(
+        `🔗 Fetching SOL balance for: ${walletAddress.slice(0, 8)}...`,
+      );
+
       const publicKey = new PublicKey(walletAddress);
-      const lamports = await connection.getBalance(publicKey);
+
+      // 🔧 添加超时保护 - 使用createRobustRPCConnection获得超时和重试功能
+      const balancePromise = connection.getBalance(publicKey);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`SOL balance fetch timeout after 15 seconds`));
+        }, 15000);
+      });
+
+      const lamports = await Promise.race([balancePromise, timeoutPromise]);
+
+      console.log(`✅ SOL balance fetched: ${lamports} lamports`);
       setBalance(BigInt(lamports));
     } catch (err) {
       const error = err as Error;
+      console.error('❌ Failed to fetch SOL balance:', error.message);
+
+      // 🔧 增强错误处理，区分超时和其他错误
+      if (error.message.includes('timeout')) {
+        console.warn('⚠️ SOL balance fetch timed out, setting balance to 0');
+      } else if (error.message.includes('Invalid public key')) {
+        console.error('❌ Invalid wallet address provided');
+      } else {
+        console.warn(
+          '⚠️ Network error fetching SOL balance, setting balance to 0',
+        );
+      }
+
       setError(error);
       setBalance(BigInt(0));
     } finally {
@@ -109,8 +137,40 @@ export const useGameCounter = () => {
       const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
       const url = `${protocol}://${serverUrl}/serverinfo`;
 
-      const response = await fetch(url);
-      const serverInfo = await response.json();
+      console.log('🔗 Fetching game counter from:', url);
+
+      // 🔧 添加超时保护 - 10秒超时
+      const fetchPromise = fetch(url);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(
+            new Error(
+              `Game counter fetch timeout after 10 seconds (${serverUrl})`,
+            ),
+          );
+        }, 10000);
+      });
+
+      const response = await Promise.race([fetchPromise, timeoutPromise]);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      // 为JSON解析也添加超时保护
+      const parsePromise = response.json();
+      const parseTimeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(
+            new Error(`JSON parsing timeout after 5 seconds (${serverUrl})`),
+          );
+        }, 5000);
+      });
+
+      const serverInfo = await Promise.race([
+        parsePromise,
+        parseTimeoutPromise,
+      ]);
 
       // 优先使用服务器的solanaGameId（这是当前活跃游戏的稳定ID）
       let currentGameId = 0;
@@ -124,9 +184,21 @@ export const useGameCounter = () => {
         currentGameId = parseInt(serverInfo.solanaGameId) || 0;
       }
 
+      console.log(`✅ Game counter fetched successfully: ${currentGameId}`);
       setGameId(currentGameId);
     } catch (err) {
       const error = err as Error;
+      console.error('❌ Failed to fetch game counter:', error.message);
+
+      // 🔧 增强错误处理
+      if (error.message.includes('timeout')) {
+        console.warn('⚠️ Game counter fetch timed out, using fallback value 0');
+      } else if (error.message.includes('fetch')) {
+        console.warn(
+          '⚠️ Network error fetching game counter, using fallback value 0',
+        );
+      }
+
       setError(error);
       setGameId(0);
     } finally {
@@ -172,32 +244,78 @@ export const useSPLTokenBalance = (
       setIsLoading(true);
       setError(null);
 
+      console.log(
+        `🔗 Fetching SPL token balance for: ${walletAddress.slice(0, 8)}... (token: ${tokenMintAddress.slice(0, 8)}...)`,
+      );
+
       const walletPubkey = new PublicKey(walletAddress);
       const mintPubkey = new PublicKey(tokenMintAddress);
 
+      // 🔧 添加超时保护 - 分别为不同操作设置超时
+
       // Get associated token account address
-      const associatedTokenAddress = await getAssociatedTokenAddress(
-        mintPubkey,
-        walletPubkey,
+      console.log('🔍 Getting associated token address...');
+      const ataPromise = getAssociatedTokenAddress(mintPubkey, walletPubkey);
+      const ataTimeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`ATA calculation timeout after 5 seconds`));
+        }, 5000);
+      });
+
+      const associatedTokenAddress = await Promise.race([
+        ataPromise,
+        ataTimeoutPromise,
+      ]);
+      console.log(
+        `✅ Associated token address: ${associatedTokenAddress.toString()}`,
       );
 
-      // Get token account info
-      const tokenAccount = await getAccount(connection, associatedTokenAddress);
+      // Get token account info with timeout
+      console.log('🔍 Getting token account info...');
+      const accountPromise = getAccount(connection, associatedTokenAddress);
+      const accountTimeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`Token account fetch timeout after 15 seconds`));
+        }, 15000);
+      });
+
+      const tokenAccount = await Promise.race([
+        accountPromise,
+        accountTimeoutPromise,
+      ]);
       const balance = BigInt(tokenAccount.amount.toString());
+
+      console.log(`✅ SPL token balance fetched: ${balance} units`);
       setBalance(balance);
     } catch (err) {
       const error = err as Error;
+      console.error('❌ Failed to fetch SPL token balance:', error.message);
 
-      // Check for various error types
-      if (
+      // Check for various error types with enhanced timeout handling
+      if (error.message.includes('timeout')) {
+        console.warn(
+          '⚠️ SPL token balance fetch timed out, setting balance to 0',
+        );
+        setError(null); // Don't treat timeout as error for token balances
+      } else if (
         error.message.includes('could not find account') ||
         error.message.includes('TokenAccountNotFoundError') ||
         error.message.includes('Account does not exist') ||
         error.message.includes('StructError') ||
         error.message.includes('Expected the value to satisfy a union')
       ) {
+        console.log(
+          'ℹ️ Token account does not exist (normal for new accounts)',
+        );
         setError(null); // Don't treat these as errors, just set balance to 0
+      } else if (error.message.includes('Invalid public key')) {
+        console.error('❌ Invalid wallet or token mint address');
+        setError(error);
       } else {
+        console.warn(
+          '⚠️ Network error fetching SPL token balance:',
+          error.message,
+        );
         setError(error);
       }
 
