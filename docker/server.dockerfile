@@ -46,14 +46,15 @@ ENV NODE_ENV=production \
     SERVER_PORT=8000
 
 # copy production deps
+COPY --chown=swordbattle:swordbattle solana/vault-sdk /solana/vault-sdk
 COPY --from=deps-prod --chown=swordbattle:swordbattle /app/node_modules ./node_modules
 
 # copy plain-JS source
-COPY server/package.json ./server/package.json
+COPY server/package.json ./package.json
 COPY server/src          ./src
 
-# GameAggregator
-# COPY server/abis/GameAggregator.json ./abis/GameAggregator.json
+# abis
+COPY server/abis/id.json ./abis/id.json
 
 USER swordbattle
 EXPOSE 8000

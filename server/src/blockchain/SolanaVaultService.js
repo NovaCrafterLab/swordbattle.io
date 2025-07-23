@@ -55,7 +55,7 @@ class SolanaVaultService {
       } else {
         // Fallback to id.json file in abis directory
         try {
-          const idPath = path.resolve(__dirname, '../../../abis/id.json');
+          const idPath = path.resolve(__dirname, '../../abis/id.json');
           const privateKeyArray = require(idPath);
           this.wallet = Keypair.fromSecretKey(Uint8Array.from(privateKeyArray));
           Logger.server.info(

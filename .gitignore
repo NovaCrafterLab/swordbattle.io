@@ -217,6 +217,7 @@ node_modules
 test-ledger
 .yarn
 abis/id.json
+server/abis/id.json
 deploy-wallet
 
 # Claude Code Kit - Generated Files
