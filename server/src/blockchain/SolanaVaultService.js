@@ -474,8 +474,8 @@ class SolanaVaultService {
       gameId,
     });
 
-    // Current implementation: Kill-based rewards
-    const killRewards = this.calculateKillBasedRewards(players, tier);
+    // Current implementation: Kill-based rewards (now async)
+    const killRewards = await this.calculateKillBasedRewards(players, tier);
     rewards.push(...killRewards);
 
     // Future expansion points:
@@ -497,19 +497,28 @@ class SolanaVaultService {
   }
 
   /**
-   * Calculate tier-based kill rewards
+   * Calculate tier-based kill rewards with dynamic token decimals
    * Core reward calculation method
    */
-  calculateKillBasedRewards(players, tier = 'low') {
+  async calculateKillBasedRewards(players, tier = 'low') {
     const rewards = [];
     const tierConfig = this.getTierConfig(tier);
     const killReward = tierConfig.killReward;
 
-    Logger.server.debug('💰 Calculating kill-based rewards', {
-      playerCount: players.length,
-      tier,
-      killReward,
-    });
+    // Get dynamic token decimals instead of hardcoding 1e9
+    const tokenDecimals = await this.getTokenDecimals();
+    const multiplier = Math.pow(10, tokenDecimals);
+
+    Logger.server.debug(
+      '💰 Calculating kill-based rewards with dynamic decimals',
+      {
+        playerCount: players.length,
+        tier,
+        killReward,
+        tokenDecimals,
+        tokenMint: this.config.tokenMint,
+      },
+    );
 
     for (const player of players) {
       const kills = player.kills || 0;
@@ -521,19 +530,26 @@ class SolanaVaultService {
           playerName: player.name,
           kills,
           tier,
-          rewardAmount: Math.floor(rewardAmount * 1e9), // Convert to lamports
-          rewardSOL: rewardAmount,
+          rewardAmount: Math.floor(rewardAmount * multiplier), // Convert using dynamic decimals
+          rewardSOL: rewardAmount, // Keep original amount for display
           rewardType: 'kill-based',
+          tokenDecimals, // Include decimals info for debugging
         });
       }
     }
 
-    Logger.server.debug('💰 Kill-based rewards calculated', {
-      rewardedPlayers: rewards.length,
-      tier,
-      killReward,
-      totalRewards: rewards.reduce((sum, r) => sum + r.rewardSOL, 0).toFixed(6),
-    });
+    Logger.server.debug(
+      '💰 Kill-based rewards calculated with dynamic decimals',
+      {
+        rewardedPlayers: rewards.length,
+        tier,
+        killReward,
+        tokenDecimals,
+        totalRewards: rewards
+          .reduce((sum, r) => sum + r.rewardSOL, 0)
+          .toFixed(6),
+      },
+    );
 
     return rewards;
   }
@@ -754,6 +770,36 @@ class SolanaVaultService {
   }
 
   /**
+   * Get token decimals for the configured token mint
+   * @returns {Promise<number>} Number of decimals for the token
+   */
+  async getTokenDecimals() {
+    if (!this.isInitialized || !this.connection) {
+      throw new Error('Solana vault service not initialized');
+    }
+
+    try {
+      const { getMint } = require('@solana/spl-token');
+      const tokenMint = new PublicKey(this.config.tokenMint);
+      const mintInfo = await getMint(this.connection, tokenMint);
+
+      Logger.server.debug('🔍 Retrieved token decimals', {
+        tokenMint: tokenMint.toString(),
+        decimals: mintInfo.decimals,
+      });
+
+      return mintInfo.decimals;
+    } catch (error) {
+      Logger.server.warn('Failed to get token decimals, using default 9', {
+        tokenMint: this.config.tokenMint,
+        error: error.message,
+      });
+      // Fallback to 9 decimals (SOL standard) if unable to fetch
+      return 9;
+    }
+  }
+
+  /**
    * Get tier configuration from server config
    */
   getTierConfig(tier) {
@@ -762,7 +808,19 @@ class SolanaVaultService {
         `Invalid tier: ${tier}. Available tiers: ${Object.keys(this.config.tiers || {}).join(', ')}`,
       );
     }
-    return this.config.tiers[tier];
+
+    const tierConfig = this.config.tiers[tier];
+
+    // Add debug logging to verify tier configuration loading
+    Logger.server.debug('🎯 Tier configuration loaded', {
+      tier,
+      entranceFee: tierConfig.entranceFee,
+      killReward: tierConfig.killReward,
+      tokenMint: this.config.tokenMint,
+      configSource: 'server config.js',
+    });
+
+    return tierConfig;
   }
 
   /**

@@ -78,24 +78,24 @@ module.exports = {
     tiers: {
       low: {
         name: 'Low Tier Arena',
-        entranceFee: parseFloat(process.env.LOW_TIER_ENTRANCE_FEE || '0.01'), // 0.01 SOL
-        killReward: parseFloat(process.env.LOW_TIER_KILL_REWARD || '0.001'), // 0.001 SOL per kill
+        entranceFee: parseFloat(process.env.LOW_TIER_ENTRANCE_FEE || '1.0'), // 1.0 token
+        killReward: parseFloat(process.env.LOW_TIER_KILL_REWARD || '0.5'), // 0.5 token per kill
         minLevel: 1,
         maxLevel: 10,
         description: 'Beginner-friendly arena with basic rewards',
       },
       medium: {
         name: 'Medium Tier Arena',
-        entranceFee: parseFloat(process.env.MID_TIER_ENTRANCE_FEE || '0.05'), // 0.05 SOL
-        killReward: parseFloat(process.env.MID_TIER_KILL_REWARD || '0.005'), // 0.005 SOL per kill
+        entranceFee: parseFloat(process.env.MID_TIER_ENTRANCE_FEE || '5.0'), // 5.0 token
+        killReward: parseFloat(process.env.MID_TIER_KILL_REWARD || '2.5'), // 2.5 token per kill
         minLevel: 11,
         maxLevel: 25,
         description: 'Intermediate arena with enhanced rewards',
       },
       high: {
         name: 'High Tier Arena',
-        entranceFee: parseFloat(process.env.HIGH_TIER_ENTRANCE_FEE || '0.1'), // 0.1 SOL
-        killReward: parseFloat(process.env.HIGH_TIER_KILL_REWARD || '0.01'), // 0.01 SOL per kill
+        entranceFee: parseFloat(process.env.HIGH_TIER_ENTRANCE_FEE || '10.0'), // 10.0 token
+        killReward: parseFloat(process.env.HIGH_TIER_KILL_REWARD || '5.0'), // 5.0 token per kill
         minLevel: 26,
         maxLevel: 999,
         description: 'Advanced arena with premium rewards',
