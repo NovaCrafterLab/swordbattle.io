@@ -320,28 +320,70 @@ export const useSolanaVault = () => {
           // Use random RPC connection for better load balancing
           const rpcConnection = createRandomRPCConnection();
 
-          // Ensure proper serialization format for sendRawTransaction
-          const serializedTransaction = signedTransaction.serialize();
-          console.log(
-            '🔍 DEBUG - Serialized transaction type:',
-            typeof serializedTransaction,
-          );
-          console.log(
-            '🔍 DEBUG - Serialized transaction constructor:',
-            serializedTransaction.constructor.name,
-          );
-          console.log(
-            '🔍 DEBUG - Serialized transaction length:',
-            serializedTransaction.length,
-          );
+          // 🔧 彻底修复StructError: 确保正确的序列化格式
+          console.log('🔧 Starting transaction serialization...');
 
-          // Ensure we have a proper Buffer/Uint8Array for sendRawTransaction
-          const transactionBuffer = Buffer.isBuffer(serializedTransaction)
-            ? serializedTransaction
-            : Buffer.from(serializedTransaction);
+          // 方法1: 使用标准序列化
+          let serializedTransaction: Uint8Array;
+          try {
+            serializedTransaction = signedTransaction.serialize({
+              requireAllSignatures: false,
+              verifySignatures: false,
+            });
+            console.log('✅ Standard serialization successful');
+          } catch (serializeError) {
+            console.error('❌ Standard serialization failed:', serializeError);
+            // 方法2: 使用兼容性序列化
+            try {
+              serializedTransaction = signedTransaction.serialize();
+              console.log('✅ Fallback serialization successful');
+            } catch (fallbackError) {
+              console.error(
+                '❌ All serialization methods failed:',
+                fallbackError,
+              );
+              throw new Error(
+                `Transaction serialization failed: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`,
+              );
+            }
+          }
+
+          console.log('🔍 DEBUG - Serialized transaction details:', {
+            type: typeof serializedTransaction,
+            constructor: serializedTransaction.constructor.name,
+            length: serializedTransaction.length,
+            isUint8Array: serializedTransaction instanceof Uint8Array,
+            isBuffer: Buffer.isBuffer(serializedTransaction),
+            firstBytes: Array.from(serializedTransaction.slice(0, 10))
+              .map((b) => b.toString(16).padStart(2, '0'))
+              .join(' '),
+          });
+
+          // 🔧 确保sendRawTransaction接收正确的类型
+          // sendRawTransaction期望Uint8Array或Buffer，但不是其他对象类型
+          let transactionData: Uint8Array;
+
+          if (serializedTransaction instanceof Uint8Array) {
+            transactionData = serializedTransaction;
+            console.log('✅ Using Uint8Array directly');
+          } else if (Buffer.isBuffer(serializedTransaction)) {
+            transactionData = new Uint8Array(serializedTransaction);
+            console.log('✅ Converted Buffer to Uint8Array');
+          } else {
+            // 最后的兜底方案
+            transactionData = new Uint8Array(serializedTransaction as any);
+            console.log('⚠️ Using fallback conversion to Uint8Array');
+          }
+
+          console.log('🔍 Final transaction data:', {
+            type: typeof transactionData,
+            constructor: transactionData.constructor.name,
+            length: transactionData.length,
+            isUint8Array: transactionData instanceof Uint8Array,
+          });
 
           txSignature = await rpcConnection.sendRawTransaction(
-            transactionBuffer,
+            transactionData,
             {
               skipPreflight: true, // Skip simulation to avoid errors
               preflightCommitment: 'confirmed',
@@ -786,14 +828,55 @@ export const useSolanaVault = () => {
             // 使用与buyTicket相同的发送方式：connection.sendRawTransaction + skipPreflight
             // Use random RPC connection for better load balancing
             const rpcConnection = createRandomRPCConnection();
-            // Ensure proper serialization format for sendRawTransaction
-            const serializedTransaction = signedTransaction.serialize();
-            const transactionBuffer = Buffer.isBuffer(serializedTransaction)
-              ? serializedTransaction
-              : Buffer.from(serializedTransaction);
+
+            // 🔧 彻底修复StructError: 确保正确的序列化格式（与buyTicket相同）
+            console.log('🔧 Starting claim transaction serialization...');
+
+            // 方法1: 使用标准序列化
+            let serializedTransaction: Uint8Array;
+            try {
+              serializedTransaction = signedTransaction.serialize({
+                requireAllSignatures: false,
+                verifySignatures: false,
+              });
+              console.log('✅ Claim standard serialization successful');
+            } catch (serializeError) {
+              console.error(
+                '❌ Claim standard serialization failed:',
+                serializeError,
+              );
+              // 方法2: 使用兼容性序列化
+              try {
+                serializedTransaction = signedTransaction.serialize();
+                console.log('✅ Claim fallback serialization successful');
+              } catch (fallbackError) {
+                console.error(
+                  '❌ Claim all serialization methods failed:',
+                  fallbackError,
+                );
+                throw new Error(
+                  `Claim transaction serialization failed: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`,
+                );
+              }
+            }
+
+            // 🔧 确保sendRawTransaction接收正确的类型
+            let transactionData: Uint8Array;
+
+            if (serializedTransaction instanceof Uint8Array) {
+              transactionData = serializedTransaction;
+              console.log('✅ Claim using Uint8Array directly');
+            } else if (Buffer.isBuffer(serializedTransaction)) {
+              transactionData = new Uint8Array(serializedTransaction);
+              console.log('✅ Claim converted Buffer to Uint8Array');
+            } else {
+              // 最后的兜底方案
+              transactionData = new Uint8Array(serializedTransaction as any);
+              console.log('⚠️ Claim using fallback conversion to Uint8Array');
+            }
 
             txSignature = await rpcConnection.sendRawTransaction(
-              transactionBuffer,
+              transactionData,
               {
                 skipPreflight: true, // Skip simulation to avoid errors
                 preflightCommitment: 'confirmed',

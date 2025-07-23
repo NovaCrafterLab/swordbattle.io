@@ -68,7 +68,7 @@ module.exports = {
     tokenMint:
       process.env.SOLANA_TOKEN_MINT ||
       'So11111111111111111111111111111111111111112', // Token mint for rewards (default: SOL)
-    killReward: parseFloat(process.env.KILL_REWARD || '0.001'), // Token reward per kill (deprecated - use tiers)
+    // killReward is deprecated - now using tier-based rewards
     environment: {
       isDev,
       isRelease,
@@ -100,6 +100,28 @@ module.exports = {
         maxLevel: 999,
         description: 'Advanced arena with premium rewards',
       },
+    },
+    // Function to get current server tier based on GAME_LEVEL
+    getCurrentTier() {
+      const gameLevel = parseInt(process.env.GAME_LEVEL || '0');
+      switch (gameLevel) {
+        case 0:
+          return 'low';
+        case 1:
+          return 'medium';
+        case 2:
+          return 'high';
+        default:
+          console.warn(
+            `Unknown GAME_LEVEL: ${gameLevel}, defaulting to low tier`,
+          );
+          return 'low';
+      }
+    },
+    // Function to get current server tier configuration
+    getCurrentTierConfig() {
+      const tierName = this.getCurrentTier();
+      return this.tiers[tierName];
     },
     // Security settings for tier validation
     security: {

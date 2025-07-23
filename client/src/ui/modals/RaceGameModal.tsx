@@ -343,7 +343,18 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     }
 
     if (!gameToken.data) {
-      addToast('error', 'Game token information not available');
+      addToast(
+        'error',
+        'Game token information not available. Please wait for server synchronization.',
+      );
+      return;
+    }
+
+    if (!gameToken.data.tokenMint) {
+      addToast(
+        'error',
+        'Server token mint configuration is missing. Cannot proceed with transaction.',
+      );
       return;
     }
 
@@ -351,28 +362,42 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       setIsJoining(true);
       setTxStep('joining');
 
-      // Use dynamic tier pricing instead of hardcoded values
+      // Use dynamic tier pricing instead of hardcoded values with enhanced validation
       if (!tierPricing.data) {
-        throw new Error(`Tier pricing not available for ${currentTier}`);
+        throw new Error(
+          `Tier pricing not available for ${currentTier}. Server configuration may be incomplete.`,
+        );
+      }
+
+      if (!tierPricing.data.entranceFee || tierPricing.data.entranceFee <= 0) {
+        throw new Error(
+          `Invalid entrance fee configuration for ${currentTier} tier. Fee: ${tierPricing.data.entranceFee}`,
+        );
       }
 
       const config = {
         entranceFee: tierPricing.data.entranceFee,
       };
 
-      // Get token mint from game token data
+      // Get token mint from server-provided game token data
       let tokenMint;
       try {
         const { PublicKey } = await import('@solana/web3.js');
-        const tokenMintAddress =
-          process.env.REACT_APP_TOKEN_MINT ||
-          'Hk4BerAoKbemG277HShrk8DSHiMEUKbm6D23RKhLDLKq';
-        console.log('🔍 DEBUG - Token mint address:', tokenMintAddress);
+
+        // Use token mint from server configuration, not environment variables
+        if (!gameToken.data?.tokenMint) {
+          throw new Error('Token mint not available from server configuration');
+        }
+
+        const tokenMintAddress = gameToken.data.tokenMint.toString();
+        console.log('🔍 DEBUG - Server token mint address:', tokenMintAddress);
         tokenMint = new PublicKey(tokenMintAddress);
         console.log('🔍 DEBUG - Token mint PublicKey:', tokenMint.toString());
       } catch (error) {
-        console.error('❌ Invalid token mint configuration:', error);
-        throw new Error('Invalid token mint configuration');
+        console.error('❌ Invalid server token mint configuration:', error);
+        throw new Error(
+          'Server token mint configuration is invalid or unavailable',
+        );
       }
 
       // 🔍 DEBUG - Log all parameters before calling buyTicket
@@ -503,6 +528,23 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       return (
         <button className="race-btn disabled" disabled>
           {gameState.error ? 'CONNECTION ERROR' : 'CONNECTING...'}
+        </button>
+      );
+    }
+
+    // Check for server configuration issues
+    if (!gameToken.data || !gameToken.data.tokenMint) {
+      return (
+        <button className="race-btn disabled" disabled>
+          ⚠️ Server Configuration Missing
+        </button>
+      );
+    }
+
+    if (!tierPricing.data || !tierPricing.data.entranceFee) {
+      return (
+        <button className="race-btn disabled" disabled>
+          ⚠️ Tier Pricing Unavailable
         </button>
       );
     }
@@ -999,6 +1041,45 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                     Try Again
                   </button>
                 )}
+              </div>
+            )}
+
+            {/* Configuration Status Display */}
+            {(!gameToken.data || !tierPricing.data) && (
+              <div className="config-status">
+                <div className="config-header">Configuration Status</div>
+                <div className="config-items">
+                  <div
+                    className={`config-item ${gameToken.data ? 'ready' : 'loading'}`}
+                  >
+                    <span className="config-icon">
+                      {gameToken.data ? '✅' : '⏳'}
+                    </span>
+                    <span className="config-text">
+                      Token Configuration{' '}
+                      {gameToken.isLoading
+                        ? '(Loading...)'
+                        : gameToken.data
+                          ? '(Ready)'
+                          : '(Failed)'}
+                    </span>
+                  </div>
+                  <div
+                    className={`config-item ${tierPricing.data ? 'ready' : 'loading'}`}
+                  >
+                    <span className="config-icon">
+                      {tierPricing.data ? '✅' : '⏳'}
+                    </span>
+                    <span className="config-text">
+                      Tier Pricing{' '}
+                      {tierPricing.isLoading
+                        ? '(Loading...)'
+                        : tierPricing.data
+                          ? '(Ready)'
+                          : '(Failed)'}
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
           </div>
