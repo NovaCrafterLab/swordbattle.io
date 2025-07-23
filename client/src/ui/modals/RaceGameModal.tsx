@@ -11,6 +11,8 @@ import {
   useCurrentGameToken,
   useTierPricing,
   useDynamicTokenBalance,
+  useTokenMetadataFromChain,
+  formatDisplayAmount,
 } from '../../hooks/useBlockchain';
 import { useToast } from '../components/Toast';
 import './RaceGameModal.scss';
@@ -90,6 +92,11 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
   const tierPricing = useTierPricing(currentTier);
   const dynamicBalance = useDynamicTokenBalance(address || '');
 
+  // 🔍 Get enhanced token metadata from chain
+  const tokenMetadata = useTokenMetadataFromChain(
+    gameToken.data?.tokenMint?.toString() || '',
+  );
+
   const [isJoining, setIsJoining] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [txStep, setTxStep] = useState<
@@ -100,10 +107,33 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
   // Get entry fee from tier pricing (dynamic) - no fallback, must come from server
   const entryFeeAmount = tierPricing.data?.entranceFee;
 
-  // Helper function to safely format entry fee amount
+  // Helper function to safely format entry fee amount using smart formatting
   const formatEntryFee = (amount?: bigint) => {
-    if (!amount) return 'Loading...';
-    return (Number(amount) / LAMPORTS_PER_SOL).toFixed(4);
+    const decimals = tokenMetadata.data?.decimals || 9;
+    return formatDisplayAmount(amount, decimals);
+  };
+
+  // Get token display information with enhanced metadata
+  const getTokenDisplayInfo = () => {
+    if (tokenMetadata.data) {
+      return {
+        symbol: tokenMetadata.data.symbol,
+        name: tokenMetadata.data.name,
+      };
+    }
+
+    // Fallback to gameToken data if metadata is not available
+    if (gameToken.data) {
+      return {
+        symbol: gameToken.data.tokenSymbol,
+        name: gameToken.data.tokenName,
+      };
+    }
+
+    return {
+      symbol: 'TOKEN',
+      name: 'Unknown Token',
+    };
   };
 
   // Get level display name from tier
@@ -222,28 +252,47 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     setPrevConnectionState({ isConnected, address: address || null });
   }, [isConnected, address]); // 🎯 只依赖原始值，不依赖函数
 
-  // 🔧 修复：简化自动刷新，移除函数依赖
-  useEffect(() => {
-    if (txStep !== 'idle') {
-      return; // Skip auto-refresh during transactions
-    }
+  // 统一的数据刷新函数
+  const refreshData = useCallback(async () => {
+    const now = Date.now();
+    if (now - lastRefreshTime < 1000) return; // 防抖保护：1秒内只能刷新一次
+    setLastRefreshTime(now);
 
-    const autoRefreshInterval = setInterval(() => {
-      // 直接调用方法，不依赖回调函数
-      Promise.allSettled([
+    try {
+      await Promise.allSettled([
         gameState.refreshGameData(),
         gameToken.refetch(),
         tierPricing.refetch(),
         ...(isConnected && address
           ? [playerData.refreshPlayerData(), dynamicBalance.refetch()]
           : []),
-      ]).catch((error) => {
-        // Silent failure - no console output
-      });
+      ]);
+    } catch (error) {
+      // Silent failure - no console output
+    }
+  }, [
+    lastRefreshTime,
+    gameState,
+    gameToken,
+    tierPricing,
+    isConnected,
+    address,
+    playerData,
+    dynamicBalance,
+  ]);
+
+  // 🔧 修复：使用统一刷新函数的自动刷新
+  useEffect(() => {
+    if (txStep !== 'idle') {
+      return; // Skip auto-refresh during transactions
+    }
+
+    const autoRefreshInterval = setInterval(() => {
+      refreshData();
     }, 60000);
 
     return () => clearInterval(autoRefreshInterval);
-  }, [txStep]); // 🎯 只依赖 txStep，移除所有函数依赖
+  }, [txStep, refreshData]); // 依赖统一的刷新函数
 
   // 🔧 修复：使用 ref 跟踪 gameId 变化，避免重复刷新
   const [prevGameId, setPrevGameId] = useState<number | null>(null);
@@ -429,9 +478,10 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       );
 
       // Show success toast with transaction details
+      const tokenInfo = getTokenDisplayInfo();
       addToast(
         'success',
-        `Successfully joined ${currentTier.toUpperCase()} tier game! Entry fee: ${(Number(config.entranceFee) / LAMPORTS_PER_SOL).toFixed(4)} ${gameToken.data.tokenSymbol}`,
+        `Successfully joined ${currentTier.toUpperCase()} tier game! Entry fee: ${formatEntryFee(config.entranceFee)} ${tokenInfo.symbol}`,
         5000,
       );
 
@@ -564,14 +614,16 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     }
 
     if (!hasSufficientBalance) {
+      const tokenInfo = getTokenDisplayInfo();
       return (
         <button className="race-btn disabled" disabled>
-          ⚠️ Insufficient {gameToken.data?.tokenSymbol || 'Token'} Balance
+          ⚠️ Insufficient {tokenInfo.symbol} Balance
         </button>
       );
     }
 
     if (needsApproval && !gameToken.data?.isSOL) {
+      const tokenInfo = getTokenDisplayInfo();
       return (
         <button
           className="race-btn warning"
@@ -582,8 +634,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             'Approving...'
           ) : (
             <>
-              Approve {formatEntryFee(entryFeeAmount)}{' '}
-              {gameToken.data?.tokenSymbol || 'Tokens'}
+              Approve {formatEntryFee(entryFeeAmount)} {tokenInfo.symbol}
             </>
           )}
         </button>
@@ -693,7 +744,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                 {getLevelDisplayName(currentTier)} TIER
               </div>
               <div className="badge token-badge">
-                {gameToken.data.tokenSymbol}
+                {getTokenDisplayInfo().symbol}
               </div>
             </>
           )}
@@ -770,22 +821,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             </div>
 
             <button
-              onClick={() => {
-                const now = Date.now();
-                if (now - lastRefreshTime < 2000) return;
-                setLastRefreshTime(now);
-
-                Promise.allSettled([
-                  gameState.refreshGameData(),
-                  gameToken.refetch(),
-                  tierPricing.refetch(),
-                  ...(isConnected && address
-                    ? [playerData.refreshPlayerData(), dynamicBalance.refetch()]
-                    : []),
-                ]).catch((error) => {
-                  // Silent failure - no console output
-                });
-              }}
+              onClick={refreshData}
               className="refresh-button"
               title="Refresh game data"
             ></button>
@@ -806,13 +842,15 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   <div className="stat-label">Prize Pool</div>
                   <div className="stat-value">
                     {entryFeeAmount
-                      ? (
-                          (Number(entryFeeAmount) *
-                            gameState.gameState.registeredCount) /
-                          LAMPORTS_PER_SOL
-                        ).toFixed(4)
+                      ? formatDisplayAmount(
+                          BigInt(
+                            Number(entryFeeAmount) *
+                              gameState.gameState.registeredCount,
+                          ),
+                          tokenMetadata.data?.decimals || 9,
+                        )
                       : 'Loading...'}{' '}
-                    {gameToken.data.tokenSymbol}
+                    {getTokenDisplayInfo().symbol}
                   </div>
                 </div>
 
@@ -834,7 +872,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   <div className="stat-label">Entry Fee</div>
                   <div className="stat-value">
                     {formatEntryFee(entryFeeAmount)}{' '}
-                    {gameToken.data.tokenSymbol}
+                    {getTokenDisplayInfo().symbol}
                   </div>
                 </div>
 
@@ -894,7 +932,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   {solanaVault.txStatus === 'idle' &&
                     txStep === 'approving' && (
                       <div className="tx-step active">
-                        ⏳ Approving {gameToken.data?.tokenSymbol || 'token'}...
+                        ⏳ Approving {getTokenDisplayInfo().symbol}...
                       </div>
                     )}
                   {solanaVault.txStatus === 'idle' && txStep === 'joining' && (
@@ -968,12 +1006,12 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                       title={
                         dynamicBalance.isLoading
                           ? 'Loading...'
-                          : `${(Number(dynamicBalance.data || BigInt(0)) / LAMPORTS_PER_SOL).toFixed(6)} ${gameToken.data?.tokenSymbol || ''}`
+                          : `${formatDisplayAmount(dynamicBalance.data, tokenMetadata.data?.decimals || 9)} ${getTokenDisplayInfo().symbol}`
                       }
                     >
                       {dynamicBalance.isLoading
                         ? 'Loading...'
-                        : `${(Number(dynamicBalance.data || BigInt(0)) / LAMPORTS_PER_SOL).toFixed(4)} ${gameToken.data?.tokenSymbol || ''}`}
+                        : `${formatDisplayAmount(dynamicBalance.data, tokenMetadata.data?.decimals || 9)} ${getTokenDisplayInfo().symbol}`}
                     </span>
                   </div>
 
@@ -983,12 +1021,12 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                       className="balance-value"
                       title={
                         entryFeeAmount
-                          ? `${(Number(entryFeeAmount) / LAMPORTS_PER_SOL).toFixed(6)} ${gameToken.data?.tokenSymbol || ''}`
+                          ? `${formatEntryFee(entryFeeAmount)} ${getTokenDisplayInfo().symbol}`
                           : 'Loading...'
                       }
                     >
                       {formatEntryFee(entryFeeAmount)}{' '}
-                      {gameToken.data?.tokenSymbol || ''}
+                      {getTokenDisplayInfo().symbol}
                     </span>
                   </div>
                 </div>
@@ -997,7 +1035,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   <div className="insufficient-warning">
                     ⚠️ Insufficient balance! Need at least{' '}
                     {formatEntryFee(entryFeeAmount)}{' '}
-                    {gameToken.data.tokenSymbol}
+                    {getTokenDisplayInfo().symbol}
                   </div>
                 )}
               </div>
