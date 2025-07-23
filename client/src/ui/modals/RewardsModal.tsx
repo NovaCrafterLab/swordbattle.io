@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import Modal from './Modal';
-import { useBlockchain, useCurrentGameToken } from '../../hooks/useBlockchain';
+import {
+  useBlockchain,
+  useCurrentGameToken,
+  formatDisplayAmount,
+} from '../../hooks/useBlockchain';
 import { useToast } from '../components/Toast';
 import './RewardsModal.scss';
 
@@ -251,13 +255,13 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
 
       // 获取奖励金额用于显示
       const reward = solanaRewards.find((r) => r.gameId === gameId);
-      const tokenSymbol = gameToken.data?.tokenSymbol || 'SOL';
+      const tokenInfo = getTokenDisplayInfo();
 
       // 显示成功提示
       if (reward) {
         addToast(
           'success',
-          `Successfully claimed ${reward.solanaReward.toFixed(6)} ${tokenSymbol} from Game #${gameId}!`,
+          `Successfully claimed ${formatTokenAmount(reward.solanaReward)} ${tokenInfo.symbol} from Game #${gameId}!`,
         );
       }
 
@@ -287,8 +291,19 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
 
   const totalGames = solanaRewards.length;
 
-  // 获取当前token symbol
-  const tokenSymbol = gameToken.data?.tokenSymbol || 'SOL';
+  // 统一使用LBG作为代币名称
+  const getTokenDisplayInfo = () => {
+    return {
+      symbol: 'LBG',
+      name: 'LETSBONKGAME Token',
+    };
+  };
+
+  // 格式化代币数量显示
+  const formatTokenAmount = (amount: number): string => {
+    if (amount === 0) return '0';
+    return formatDisplayAmount(BigInt(Math.floor(amount * Math.pow(10, 9))), 9);
+  };
 
   // 根据过滤条件过滤对局
   const filteredRewards =
@@ -361,7 +376,8 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
             <div className="stat-item">
               <label>Available to Claim</label>
               <span className="stat-value claimable">
-                {unclaimedSolanaRewards.toFixed(6)} {tokenSymbol}
+                {formatTokenAmount(unclaimedSolanaRewards)}{' '}
+                {getTokenDisplayInfo().symbol}
               </span>
             </div>
             <div className="stat-item">
@@ -416,7 +432,8 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
                       <div className="game-stats">
                         <span className="kills">Kills: {reward.kills}</span>
                         <span className="reward-amount">
-                          🌟 {reward.solanaReward.toFixed(6)} {tokenSymbol}
+                          🌟 {formatTokenAmount(reward.solanaReward)}{' '}
+                          {getTokenDisplayInfo().symbol}
                         </span>
                       </div>
                     </div>

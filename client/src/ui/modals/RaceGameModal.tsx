@@ -11,7 +11,6 @@ import {
   useCurrentGameToken,
   useTierPricing,
   useDynamicTokenBalance,
-  useTokenMetadataFromChain,
   formatDisplayAmount,
 } from '../../hooks/useBlockchain';
 import { useToast } from '../components/Toast';
@@ -86,16 +85,11 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
   const { walletStatus, showInstallPrompt } = useWalletCheck();
   const { addToast } = useToast();
 
-  // 🚀 Dynamic token and tier information
+  // Dynamic token and tier information
   const gameToken = useCurrentGameToken();
   const currentTier = gameToken.data?.tier || 'low';
   const tierPricing = useTierPricing(currentTier);
   const dynamicBalance = useDynamicTokenBalance(address || '');
-
-  // 🔍 Get enhanced token metadata from chain
-  const tokenMetadata = useTokenMetadataFromChain(
-    gameToken.data?.tokenMint?.toString() || '',
-  );
 
   const [isJoining, setIsJoining] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
@@ -109,30 +103,15 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
 
   // Helper function to safely format entry fee amount using smart formatting
   const formatEntryFee = (amount?: bigint) => {
-    const decimals = tokenMetadata.data?.decimals || 9;
-    return formatDisplayAmount(amount, decimals);
+    // 统一使用9位小数（SOL标准）
+    return formatDisplayAmount(amount, 9);
   };
 
-  // Get token display information with enhanced metadata
+  // Get token display information - 统一使用LBG作为代币名称
   const getTokenDisplayInfo = () => {
-    if (tokenMetadata.data) {
-      return {
-        symbol: tokenMetadata.data.symbol,
-        name: tokenMetadata.data.name,
-      };
-    }
-
-    // Fallback to gameToken data if metadata is not available
-    if (gameToken.data) {
-      return {
-        symbol: gameToken.data.tokenSymbol,
-        name: gameToken.data.tokenName,
-      };
-    }
-
     return {
-      symbol: 'TOKEN',
-      name: 'Unknown Token',
+      symbol: 'LBG',
+      name: 'LETSBONKGAME Token',
     };
   };
 
@@ -841,15 +820,25 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   </div>
                   <div className="stat-label">Prize Pool</div>
                   <div className="stat-value">
-                    {entryFeeAmount
-                      ? formatDisplayAmount(
-                          BigInt(
-                            Number(entryFeeAmount) *
-                              gameState.gameState.registeredCount,
-                          ),
-                          tokenMetadata.data?.decimals || 9,
-                        )
-                      : 'Loading...'}{' '}
+                    {(() => {
+                      if (
+                        entryFeeAmount !== undefined &&
+                        entryFeeAmount !== null &&
+                        typeof gameState.gameState.registeredCount ===
+                          'number' &&
+                        gameState.gameState.registeredCount >= 0
+                      ) {
+                        const prizePoolAmount =
+                          entryFeeAmount *
+                          BigInt(gameState.gameState.registeredCount);
+                        // 特殊处理 0 值情况
+                        if (prizePoolAmount === 0n) {
+                          return '0';
+                        }
+                        return formatDisplayAmount(prizePoolAmount, 9);
+                      }
+                      return 'Loading...';
+                    })()}{' '}
                     {getTokenDisplayInfo().symbol}
                   </div>
                 </div>
@@ -860,8 +849,10 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   </div>
                   <div className="stat-label">Players</div>
                   <div className="stat-value">
-                    {gameState.gameState.registeredCount}/
-                    {gameState.gameState.playerCount}
+                    {typeof gameState.gameState.registeredCount === 'number' &&
+                    typeof gameState.gameState.playerCount === 'number'
+                      ? `${gameState.gameState.registeredCount}/${gameState.gameState.playerCount}`
+                      : 'Loading...'}
                   </div>
                 </div>
 
@@ -1006,12 +997,12 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                       title={
                         dynamicBalance.isLoading
                           ? 'Loading...'
-                          : `${formatDisplayAmount(dynamicBalance.data, tokenMetadata.data?.decimals || 9)} ${getTokenDisplayInfo().symbol}`
+                          : `${formatDisplayAmount(dynamicBalance.data, 9)} ${getTokenDisplayInfo().symbol}`
                       }
                     >
                       {dynamicBalance.isLoading
                         ? 'Loading...'
-                        : `${formatDisplayAmount(dynamicBalance.data, tokenMetadata.data?.decimals || 9)} ${getTokenDisplayInfo().symbol}`}
+                        : `${formatDisplayAmount(dynamicBalance.data, 9)} ${getTokenDisplayInfo().symbol}`}
                     </span>
                   </div>
 

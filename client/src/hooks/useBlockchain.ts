@@ -10,6 +10,38 @@ import {
 } from '@solana/spl-token';
 import { useSolanaVault } from './useSolanaVault';
 
+// Utility functions
+
+/**
+ * Smart token amount formatter - shows integers without decimals, decimals with max 2 places
+ */
+export const formatTokenAmount = (
+  amount: bigint | number,
+  decimals: number = 9,
+): string => {
+  const numAmount = typeof amount === 'bigint' ? Number(amount) : amount;
+  const tokenAmount = numAmount / Math.pow(10, decimals);
+
+  // If it's a whole number, show without decimals
+  if (tokenAmount % 1 === 0) {
+    return tokenAmount.toString();
+  }
+
+  // Show up to 2 decimal places, removing trailing zeros
+  return parseFloat(tokenAmount.toFixed(2)).toString();
+};
+
+/**
+ * Format token amount specifically for display in UI components
+ */
+export const formatDisplayAmount = (
+  amount?: bigint,
+  decimals: number = 9,
+): string => {
+  if (!amount) return 'Loading...';
+  return formatTokenAmount(amount, decimals);
+};
+
 // Separate custom hooks to avoid rules of hooks violations
 
 /**
