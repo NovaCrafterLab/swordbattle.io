@@ -604,10 +604,6 @@ function registerPublicRoutes(app, game) {
           const { PublicKey } = require('@solana/web3.js');
           const playerPubkey = new PublicKey(playerAddress);
 
-          console.log(
-            `🔍 Checking reward status for player ${playerAddress} in game ${gameId}`,
-          );
-
           // 1. Check if player has a reward in the reward map
           const rewardMapAccount =
             await game.solanaVaultService.vaultSDK.getRewardMapAccount(gameId);
@@ -2120,12 +2116,8 @@ async function initializeSolanaVaultService() {
 
     if (!(await svc.isConnected()))
       throw new Error('Failed to connect to Solana');
-    Logger.status('Solana connection verified');
 
     if (!config.solana.programId) throw new Error('Vault program ID missing');
-
-    Logger.status('Solana config verified');
-
     global.solanaVaultService = svc;
     Logger.status('Solana vault service ready');
     return svc;

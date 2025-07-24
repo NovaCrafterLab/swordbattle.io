@@ -162,6 +162,11 @@ export const useSolanaVault = () => {
   const checkTransactionStatus = async (txHash: string): Promise<boolean> => {
     try {
       const rpcConnection = createRandomRPCConnection();
+      console.log('🔗 Using RPC connection for transaction status check:', {
+        txHash: txHash.slice(0, 8) + '...',
+        rpcEndpoint: 'randomRPC', // RPC selection handled internally
+      });
+
       const txStatus = await rpcConnection.getSignatureStatus(txHash);
 
       console.log('🔍 Checking transaction status:', {
@@ -554,6 +559,10 @@ export const useSolanaVault = () => {
           // Send directly via connection to avoid second wallet popup
           // Use random RPC connection for better load balancing
           const rpcConnection = createRandomRPCConnection();
+          console.log('🔗 Using RPC connection for transaction sending:', {
+            rpcEndpoint: 'randomRPC', // RPC selection handled internally
+            transactionType: 'buyTicket',
+          });
 
           // 🔧 彻底修复StructError: 确保正确的序列化格式
           console.log('🔧 Starting transaction serialization...');
@@ -695,6 +704,15 @@ export const useSolanaVault = () => {
 
               // 每次重试使用不同的 RPC 连接，提高成功率
               const retryConnection = createRandomRPCConnection();
+              console.log(
+                '🔗 Using retry RPC connection for transaction sending:',
+                {
+                  attempt: attempt + 1,
+                  maxRetries,
+                  rpcEndpoint: 'randomRPC', // RPC selection handled internally
+                  transactionType: 'buyTicket',
+                },
+              );
 
               txSignature = await retryConnection.sendRawTransaction(
                 transactionData,
@@ -1078,6 +1096,11 @@ export const useSolanaVault = () => {
 
       // Get recent blockhash using random RPC connection
       const rpcConnection = createRandomRPCConnection();
+      console.log('🔗 Using RPC connection for wallet test:', {
+        rpcEndpoint: 'randomRPC', // RPC selection handled internally
+        operation: 'getLatestBlockhash',
+      });
+
       const { blockhash } = await rpcConnection.getLatestBlockhash();
       testTransaction.recentBlockhash = blockhash;
       testTransaction.feePayer = publicKey!;
@@ -1373,6 +1396,15 @@ export const useSolanaVault = () => {
 
                 // 每次重试使用不同的 RPC 连接，提高成功率
                 const retryConnection = createRandomRPCConnection();
+                console.log(
+                  '🔗 Using retry RPC connection for claim transaction:',
+                  {
+                    attempt: attempt + 1,
+                    maxRetries,
+                    rpcEndpoint: 'randomRPC', // RPC selection handled internally
+                    transactionType: 'claimReward',
+                  },
+                );
 
                 txSignature = await retryConnection.sendRawTransaction(
                   transactionData,
@@ -1483,6 +1515,12 @@ export const useSolanaVault = () => {
         try {
           // Use random RPC connection for confirmation
           const rpcConnection = createRandomRPCConnection();
+          console.log('🔗 Using RPC connection for transaction confirmation:', {
+            txHash: trimmedSignature.slice(0, 8) + '...',
+            rpcEndpoint: 'randomRPC', // RPC selection handled internally
+            operation: 'confirmTransaction',
+          });
+
           const latestBlockhash = await rpcConnection.getLatestBlockhash();
           const confirmation = await rpcConnection.confirmTransaction(
             {

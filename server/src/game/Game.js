@@ -935,7 +935,7 @@ class Game {
 
   /**
    * Verify player has bought a ticket for this Solana game
-   * Replaces complex BSC registration verification
+   * Enhanced to work with optimized verifyPlayerTicket method
    */
   async verifySolanaPlayerTicket(playerAddress) {
     if (!this.solanaVaultService || !this.solanaGameId) {
@@ -946,24 +946,98 @@ class Game {
     }
 
     try {
-      // Check if player has bought a ticket for this game
+      // Use enhanced verifyPlayerTicket with tier validation
       const hasTicket = await this.solanaVaultService.verifyPlayerTicket(
         this.solanaGameId,
         playerAddress,
+        this.gameTier, // Pass current game tier for validation
       );
 
       if (hasTicket) {
         this.registeredPlayers.add(playerAddress.toLowerCase());
-        console.log(`✅ Player ${playerAddress} has valid ticket`);
+        console.log(
+          `✅ Player ${playerAddress} has valid ticket for ${this.gameTier} tier game`,
+        );
         return true;
       } else {
         console.log(
-          `❌ Player ${playerAddress} has no ticket for game ${this.solanaGameId}`,
+          `❌ Player ${playerAddress} has no valid ticket for game ${this.solanaGameId} (${this.gameTier} tier)`,
         );
         return false;
       }
     } catch (error) {
-      console.error('Error verifying player ticket:', error);
+      const errorMessage = error.message || String(error);
+
+      // Handle different error types appropriately
+      if (
+        errorMessage.includes('Invalid playerAddress') ||
+        errorMessage.includes('Base58')
+      ) {
+        // Input validation errors - these indicate client-side issues
+        console.error(`❌ Invalid player address format: ${playerAddress}`, {
+          error: errorMessage,
+          gameId: this.solanaGameId,
+        });
+        return false; // Reject invalid addresses immediately
+      }
+
+      if (errorMessage.includes('Solana vault service not initialized')) {
+        // Service initialization errors - critical system issues
+        console.error(
+          `❌ Solana vault service not initialized for ticket verification`,
+          {
+            error: errorMessage,
+            gameId: this.solanaGameId,
+            playerAddress,
+          },
+        );
+        return false; // System not ready, reject
+      }
+
+      if (
+        errorMessage.includes('Failed to verify player ticket after') &&
+        errorMessage.includes('attempts')
+      ) {
+        // Network/RPC errors after retries - the enhanced method already tried multiple times
+        console.error(
+          `❌ Network error during ticket verification after retries: ${playerAddress}`,
+          {
+            error: errorMessage,
+            gameId: this.solanaGameId,
+            attempts: error.attempts || 'unknown',
+          },
+        );
+
+        // For network errors after retries, be more lenient in development
+        // but strict in production to prevent abuse
+        const isDevelopment =
+          process.env.NODE_ENV === 'development' ||
+          process.env.BUILD_ENV === 'development';
+        if (isDevelopment) {
+          console.warn(
+            `⚠️ Development mode: Allowing player ${playerAddress} despite network error`,
+          );
+          this.registeredPlayers.add(playerAddress.toLowerCase());
+          return true;
+        } else {
+          console.error(
+            `🚫 Production mode: Rejecting player ${playerAddress} due to network verification failure`,
+          );
+          return false;
+        }
+      }
+
+      // Unknown errors - log and reject for security
+      console.error(
+        `❌ Unknown error during ticket verification for ${playerAddress}:`,
+        {
+          error: errorMessage,
+          errorType: typeof error,
+          errorName: error.name,
+          gameId: this.solanaGameId,
+          stack: error.stack,
+        },
+      );
       return false;
     }
   }

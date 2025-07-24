@@ -38,10 +38,6 @@ class SolanaVaultService {
       // Create connection using RPC manager
       this.connection = this.rpcManager.getCurrentConnection('confirmed');
 
-      Logger.server.info('✅ Using RPC manager for Solana connections', {
-        stats: this.rpcManager.getStats(),
-      });
-
       // Initialize wallet from private key
       if (this.config.privateKey) {
         const privateKeyBytes = Uint8Array.from(
@@ -388,77 +384,254 @@ class SolanaVaultService {
 
   /**
    * Check if a player has bought a ticket for the game with tier validation
+   * Enhanced with proper error handling and dynamic decimals support
    * Replaces BSC player registration verification
    */
   async verifyPlayerTicket(gameId, playerAddress, expectedTier = null) {
+    // Early validation - service initialization
     if (!this.isInitialized || !this.vaultSDK) {
-      return false;
+      throw new Error('Solana vault service not initialized');
     }
 
-    try {
-      Logger.server.debug('🎫 Checking player ticket with tier validation', {
-        gameId,
-        playerAddress,
-        expectedTier,
-      });
+    // Input validation
+    if (!gameId || gameId === null || gameId === undefined) {
+      throw new Error('Invalid gameId: gameId is required');
+    }
 
-      // Convert string address to PublicKey
-      const playerPubkey = new PublicKey(playerAddress);
+    if (
+      !playerAddress ||
+      typeof playerAddress !== 'string' ||
+      playerAddress.trim().length === 0
+    ) {
+      throw new Error('Invalid playerAddress: must be a non-empty string');
+    }
 
-      // Use VaultSDK to check if player has a ticket for this game
-      const ticketAccount = await this.vaultSDK.getUserTicketAccount(
-        gameId,
-        playerPubkey,
+    const trimmedAddress = playerAddress.trim();
+
+    // Basic Base58 format validation for Solana addresses
+    if (trimmedAddress.length < 32 || trimmedAddress.length > 44) {
+      throw new Error(
+        `Invalid playerAddress format: address length ${trimmedAddress.length} is outside valid range (32-44 characters)`,
       );
+    }
 
-      if (!ticketAccount || ticketAccount.hasWithdrawn) {
-        Logger.server.debug('❌ Player has no valid ticket', {
-          gameId,
-          playerAddress,
-        });
-        return false;
-      }
+    // Validate Base58 characters (basic check)
+    const base58Regex = /^[1-9A-HJ-NP-Za-km-z]+$/;
+    if (!base58Regex.test(trimmedAddress)) {
+      throw new Error(
+        'Invalid playerAddress format: contains invalid Base58 characters',
+      );
+    }
 
-      // Tier-based price validation if expectedTier is provided
-      if (expectedTier && this.config.security?.enableStrictPriceValidation) {
-        const tierConfig = this.getTierConfig(expectedTier);
-        const expectedAmountLamports = Math.floor(tierConfig.entranceFee * 1e9);
-        const actualAmountLamports = parseInt(ticketAccount.amount);
+    const maxRetries = 3;
+    const retryDelays = [0, 1000, 2000]; // 0ms, 1s, 2s
+    let lastError = null;
 
-        if (actualAmountLamports !== expectedAmountLamports) {
-          Logger.server.warn('❌ Ticket price validation failed', {
-            gameId,
-            playerAddress,
-            expectedTier,
-            expectedAmount: expectedAmountLamports,
-            actualAmount: actualAmountLamports,
-          });
-          return false;
+    Logger.server.debug('🎫 Checking player ticket with enhanced validation', {
+      gameId,
+      playerAddress: trimmedAddress,
+      expectedTier,
+      retriesEnabled: true,
+    });
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          Logger.server.debug(
+            `🔄 Retry attempt ${attempt + 1}/${maxRetries} for ticket verification`,
+            {
+              gameId,
+              playerAddress: trimmedAddress,
+              previousError: lastError?.message,
+            },
+          );
+
+          // Wait before retry
+          await new Promise((resolve) =>
+            setTimeout(resolve, retryDelays[attempt]),
+          );
         }
 
-        Logger.server.debug('✅ Player has valid tier ticket', {
-          gameId,
-          playerAddress,
-          tier: expectedTier,
-          ticketAmount: ticketAccount.amount,
-        });
-      } else {
-        Logger.server.debug('✅ Player has valid ticket (no tier validation)', {
-          gameId,
-          playerAddress,
-          ticketAmount: ticketAccount.amount,
-        });
-      }
+        // Convert string address to PublicKey with proper error handling
+        let playerPubkey;
+        try {
+          playerPubkey = new PublicKey(trimmedAddress);
+        } catch (publicKeyError) {
+          // This is an input validation error, don't retry
+          throw new Error(
+            `Invalid playerAddress format: ${publicKeyError.message}`,
+          );
+        }
 
-      return true;
-    } catch (error) {
-      Logger.server.warn('Failed to verify player ticket', {
-        gameId,
-        playerAddress,
-        error: error.message,
-      });
-      return false;
+        // Use VaultSDK to check if player has a ticket for this game
+        // Log RPC usage for debugging
+        Logger.server.debug(
+          '🔗 Calling VaultSDK.getUserTicketAccount via RPC Pool',
+          {
+            gameId,
+            playerAddress: trimmedAddress,
+            currentRPC: this.rpcManager?.getCurrentRPC(),
+            rpcStats: this.rpcManager?.getStats(),
+          },
+        );
+
+        const ticketAccount = await this.vaultSDK.getUserTicketAccount(
+          gameId,
+          playerPubkey,
+        );
+
+        // Business logic: no ticket or withdrawn ticket
+        if (!ticketAccount || ticketAccount.hasWithdrawn) {
+          Logger.server.debug('❌ Player has no valid ticket', {
+            gameId,
+            playerAddress: trimmedAddress,
+            hasTicketAccount: !!ticketAccount,
+            hasWithdrawn: ticketAccount?.hasWithdrawn || false,
+          });
+          return false; // This is expected behavior, not an error
+        }
+
+        // Tier-based price validation if expectedTier is provided
+        if (expectedTier && this.config.security?.enableStrictPriceValidation) {
+          const tierConfig = this.getTierConfig(expectedTier);
+
+          // 🔧 Fix: Use dynamic token decimals instead of hardcoded 1e9
+          const tokenDecimals = await this.getTokenDecimals();
+          const multiplier = Math.pow(10, tokenDecimals);
+          const expectedAmountLamports = Math.floor(
+            tierConfig.entranceFee * multiplier,
+          );
+          const actualAmountLamports = parseInt(ticketAccount.amount);
+
+          Logger.server.debug('🔍 Performing tier-based price validation', {
+            gameId,
+            playerAddress: trimmedAddress,
+            expectedTier,
+            tierConfig: {
+              entranceFee: tierConfig.entranceFee,
+              name: tierConfig.name,
+            },
+            tokenDecimals,
+            expectedAmountLamports,
+            actualAmountLamports,
+          });
+
+          if (actualAmountLamports !== expectedAmountLamports) {
+            Logger.server.warn('❌ Ticket price validation failed', {
+              gameId,
+              playerAddress: trimmedAddress,
+              expectedTier,
+              tierConfig: tierConfig.name,
+              tokenDecimals,
+              expectedAmount: expectedAmountLamports,
+              actualAmount: actualAmountLamports,
+              difference: actualAmountLamports - expectedAmountLamports,
+            });
+            return false; // This is expected behavior for wrong-tier tickets
+          }
+
+          Logger.server.debug('✅ Player has valid tier ticket', {
+            gameId,
+            playerAddress: trimmedAddress,
+            tier: expectedTier,
+            tierName: tierConfig.name,
+            ticketAmount: ticketAccount.amount,
+            tokenDecimals,
+          });
+        } else {
+          Logger.server.debug(
+            '✅ Player has valid ticket (no tier validation)',
+            {
+              gameId,
+              playerAddress: trimmedAddress,
+              tierValidationEnabled: !!expectedTier,
+              strictPriceValidationEnabled:
+                !!this.config.security?.enableStrictPriceValidation,
+              ticketAmount: ticketAccount.amount,
+            },
+          );
+        }
+
+        // Success case
+        Logger.server.info('✅ Player ticket verification successful', {
+          gameId,
+          playerAddress: trimmedAddress,
+          tier: expectedTier,
+          attempts: attempt + 1,
+        });
+
+        return true;
+      } catch (error) {
+        lastError = error;
+
+        // Categorize errors for appropriate handling
+        const errorMessage = error.message || String(error);
+        const isInputValidationError =
+          errorMessage.includes('Invalid playerAddress') ||
+          errorMessage.includes('Invalid gameId') ||
+          errorMessage.includes('Base58');
+        const isNetworkError =
+          errorMessage.includes('network') ||
+          errorMessage.includes('timeout') ||
+          errorMessage.includes('connection') ||
+          errorMessage.includes('ENOTFOUND') ||
+          errorMessage.includes('fetch');
+        const isRPCError =
+          errorMessage.includes('RPC') ||
+          errorMessage.includes('429') ||
+          errorMessage.includes('rate limit');
+
+        Logger.server.warn(
+          `❌ Ticket verification attempt ${attempt + 1} failed`,
+          {
+            gameId,
+            playerAddress: trimmedAddress,
+            expectedTier,
+            attempt: attempt + 1,
+            maxRetries,
+            error: errorMessage,
+            errorType: isInputValidationError
+              ? 'INPUT_VALIDATION'
+              : isNetworkError
+                ? 'NETWORK'
+                : isRPCError
+                  ? 'RPC'
+                  : 'UNKNOWN',
+            willRetry: attempt < maxRetries - 1 && !isInputValidationError,
+          },
+        );
+
+        // Don't retry input validation errors
+        if (isInputValidationError) {
+          throw error;
+        }
+
+        // Don't retry on the last attempt
+        if (attempt === maxRetries - 1) {
+          break;
+        }
+      }
     }
+
+    // All retries exhausted
+    const finalError = new Error(
+      `Failed to verify player ticket after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`,
+    );
+    finalError.originalError = lastError;
+    finalError.gameId = gameId;
+    finalError.playerAddress = trimmedAddress;
+    finalError.attempts = maxRetries;
+
+    Logger.server.error('❌ All ticket verification attempts failed', {
+      gameId,
+      playerAddress: trimmedAddress,
+      expectedTier,
+      totalAttempts: maxRetries,
+      finalError: lastError?.message,
+      errorStack: lastError?.stack,
+    });
+
+    throw finalError;
   }
 
   /**
@@ -756,14 +929,19 @@ class SolanaVaultService {
    * Check if service is connected and ready
    */
   async isConnected() {
-    if (!this.isInitialized) return false;
+    if (!this.isInitialized || !this.rpcManager) return false;
 
     try {
-      await this.connection.getLatestBlockhash();
+      // Use RPC Pool for connection testing
+      const rpcConnection = this.rpcManager.getCurrentConnection('confirmed');
+
+      await rpcConnection.getLatestBlockhash();
+
       return true;
     } catch (error) {
-      Logger.server.error('Solana connection check failed', {
+      Logger.server.error('Solana connection check failed via RPC Pool', {
         error: error.message,
+        rpcEndpoint: this.rpcManager?.getCurrentRPC(),
       });
       return false;
     }
@@ -774,26 +952,38 @@ class SolanaVaultService {
    * @returns {Promise<number>} Number of decimals for the token
    */
   async getTokenDecimals() {
-    if (!this.isInitialized || !this.connection) {
+    if (!this.isInitialized || !this.rpcManager) {
       throw new Error('Solana vault service not initialized');
     }
 
     try {
+      // Use RPC Pool for better load balancing and failover
+      const rpcConnection = this.rpcManager.getCurrentConnection('confirmed');
+      Logger.server.debug('🔗 Using RPC Pool connection for getTokenDecimals', {
+        currentRPC: this.rpcManager.getCurrentRPC(),
+        stats: this.rpcManager.getStats(),
+      });
+
       const { getMint } = require('@solana/spl-token');
       const tokenMint = new PublicKey(this.config.tokenMint);
-      const mintInfo = await getMint(this.connection, tokenMint);
+      const mintInfo = await getMint(rpcConnection, tokenMint);
 
-      Logger.server.debug('🔍 Retrieved token decimals', {
+      Logger.server.debug('🔍 Retrieved token decimals via RPC Pool', {
         tokenMint: tokenMint.toString(),
         decimals: mintInfo.decimals,
+        rpcEndpoint: this.rpcManager.getCurrentRPC(),
       });
 
       return mintInfo.decimals;
     } catch (error) {
-      Logger.server.warn('Failed to get token decimals, using default 9', {
-        tokenMint: this.config.tokenMint,
-        error: error.message,
-      });
+      Logger.server.warn(
+        'Failed to get token decimals via RPC Pool, using default 9',
+        {
+          tokenMint: this.config.tokenMint,
+          error: error.message,
+          rpcEndpoint: this.rpcManager?.getCurrentRPC(),
+        },
+      );
       // Fallback to 9 decimals (SOL standard) if unable to fetch
       return 9;
     }
@@ -940,22 +1130,38 @@ class SolanaVaultService {
     const startTime = Date.now();
     const checkInterval = 2000; // Check every 2 seconds
 
-    Logger.server.debug('⏳ Waiting for transaction confirmation', {
-      txHash: txHash.slice(0, 8) + '...',
-      timeout: timeout / 1000 + 's',
-    });
+    if (!this.rpcManager) {
+      throw new Error('RPC Manager not initialized');
+    }
+
+    Logger.server.debug(
+      '⏳ Waiting for transaction confirmation via RPC Pool',
+      {
+        txHash: txHash.slice(0, 8) + '...',
+        timeout: timeout / 1000 + 's',
+        initialRPC: this.rpcManager.getCurrentRPC(),
+      },
+    );
 
     while (Date.now() - startTime < timeout) {
       try {
-        const status = await this.connection.getSignatureStatus(txHash);
+        // Use RPC Pool for better reliability during confirmation
+        const rpcConnection = this.rpcManager.getCurrentConnection('confirmed');
+        Logger.server.debug('🔗 Checking transaction status via RPC Pool', {
+          txHash: txHash.slice(0, 8) + '...',
+          rpcEndpoint: this.rpcManager.getCurrentRPC(),
+        });
+
+        const status = await rpcConnection.getSignatureStatus(txHash);
 
         if (
           status?.value?.confirmationStatus === 'confirmed' ||
           status?.value?.confirmationStatus === 'finalized'
         ) {
-          Logger.server.debug('✅ Transaction confirmed', {
+          Logger.server.debug('✅ Transaction confirmed via RPC Pool', {
             txHash: txHash.slice(0, 8) + '...',
             confirmationStatus: status.value.confirmationStatus,
+            rpcEndpoint: this.rpcManager.getCurrentRPC(),
           });
           return true;
         }
@@ -968,9 +1174,10 @@ class SolanaVaultService {
 
         await new Promise((resolve) => setTimeout(resolve, checkInterval));
       } catch (error) {
-        Logger.server.warn('Error checking transaction status', {
+        Logger.server.warn('Error checking transaction status via RPC Pool', {
           txHash: txHash.slice(0, 8) + '...',
           error: error.message,
+          rpcEndpoint: this.rpcManager?.getCurrentRPC(),
         });
         await new Promise((resolve) => setTimeout(resolve, checkInterval));
       }
@@ -1030,14 +1237,24 @@ class SolanaVaultService {
     };
 
     try {
-      // Test connection
-      const latestBlockhash = await this.connection.getLatestBlockhash();
+      // Test connection using RPC Pool
+      if (!this.rpcManager) {
+        throw new Error('RPC Manager not initialized');
+      }
+
+      const rpcConnection = this.rpcManager.getCurrentConnection('confirmed');
+      Logger.server.debug('🔗 Testing connection via RPC Pool', {
+        rpcEndpoint: this.rpcManager.getCurrentRPC(),
+      });
+
+      const latestBlockhash = await rpcConnection.getLatestBlockhash();
       results.connection = true;
-      Logger.server.debug('✅ Connection test passed', {
+      Logger.server.debug('✅ Connection test passed via RPC Pool', {
         blockhash: latestBlockhash.blockhash.slice(0, 8) + '...',
+        rpcEndpoint: this.rpcManager.getCurrentRPC(),
       });
     } catch (error) {
-      results.errors.push(`Connection failed: ${error.message}`);
+      results.errors.push(`Connection failed via RPC Pool: ${error.message}`);
     }
 
     try {
