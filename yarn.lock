@@ -2099,6 +2099,29 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@coral-xyz/anchor@npm:^0.28.0":
+  version: 0.28.0
+  resolution: "@coral-xyz/anchor@npm:0.28.0"
+  dependencies:
+    "@coral-xyz/borsh": "npm:^0.28.0"
+    "@solana/web3.js": "npm:^1.68.0"
+    base64-js: "npm:^1.5.1"
+    bn.js: "npm:^5.1.2"
+    bs58: "npm:^4.0.1"
+    buffer-layout: "npm:^1.2.2"
+    camelcase: "npm:^6.3.0"
+    cross-fetch: "npm:^3.1.5"
+    crypto-hash: "npm:^1.3.0"
+    eventemitter3: "npm:^4.0.7"
+    js-sha256: "npm:^0.9.0"
+    pako: "npm:^2.0.3"
+    snake-case: "npm:^3.0.4"
+    superstruct: "npm:^0.15.4"
+    toml: "npm:^3.0.0"
+  checksum: 10c0/be1c64496d8fba3c9cc2867794cbeb02a45fb4ccd23eaf810ee34ba9069370c27781f38d25e9efe71d894373e807154f3f2ce08d7b41b5aeeb3567e6f7b798a3
+  languageName: node
+  linkType: hard
+
 "@coral-xyz/anchor@npm:^0.31.1":
   version: 0.31.1
   resolution: "@coral-xyz/anchor@npm:0.31.1"
@@ -2117,6 +2140,18 @@ __metadata:
     superstruct: "npm:^0.15.4"
     toml: "npm:^3.0.0"
   checksum: 10c0/244e4e9e047e700372d0d0c35683dec186d54a6c8593680bbf987051aa999f75d7764024e2d13bd593b848f7788e7a10b4fa06b31be297f2c8ad8355f5040675
+  languageName: node
+  linkType: hard
+
+"@coral-xyz/borsh@npm:^0.28.0":
+  version: 0.28.0
+  resolution: "@coral-xyz/borsh@npm:0.28.0"
+  dependencies:
+    bn.js: "npm:^5.1.2"
+    buffer-layout: "npm:^1.2.0"
+  peerDependencies:
+    "@solana/web3.js": ^1.68.0
+  checksum: 10c0/f0ad6aa39f00bb646e3cae5f10aa572f141bf5df687746f0a2e6d943619148b68493db780a30b0ff75702d8919ea781b82c7d1e725c53ad8870efb524eff048a
   languageName: node
   linkType: hard
 
@@ -5081,7 +5116,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/spl-token-metadata@npm:^0.1.6":
+"@solana/spl-token-metadata@npm:^0.1.2, @solana/spl-token-metadata@npm:^0.1.6":
   version: 0.1.6
   resolution: "@solana/spl-token-metadata@npm:0.1.6"
   dependencies:
@@ -5089,6 +5124,20 @@ __metadata:
   peerDependencies:
     "@solana/web3.js": ^1.95.3
   checksum: 10c0/a2ea535ac28cf9b8f499c2e2aced7ce9134b0728a0c1d4c8f2dfce8fe01ae66d94ccaca8f1f677c9613d3dbc913845c29df785efeafc25d9398e830fba4a626f
+  languageName: node
+  linkType: hard
+
+"@solana/spl-token@npm:^0.3.8":
+  version: 0.3.11
+  resolution: "@solana/spl-token@npm:0.3.11"
+  dependencies:
+    "@solana/buffer-layout": "npm:^4.0.0"
+    "@solana/buffer-layout-utils": "npm:^0.2.0"
+    "@solana/spl-token-metadata": "npm:^0.1.2"
+    buffer: "npm:^6.0.3"
+  peerDependencies:
+    "@solana/web3.js": ^1.88.0
+  checksum: 10c0/eae23e1ced21c8cc117a43d4c6e1b1f0f9aa412619e22f7fed96e15a833e350dddd6ec1b1498f5274a9542d8b0fdbd9ce93a5b79ed77863f7170951aeacb18fe
   languageName: node
   linkType: hard
 
@@ -5810,7 +5859,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@solana/web3.js@npm:^1.32.0, @solana/web3.js@npm:^1.36.0, @solana/web3.js@npm:^1.69.0, @solana/web3.js@npm:^1.87.0, @solana/web3.js@npm:^1.91.4, @solana/web3.js@npm:^1.95.4, @solana/web3.js@npm:^1.98.2":
+"@solana/web3.js@npm:^1.32.0, @solana/web3.js@npm:^1.36.0, @solana/web3.js@npm:^1.68.0, @solana/web3.js@npm:^1.69.0, @solana/web3.js@npm:^1.78.4, @solana/web3.js@npm:^1.87.0, @solana/web3.js@npm:^1.91.4, @solana/web3.js@npm:^1.95.4, @solana/web3.js@npm:^1.98.2":
   version: 1.98.2
   resolution: "@solana/web3.js@npm:1.98.2"
   dependencies:
@@ -6065,6 +6114,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@swordbattle/api@workspace:api"
   dependencies:
+    "@coral-xyz/anchor": "npm:^0.28.0"
     "@nestjs/cli": "npm:^11.0.7"
     "@nestjs/common": "npm:^10.0.0"
     "@nestjs/config": "npm:^3.1.1"
@@ -6073,6 +6123,8 @@ __metadata:
     "@nestjs/schematics": "npm:^10.0.0"
     "@nestjs/testing": "npm:^10.0.0"
     "@nestjs/typeorm": "npm:^10.0.0"
+    "@solana/spl-token": "npm:^0.3.8"
+    "@solana/web3.js": "npm:^1.78.4"
     "@types/bcrypt": "npm:^5.0.1"
     "@types/express": "npm:^4.17.17"
     "@types/express-session": "npm:^1.17.9"
@@ -6107,7 +6159,6 @@ __metadata:
     typeorm: "npm:^0.3.17"
     typescript: "npm:^5.1.3"
     uuid: "npm:^9.0.1"
-    viem: "npm:^2.31.3"
   languageName: unknown
   linkType: soft
 
@@ -9654,7 +9705,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"base64-js@npm:^1.0.2, base64-js@npm:^1.2.0, base64-js@npm:^1.3.1":
+"base64-js@npm:^1.0.2, base64-js@npm:^1.2.0, base64-js@npm:^1.3.1, base64-js@npm:^1.5.1":
   version: 1.5.1
   resolution: "base64-js@npm:1.5.1"
   checksum: 10c0/f23823513b63173a001030fae4f2dabe283b99a9d324ade3ad3d148e218134676f1ee8568c877cd79ec1c53158dcf2d2ba527a97c606618928ba99dd930102bf
@@ -11776,6 +11827,13 @@ __metadata:
     randombytes: "npm:^2.1.0"
     randomfill: "npm:^1.0.4"
   checksum: 10c0/184a2def7b16628e79841243232ab5497f18d8e158ac21b7ce90ab172427d0a892a561280adc08f9d4d517bce8db2a5b335dc21abb970f787f8e874bd7b9db7d
+  languageName: node
+  linkType: hard
+
+"crypto-hash@npm:^1.3.0":
+  version: 1.3.0
+  resolution: "crypto-hash@npm:1.3.0"
+  checksum: 10c0/651003421dce76fd686eb3ed4981117f9cd3f309a4af41697a646aecbbfc49179547bdd7146f7a74e2c8c7ab703227c25ce03e85fea2da3189ab65e32971ecce
   languageName: node
   linkType: hard
 
@@ -17609,6 +17667,13 @@ __metadata:
     git-sha1: "npm:^0.1.2"
     pako: "npm:^0.2.5"
   checksum: 10c0/703e6e06dce12fac727884a7643d7fd2098625e921a742cf61f783589f383bbbc42330f0c98924d85e1b16e43d5d014a99c4d1a5e41b76e7dd8a6a7a26fbca82
+  languageName: node
+  linkType: hard
+
+"js-sha256@npm:^0.9.0":
+  version: 0.9.0
+  resolution: "js-sha256@npm:0.9.0"
+  checksum: 10c0/f20b9245f6ebe666f42ca05536f777301132fb1aa7fbc22f10578fa302717a6cca507344894efdeaf40a011256eb2f7d517b94ac7105bd5cf087fa61551ad634
   languageName: node
   linkType: hard
 
@@ -23842,6 +23907,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"snake-case@npm:^3.0.4":
+  version: 3.0.4
+  resolution: "snake-case@npm:3.0.4"
+  dependencies:
+    dot-case: "npm:^3.0.4"
+    tslib: "npm:^2.0.3"
+  checksum: 10c0/ab19a913969f58f4474fe9f6e8a026c8a2142a01f40b52b79368068343177f818cdfef0b0c6b9558f298782441d5ca8ed5932eb57822439fad791d866e62cecd
+  languageName: node
+  linkType: hard
+
 "socket.io-client@npm:^4.7.5":
   version: 4.8.1
   resolution: "socket.io-client@npm:4.8.1"
@@ -26467,7 +26542,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"viem@npm:>=2.23.11, viem@npm:^2.31.3":
+"viem@npm:>=2.23.11":
   version: 2.31.7
   resolution: "viem@npm:2.31.7"
   dependencies:
