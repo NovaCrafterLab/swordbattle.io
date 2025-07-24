@@ -6,6 +6,7 @@ import {
   useCurrentGameToken,
   formatDisplayAmount,
 } from '../../hooks/useBlockchain';
+import { endpoint, getAsync } from '@/api';
 import { useToast } from '../components/Toast';
 import './RewardsModal.scss';
 
@@ -47,7 +48,6 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
       if (!address || gameRewards.length === 0) return gameRewards;
 
       try {
-        // 分批处理，避免大量并发请求
         const batchSize = 5;
         const batches = [];
         for (let i = 0; i < gameRewards.length; i += batchSize) {
@@ -59,55 +59,41 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
         for (const batch of batches) {
           await Promise.allSettled(
             batch.map(async (reward) => {
-              try {
-                // 查询链上奖励状态
-                const response = await fetch(
-                  `http://localhost:8080/race-games/players/${address}/rewards/${reward.gameId}/chain-status`,
-                );
+              // old: const response = await fetch(`http://localhost:8080/…`);
+              const chainData = await getAsync(
+                `${endpoint}/race-games/players/${address}/rewards/${reward.gameId}/chain-status`,
+              ); // ← use getAsync
 
-                if (response.ok) {
-                  const chainData = await response.json();
-                  if (chainData.success && chainData.data) {
-                    const chainClaimed = chainData.data.claimed || false;
-                    const chainClaimable = chainData.data.claimable || false;
-
-                    // 如果链上状态与数据库不一致，以链上为准
-                    if (
-                      chainClaimed !== reward.solanaClaimed ||
-                      chainClaimable !== reward.solanaClaimable
-                    ) {
-                      const originalIndex = gameRewards.findIndex(
-                        (r) => r.gameId === reward.gameId,
-                      );
-                      if (originalIndex !== -1) {
-                        syncedRewards[originalIndex] = {
-                          ...reward,
-                          solanaClaimed: chainClaimed,
-                          solanaClaimable: chainClaimable,
-                        };
-                      }
-                    }
+              if (chainData.success && chainData.data) {
+                const chainClaimed = chainData.data.claimed || false;
+                const chainClaimable = chainData.data.claimable || false;
+                if (
+                  chainClaimed !== reward.solanaClaimed ||
+                  chainClaimable !== reward.solanaClaimable
+                ) {
+                  const idx = gameRewards.findIndex(
+                    (r) => r.gameId === reward.gameId,
+                  );
+                  if (idx !== -1) {
+                    syncedRewards[idx] = {
+                      ...reward,
+                      solanaClaimed: chainClaimed,
+                      solanaClaimable: chainClaimable,
+                    };
                   }
                 }
-              } catch (error) {
-                console.warn(
-                  `Failed to sync chain status for game ${reward.gameId}:`,
-                  error,
-                );
               }
             }),
           );
-
-          // 批次间短暂延迟，避免过载
           if (batches.indexOf(batch) < batches.length - 1) {
-            await new Promise((resolve) => setTimeout(resolve, 100));
+            await new Promise((r) => setTimeout(r, 100));
           }
         }
 
         return syncedRewards;
-      } catch (error) {
-        console.error('Failed to sync reward status from chain:', error);
-        return gameRewards; // 同步失败时返回原始数据
+      } catch (err) {
+        console.error('Failed to sync reward status from chain:', err);
+        return gameRewards;
       }
     },
     [address],
@@ -120,12 +106,11 @@ const RewardsModal: React.FC<RewardsModalProps> = ({ onClose }) => {
 
       try {
         setIsLoading(true);
-        const url = bustCache
-          ? `http://localhost:8080/race-games/players/${address}/games?t=${Date.now()}`
-          : `http://localhost:8080/race-games/players/${address}/games`;
+        const basePath = `/race-games/players/${address}/games`;
+        const query = bustCache ? `?t=${Date.now()}` : '';
+        const url = `${basePath}${query}`;
 
-        const response = await fetch(url);
-        const data = await response.json();
+        const data = await getAsync(`${endpoint}${url}`);
 
         if (data.success) {
           let solanaRewardsData: GameReward[] = data.data.games.map(

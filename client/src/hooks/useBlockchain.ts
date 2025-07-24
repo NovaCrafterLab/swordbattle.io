@@ -1,13 +1,14 @@
 // Solana blockchain interaction hook
-import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
-
 import {
   getAssociatedTokenAddress,
   getAccount,
   getMint,
 } from '@solana/spl-token';
+
+import { ensureServerURL } from '@/ServerList';
 import { useSolanaVault } from './useSolanaVault';
 
 // Utility functions
@@ -126,100 +127,57 @@ export const useGameCounter = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
+  /* fetch current game id with timeout & graceful fallback */
   const fetchGameCounter = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
     try {
-      setIsLoading(true);
-      setError(null);
+      const baseURL = await ensureServerURL();              // unified helper
+      const url = `${baseURL}/serverinfo`;
 
-      // Get server URL from localStorage or default
-      const serverUrl =
-        localStorage.getItem('selectedServer') || 'localhost:8000';
-      const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
-      const url = `${protocol}://${serverUrl}/serverinfo`;
+      // create abortable fetch with 10 s timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10_000);
 
-      console.log('🔗 Fetching game counter from:', url);
+      const resp = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
 
-      // 🔧 添加超时保护 - 10秒超时
-      const fetchPromise = fetch(url);
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(
-            new Error(
-              `Game counter fetch timeout after 10 seconds (${serverUrl})`,
-            ),
-          );
-        }, 10000);
-      });
-
-      const response = await Promise.race([fetchPromise, timeoutPromise]);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
       }
 
-      // 为JSON解析也添加超时保护
-      const parsePromise = response.json();
-      const parseTimeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(
-            new Error(`JSON parsing timeout after 5 seconds (${serverUrl})`),
-          );
-        }, 5000);
-      });
+      // parse json with extra 5 s timeout
+      const parseController = new AbortController();
+      const parseTimeout = setTimeout(() => parseController.abort(), 5_000);
 
-      const serverInfo = await Promise.race([
-        parsePromise,
-        parseTimeoutPromise,
-      ]);
+      const serverInfo: any = await resp.json();
+      clearTimeout(parseTimeout);
 
-      // 优先使用服务器的solanaGameId（这是当前活跃游戏的稳定ID）
-      let currentGameId = 0;
-      if (
-        serverInfo?.gameStatus?.gameId !== null &&
-        serverInfo?.gameStatus?.gameId !== undefined
-      ) {
-        currentGameId = serverInfo.gameStatus.gameId;
-      } else if (serverInfo?.solanaGameId) {
-        // 如果gameStatus中没有，尝试从solanaGameId获取
-        currentGameId = parseInt(serverInfo.solanaGameId) || 0;
-      }
+      const id =
+        serverInfo?.gameStatus?.gameId ??
+        Number.parseInt(serverInfo?.solanaGameId ?? '0') ??
+        0;
 
-      console.log(`✅ Game counter fetched successfully: ${currentGameId}`);
-      setGameId(currentGameId);
-    } catch (err) {
-      const error = err as Error;
-      console.error('❌ Failed to fetch game counter:', error.message);
-
-      // 🔧 增强错误处理
-      if (error.message.includes('timeout')) {
-        console.warn('⚠️ Game counter fetch timed out, using fallback value 0');
-      } else if (error.message.includes('fetch')) {
-        console.warn(
-          '⚠️ Network error fetching game counter, using fallback value 0',
-        );
-      }
-
-      setError(error);
+      setGameId(id || 0);
+    } catch (e) {
+      const err = e as Error;
+      console.error('[useGameCounter]', err.message);
+      setError(err);
       setGameId(0);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, []); // deliberate empty deps
 
+  /* initial fetch + polling */
   useEffect(() => {
     fetchGameCounter();
+    const timer = setInterval(fetchGameCounter, 120_000);
+    return () => clearInterval(timer);
+  }, []); // do not pass fetchGameCounter
 
-    // 修复：增加到120秒一次轮询，大幅减少 API 请求
-    const interval = setInterval(fetchGameCounter, 120000); // 从60秒增加到120秒
-    return () => clearInterval(interval);
-  }, []); // 移除 fetchGameCounter 依赖，防止重复创建定时器
-
-  return {
-    data: gameId,
-    isLoading,
-    error,
-    refetch: fetchGameCounter,
-  };
+  return { data: gameId, isLoading, error, refetch: fetchGameCounter };
 };
 
 /**
@@ -436,13 +394,16 @@ export const useTokenMetadata = (tokenMintAddress: string) => {
  */
 export const useCurrentGameToken = () => {
   const { connection } = useConnection();
+
   const [tokenInfo, setTokenInfo] = useState<{
     tokenMint: string;
     tokenSymbol: string;
     tokenName: string;
     isSOL: boolean;
-    isWSol?: boolean; // 添加 WSOL 标识
+    isWSol?: boolean;
     isUSDC: boolean;
+    isSBTT?: boolean;
+    tokenDecimals?: number;
     gameId: string;
     tier: string;
     canBuyTickets: boolean;
@@ -451,68 +412,62 @@ export const useCurrentGameToken = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
+  /* pull token metadata from /serverinfo with timeout */
   const fetchCurrentGameToken = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
     try {
-      setIsLoading(true);
-      setError(null);
+      const baseURL = await ensureServerURL();
+      const url = `${baseURL}/serverinfo`;
 
-      // Get server URL from localStorage or default
-      const serverUrl =
-        localStorage.getItem('selectedServer') || 'localhost:8000';
-      const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+      /* 10 s network timeout */
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10_000);
 
-      // 🚀 优化：直接从 /serverinfo 获取 token 信息，避免额外的 API 调用
-      const url = `${protocol}://${serverUrl}/serverinfo`;
+      const resp = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
 
-      const response = await fetch(url);
-      const serverInfo = await response.json();
-
-      // 检查是否有 gameStatus 和 token 信息
-      if (!serverInfo.gameStatus) {
-        throw new Error('Game status not available from server');
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
       }
 
-      const gameStatus = serverInfo.gameStatus;
+      const serverInfo: any = await resp.json();
+      const gameStatus = serverInfo?.gameStatus;
+      if (!gameStatus) throw new Error('gameStatus missing');
 
-      // 获取 token mint 信息 - 优先使用 gameStatus 中的信息
-      let tokenMint = gameStatus.tokenMint;
-      let tokenInfoData = gameStatus.tokenInfo;
+      /* resolve mint */
+      let tokenMint: string =
+        gameStatus.tokenMint ??
+        serverInfo?.solanaConfig?.defaultToken ??
+        'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr'; // fallback USDC
 
-      // 如果 gameStatus 中没有 token 信息，回退到服务器配置
-      if (!tokenMint && serverInfo.solanaConfig) {
-        tokenMint = 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr'; // 默认 USDC
-      }
-
-      if (!tokenMint) {
-        throw new Error('Token mint information not available');
-      }
-
-      // 🚀 Dynamic token metadata retrieval
+      /* mint metadata */
       let tokenSymbol = 'UNKNOWN';
       let tokenName = 'Unknown Token';
-      let tokenDecimals = 9; // Default decimals
+      let tokenDecimals = 9;
 
-      // Try to get mint info for decimals and better metadata
       try {
-        const mintPubkey = new PublicKey(tokenMint);
-        // Use stable connection instead of random RPC to avoid API key issues
-        const mintInfo = await getMint(connection, mintPubkey);
+        const mintInfo = await getMint(connection, new PublicKey(tokenMint));
         tokenDecimals = mintInfo.decimals;
-      } catch (error) {
-        // Silent failure - use default decimals
-        console.warn('Failed to get mint info, using default decimals:', error);
+      } catch (err) {
+        console.warn(
+          `[useCurrentGameToken] getMint failed for ${tokenMint}:`,
+          (err as Error).message,
+        );
+        /* ignore, use defaults */
       }
 
-      // 使用 tokenInfo 中的信息，或基于 tokenMint 地址判断
+      /* static mapping */
       if (
-        tokenInfoData?.isSOL ||
+        gameStatus.tokenInfo?.isSOL ||
         tokenMint === 'So11111111111111111111111111111111111111112'
       ) {
         tokenSymbol = 'SOL';
         tokenName = 'Solana';
         tokenDecimals = 9;
       } else if (
-        tokenInfoData?.isUSDC ||
+        gameStatus.tokenInfo?.isUSDC ||
         tokenMint === 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr'
       ) {
         tokenSymbol = 'USDC';
@@ -521,36 +476,30 @@ export const useCurrentGameToken = () => {
       } else if (tokenMint === 'Hk4BerAoKbemG277HShrk8DSHiMEUKbm6D23RKhLDLKq') {
         tokenSymbol = 'SBTT';
         tokenName = 'SwordBattle Test Token';
-        tokenDecimals = 9; // From test-token-config.json
+        tokenDecimals = 9;
       } else {
-        // For unknown tokens, use a more descriptive fallback
         tokenSymbol = tokenMint.slice(0, 4) + '...';
         tokenName = 'Custom Token';
       }
 
-      // 🔧 修复：WSOL 应该被当作 SPL Token 处理，不是原生 SOL
-      // WSOL (wrapped SOL) 有特殊的 token mint，但它仍然是 SPL Token
-      const gameTokenInfo = {
+      setTokenInfo({
         tokenMint,
         tokenSymbol,
         tokenName,
-        tokenDecimals, // 添加 decimals 信息
-        isSOL: false, // 🔧 重要：即使是 WSOL 也应该作为 SPL Token 处理
-        isWSol: tokenMint === 'So11111111111111111111111111111111111111112', // 添加 WSOL 标识
+        tokenDecimals,
+        isSOL: false,
+        isWSol: tokenMint === 'So11111111111111111111111111111111111111112',
         isUSDC:
-          tokenInfoData?.isUSDC ||
+          gameStatus.tokenInfo?.isUSDC ||
           tokenMint === 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
-        isSBTT: tokenMint === 'Hk4BerAoKbemG277HShrk8DSHiMEUKbm6D23RKhLDLKq', // 添加 SBTT 标识
-        gameId: gameStatus.gameId?.toString() || '0',
-        tier: 'low', // 默认 tier，可以从服务器配置获取
-        canBuyTickets: true, // 默认允许购买
-        retrievalMethod: 'serverinfo-optimized-with-metadata', // 标记为优化版本
-      };
-
-      setTokenInfo(gameTokenInfo);
-    } catch (err) {
-      const error = err as Error;
-      setError(error);
+        isSBTT: tokenMint === 'Hk4BerAoKbemG277HShrk8DSHiMEUKbm6D23RKhLDLKq',
+        gameId: String(gameStatus.gameId ?? 0),
+        tier: 'low',
+        canBuyTickets: true,
+        retrievalMethod: 'serverinfo-metadata',
+      });
+    } catch (e) {
+      setError(e as Error);
       setTokenInfo(null);
     } finally {
       setIsLoading(false);
@@ -561,12 +510,7 @@ export const useCurrentGameToken = () => {
     fetchCurrentGameToken();
   }, [fetchCurrentGameToken]);
 
-  return {
-    data: tokenInfo,
-    isLoading,
-    error,
-    refetch: fetchCurrentGameToken,
-  };
+  return { data: tokenInfo, isLoading, error, refetch: fetchCurrentGameToken };
 };
 
 /**
@@ -584,60 +528,48 @@ export const useTierPricing = (tier: string = 'low') => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
+  /* request helper with timeout + proper URL */
   const fetchTierPricing = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
     try {
-      setIsLoading(true);
-      setError(null);
+      const baseURL = await ensureServerURL();
+      const url = `${baseURL}/serverinfo`;
 
-      // Get server URL from localStorage or default
-      const serverUrl =
-        localStorage.getItem('selectedServer') || 'localhost:8000';
-      const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+      /* 10 s timeout */
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 10_000);
+      const resp = await fetch(url, { signal: ctl.signal });
+      clearTimeout(t);
 
-      // Fetch tier configuration from server
-      const response = await fetch(`${protocol}://${serverUrl}/serverinfo`);
-      const serverInfo = await response.json();
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+      }
 
-      // Extract tier configuration from server info
-      const solanaConfig = serverInfo.solana || {};
-      const tiers = solanaConfig.tiers || {};
-
-      // Get the specific tier configuration
-      const tierConfig = tiers[tier];
-      if (!tierConfig) {
+      const data: any = await resp.json();
+      const tiers = data?.solana?.tiers ?? {};
+      const tierCfg = tiers[tier];
+      if (!tierCfg) {
         throw new Error(
-          `Invalid tier: ${tier}. Available tiers: ${Object.keys(tiers).join(', ')}`,
+          `Invalid tier "${tier}". Valid: ${Object.keys(tiers).join(', ') || 'none'}`,
         );
       }
 
-      // Convert entrance fee and kill reward to lamports (assuming they're in token units)
-      // Note: The server config uses token decimals, we need to convert to the smallest unit
-      const tokenDecimals = serverInfo.gameStatus?.tokenDecimals || 9; // Default to 9 decimals
-      const multiplier = Math.pow(10, tokenDecimals);
+      /* convert token units → lamports-like bigint */
+      const decimals: number = data?.gameStatus?.tokenDecimals ?? 9;
+      const mul = 10 ** decimals;
 
-      const config = {
-        entranceFee: BigInt(Math.floor(tierConfig.entranceFee * multiplier)),
-        killReward: BigInt(Math.floor(tierConfig.killReward * multiplier)),
-        tierName:
-          tierConfig.name ||
-          `${tier.charAt(0).toUpperCase() + tier.slice(1)} Tier Arena`,
-        minLevel: tierConfig.minLevel || 1,
-        maxLevel: tierConfig.maxLevel || 999,
-        description: tierConfig.description || `${tier} tier arena`,
-      };
-
-      console.log(`🎯 Tier ${tier} pricing from server:`, {
-        entranceFee: tierConfig.entranceFee,
-        killReward: tierConfig.killReward,
-        entranceFeeWei: config.entranceFee.toString(),
-        killRewardWei: config.killReward.toString(),
-        tokenDecimals,
+      setPricing({
+        entranceFee: BigInt(Math.round(tierCfg.entranceFee * mul)),
+        killReward: BigInt(Math.round(tierCfg.killReward * mul)),
+        tierName: tierCfg.name ?? `${tier[0].toUpperCase()}${tier.slice(1)} Tier`,
+        minLevel: tierCfg.minLevel ?? 1,
+        maxLevel: tierCfg.maxLevel ?? 999,
+        description: tierCfg.description ?? `${tier} tier arena`,
       });
-
-      setPricing(config);
-    } catch (err) {
-      const error = err as Error;
-      setError(error);
+    } catch (e) {
+      setError(e as Error);
       setPricing(null);
     } finally {
       setIsLoading(false);
@@ -648,12 +580,7 @@ export const useTierPricing = (tier: string = 'low') => {
     fetchTierPricing();
   }, [fetchTierPricing]);
 
-  return {
-    data: pricing,
-    isLoading,
-    error,
-    refetch: fetchTierPricing,
-  };
+  return { data: pricing, isLoading, error, refetch: fetchTierPricing };
 };
 
 /**
@@ -728,23 +655,31 @@ export const usePlayerTicket = (gameId: number, playerAddress: string) => {
       return;
     }
 
+    setIsLoading(true);
+    setError(null);
+
     try {
-      setIsLoading(true);
-      setError(null);
+      const baseURL = await ensureServerURL();
+      const url = `${baseURL}/api/vault-info/${gameId}/${playerAddress}`;
 
-      // Get server vault info to use VaultSDK
-      const serverUrl =
-        localStorage.getItem('selectedServer') || 'localhost:8000';
-      const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
-      const vaultInfoUrl = `${protocol}://${serverUrl}/api/vault-info/${gameId}/${playerAddress}`;
+      /* 10 s timeout */
+      const ctl = new AbortController();
+      const to = setTimeout(() => ctl.abort(), 10_000);
+      const resp = await fetch(url, { signal: ctl.signal });
+      clearTimeout(to);
 
-      const response = await fetch(vaultInfoUrl);
-      const result = await response.json();
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+      }
 
-      setTicket(result.ticket);
-    } catch (err) {
-      const error = err as Error;
-      setError(error);
+      const json = await resp.json();
+      setTicket(json.ticket ?? null);
+    } catch (e) {
+      console.warn(
+        `[usePlayerTicket] failed: gameId=${gameId} address=${playerAddress}`,
+        (e as Error).message,
+      );
+      setError(e as Error);
       setTicket(null);
     } finally {
       setIsLoading(false);
@@ -778,23 +713,28 @@ export const useGameVault = (gameId: number) => {
       return;
     }
 
+    setIsLoading(true);
+    setError(null);
+
     try {
-      setIsLoading(true);
-      setError(null);
+      const baseURL = await ensureServerURL();
+      const url = `${baseURL}/api/vault-info/${gameId}`;
 
-      // Get server vault info
-      const serverUrl =
-        localStorage.getItem('selectedServer') || 'localhost:8000';
-      const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
-      const vaultInfoUrl = `${protocol}://${serverUrl}/api/vault-info/${gameId}`;
+      /* 10 s timeout */
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 10_000);
+      const resp = await fetch(url, { signal: ctl.signal });
+      clearTimeout(timer);
 
-      const response = await fetch(vaultInfoUrl);
-      const result = await response.json();
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+      }
 
-      setVault(result.vault);
-    } catch (err) {
-      const error = err as Error;
-      setError(error);
+      const json = await resp.json();
+      setVault(json.vault ?? null);
+    } catch (e) {
+      console.warn(`[useGameVault] fetch failed (gameId=${gameId})`, (e as Error).message);
+      setError(e as Error);
       setVault(null);
     } finally {
       setIsLoading(false);
@@ -805,12 +745,7 @@ export const useGameVault = (gameId: number) => {
     fetchVault();
   }, [fetchVault]);
 
-  return {
-    data: vault,
-    isLoading,
-    error,
-    refetch: fetchVault,
-  };
+  return { data: vault, isLoading, error, refetch: fetchVault };
 };
 
 // Type definitions for backward compatibility
@@ -920,7 +855,7 @@ export const useBlockchain = () => {
       data: null,
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );
@@ -930,7 +865,7 @@ export const useBlockchain = () => {
       data: [],
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );
@@ -940,7 +875,7 @@ export const useBlockchain = () => {
       data: [],
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );
@@ -950,7 +885,7 @@ export const useBlockchain = () => {
       data: null,
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );
@@ -960,7 +895,7 @@ export const useBlockchain = () => {
       data: null,
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );
@@ -970,7 +905,7 @@ export const useBlockchain = () => {
       data: null,
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );
@@ -980,7 +915,7 @@ export const useBlockchain = () => {
       data: null,
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );
@@ -990,7 +925,7 @@ export const useBlockchain = () => {
       data: null,
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );
@@ -1000,7 +935,7 @@ export const useBlockchain = () => {
       data: null,
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );
@@ -1013,81 +948,59 @@ export const useBlockchain = () => {
       }
 
       try {
-        // Get server configuration (single fetch for both tier and token info)
-        const serverUrl =
-          localStorage.getItem('selectedServer') || 'localhost:8000';
-        const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+        /* unified, auto-switching server URL */
+        const baseURL = await ensureServerURL();
+        const url = `${baseURL}/serverinfo`;
 
-        // Fetch server info once
-        const response = await fetch(`${protocol}://${serverUrl}/serverinfo`);
-        const serverInfo = await response.json();
+        /* 10 s timeout */
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 10_000);
+        const resp = await fetch(url, { signal: ctl.signal });
+        clearTimeout(timer);
 
-        // Extract tier configuration from server info
-        const solanaConfig = serverInfo.solana || {};
-        const tiers = solanaConfig.tiers || {};
-        const tierConfig = tiers[tier];
+        if (!resp.ok) {
+          throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+        }
 
-        if (!tierConfig) {
+        const serverInfo: any = await resp.json();
+
+        /* tier config */
+        const tiers = serverInfo?.solana?.tiers ?? {};
+        const tierCfg = tiers[tier];
+        if (!tierCfg) {
           throw new Error(
-            `Invalid tier: ${tier}. Available tiers: ${Object.keys(tiers).join(', ')}`,
+            `Invalid tier "${tier}". Valid: ${Object.keys(tiers).join(', ') || 'none'}`,
           );
         }
 
-        // Convert entrance fee to the smallest unit (considering token decimals)
-        const tokenDecimals = serverInfo.gameStatus?.tokenDecimals || 9;
-        const multiplier = Math.pow(10, tokenDecimals);
-        const entranceFee = BigInt(
-          Math.floor(tierConfig.entranceFee * multiplier),
+        /* token decimals & entrance fee ↓ smallest unit */
+        const decimals = serverInfo?.gameStatus?.tokenDecimals ?? 9;
+        const mul = 10 ** decimals;
+        const entranceFee = BigInt(Math.round(tierCfg.entranceFee * mul));
+
+        /* token mint */
+        const tokenMint = new PublicKey(
+          serverInfo?.gameStatus?.tokenMint ??
+            'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr', // fallback USDC
         );
 
-        const config = { entranceFee };
-
-        console.log(`🎯 Using tier ${tier} configuration from server:`, {
-          entranceFeeFromServer: tierConfig.entranceFee,
-          entranceFeeWei: entranceFee.toString(),
-          tokenDecimals,
-          multiplier,
-        });
-
-        console.log('🔍 DEBUG - Server info:', serverInfo);
-
-        let tokenMint: PublicKey;
-
-        if (serverInfo.gameStatus?.tokenMint) {
-          console.log(
-            '🪙 Using token mint from server:',
-            serverInfo.gameStatus.tokenMint,
-          );
-          tokenMint = new PublicKey(serverInfo.gameStatus.tokenMint);
-        } else {
-          console.log('⚠️ No token mint in server info, using default USDC');
-          // Default to USDC if no token mint specified
-          tokenMint = new PublicKey(
-            'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
-          );
-        }
-
-        console.log('🔍 Final token mint:', tokenMint.toString());
-
-        // Check if vault is configured
+        /* vault check */
         if (!solanaVault.isVaultConfigured) {
-          throw new Error(
-            'Vault program not configured. Please set REACT_APP_VAULT_PROGRAM_ID environment variable.',
-          );
+          throw new Error('Vault program not configured');
         }
 
-        // Use direct Solana vault implementation
-        const result = await solanaVault.buyTicket(
+        const txHash = await solanaVault.buyTicket(
           gameId,
-          config.entranceFee,
+          entranceFee,
           tokenMint,
           tier,
-          config.entranceFee, // expected amount for validation
+          entranceFee, // expected amount
         );
 
-        return { success: true, txHash: result, tier };
-      } catch (error) {
-        throw error;
+        return { success: true, txHash, tier };
+      } catch (e) {
+        /* rethrow for caller */
+        throw e;
       }
     },
     [isConnected, address, publicKey, solanaVault],
@@ -1178,7 +1091,7 @@ export const useBlockchain = () => {
       data: BigInt(1000000), // 0.001 SOL in lamports
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );
@@ -1192,7 +1105,7 @@ export const useBlockchain = () => {
       },
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );
@@ -1202,7 +1115,7 @@ export const useBlockchain = () => {
       data: [] as string[],
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );
@@ -1212,7 +1125,7 @@ export const useBlockchain = () => {
       data: BigInt(0),
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );
@@ -1222,7 +1135,7 @@ export const useBlockchain = () => {
       data: BigInt(0),
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );
@@ -1232,7 +1145,7 @@ export const useBlockchain = () => {
       data: false,
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );
@@ -1243,7 +1156,7 @@ export const useBlockchain = () => {
       data: BigInt(0),
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );
@@ -1254,7 +1167,7 @@ export const useBlockchain = () => {
       data: '11111111111111111111111111111112', // System Program as placeholder
       isLoading: false,
       error: null,
-      refetch: () => {},
+      refetch: () => { },
     }),
     [],
   );

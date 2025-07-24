@@ -4,9 +4,9 @@ import { Settings } from './game/Settings';
 import { config } from './config';
 import logger from '@/utils/logger';
 
-/* ──────────────────────────────────────────────────────────── *
- * types & constants                                            *
- * ──────────────────────────────────────────────────────────── */
+/* ======================== *
+ * types & constants
+ * ======================== */
 export interface Server {
   value: string;
   name: string;
@@ -49,9 +49,9 @@ if (config.isDev) {
 let lastPingUpdate = 0;
 let isUpdating = false;
 
-/* ──────────────────────────────────────────────────────────── *
- * ping helpers                                                *
- * ──────────────────────────────────────────────────────────── */
+/* ======================== *
+ * ping helpers
+ * ======================== */
 export async function updatePing(): Promise<Server[]> {
   const cache: Record<string, Server> = {};
 
@@ -104,9 +104,9 @@ export async function updatePing(): Promise<Server[]> {
   return servers;
 }
 
-/* ──────────────────────────────────────────────────────────── *
- * public API                                                  *
- * ──────────────────────────────────────────────────────────── */
+/* ==================== *
+ * public API
+ * ==================== */
 export async function getServerList(): Promise<Server[]> {
   const t0 = performance.now();
   await updatePing();
@@ -152,9 +152,21 @@ export function getCurrentServer(): Server | null {
   return currentServer;
 }
 
-/* ──────────────────────────────────────────────────────────── *
- * helpers                                                     *
- * ──────────────────────────────────────────────────────────── */
+/* Return full URL of current server, or null if not selected. */
+export function getServerURL(): string | null {
+  const srv = getCurrentServer();
+  return srv ? `${window.location.protocol}//${srv.address}` : null;
+}
+
+/* Ensure a server has been chosen, then get its full URL. */
+export async function ensureServerURL(): Promise<string> {
+  const srv = getCurrentServer() ?? (await getServer());
+  return `${window.location.protocol}//${srv.address}`;
+}
+
+/* ======================== *
+ * helpers 
+ * ======================== */
 function pickLowestPing(): Server {
   const best = servers.reduce((min, cur) => (cur.ping < min.ping ? cur : min));
   if (best.offline) {

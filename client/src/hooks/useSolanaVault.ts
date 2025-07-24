@@ -3,6 +3,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useState, useCallback } from 'react';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { createRandomRPCConnection } from '../blockchain';
+import { ensureServerURL } from '@/ServerList';
 
 /**
  * Hook for Solana vault operations using secure frontend transaction building
@@ -191,9 +192,8 @@ export const useSolanaVault = () => {
       try {
         console.log(`🎫 Verifying player ticket for game ${gameId}...`);
 
-        const serverUrl =
-          localStorage.getItem('selectedServer') || 'localhost:8000';
-        const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+        // 使用动态服务器URL，避免硬编码
+        const serverUrl = await ensureServerURL();
 
         // 使用多重验证策略确保票据状态准确
         const maxVerificationAttempts = 3;
@@ -214,16 +214,23 @@ export const useSolanaVault = () => {
               );
             }
 
+            // 添加请求超时控制
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+
             const response = await fetch(
-              `${protocol}://${serverUrl}/api/vault-info/${gameId}/${publicKey.toString()}`,
+              `${serverUrl}/api/vault-info/${gameId}/${publicKey.toString()}`,
               {
                 method: 'GET',
                 headers: {
                   Accept: 'application/json',
                   'Content-Type': 'application/json',
                 },
+                signal: controller.signal,
               },
             );
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
               if (attempt === maxVerificationAttempts - 1) {
@@ -406,9 +413,8 @@ export const useSolanaVault = () => {
         });
 
         // Step 1: Security validation and parameter verification
-        const serverUrl =
-          localStorage.getItem('selectedServer') || 'localhost:8000';
-        const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+        // 使用动态服务器URL，避免硬编码
+        const serverUrl = await ensureServerURL();
 
         // Generate secure signature for anti-tampering
         const requestData = `${gameId}:${amount}:${tokenMint.toString()}:${tier || 'default'}:${publicKey!.toString()}`;
@@ -422,7 +428,7 @@ export const useSolanaVault = () => {
           '📡 Requesting server transaction building with parameter validation...',
         );
 
-        const requestUrl = `${protocol}://${serverUrl}/api/build-buy-ticket-transaction`;
+        const requestUrl = `${serverUrl}/api/build-buy-ticket-transaction`;
         const requestBody = {
           gameId,
           amount: amount.toString(),
@@ -439,11 +445,18 @@ export const useSolanaVault = () => {
           body: requestBody,
         });
 
+        // 添加请求超时控制
+        const buildController = new AbortController();
+        const buildTimeoutId = setTimeout(() => buildController.abort(), 10000); // 10秒超时
+
         const buildResponse = await fetch(requestUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(requestBody),
+          signal: buildController.signal,
         });
+
+        clearTimeout(buildTimeoutId);
 
         console.log('🔍 DEBUG - Server response status:', buildResponse.status);
 
@@ -875,12 +888,18 @@ export const useSolanaVault = () => {
         }
 
         // Step 7: Notify server of successful transaction for game state sync
+        // 添加请求超时控制
+        const syncController = new AbortController();
+        const syncTimeoutId = setTimeout(() => syncController.abort(), 10000); // 10秒超时
+        
         try {
+
           const response = await fetch(
-            `${protocol}://${serverUrl}/api/player-joined`,
+            `${serverUrl}/api/player-joined`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
+              signal: syncController.signal,
               body: JSON.stringify({
                 gameId,
                 playerAddress: publicKey!.toString(),
@@ -891,6 +910,8 @@ export const useSolanaVault = () => {
             },
           );
 
+          clearTimeout(syncTimeoutId);
+
           if (response.ok) {
             console.log('✅ Server notified of successful transaction');
           } else {
@@ -899,6 +920,7 @@ export const useSolanaVault = () => {
             );
           }
         } catch (syncError) {
+          clearTimeout(syncTimeoutId);
           console.warn(
             '⚠️ Failed to sync with server, but transaction completed:',
             syncError,
@@ -999,13 +1021,19 @@ export const useSolanaVault = () => {
       if (!publicKey) return false;
 
       try {
-        const serverUrl =
-          localStorage.getItem('selectedServer') || 'localhost:8000';
-        const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+        // 使用动态服务器URL，避免硬编码
+        const serverUrl = await ensureServerURL();
+
+        // 添加请求超时控制
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
 
         const response = await fetch(
-          `${protocol}://${serverUrl}/api/vault-info/${gameId}/${publicKey!.toString()}`,
+          `${serverUrl}/api/vault-info/${gameId}/${publicKey!.toString()}`,
+          { signal: controller.signal },
         );
+        
+        clearTimeout(timeoutId);
         if (!response.ok) return false;
 
         const result = await response.json();
@@ -1021,13 +1049,19 @@ export const useSolanaVault = () => {
   // Get vault information using server API
   const getVaultInfo = useCallback(async (gameId: number) => {
     try {
-      const serverUrl =
-        localStorage.getItem('selectedServer') || 'localhost:8000';
-      const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
+      // 使用动态服务器URL，避免硬编码
+      const serverUrl = await ensureServerURL();
+
+      // 添加请求超时控制
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
 
       const response = await fetch(
-        `${protocol}://${serverUrl}/api/vault-info/${gameId}`,
+        `${serverUrl}/api/vault-info/${gameId}`,
+        { signal: controller.signal },
       );
+      
+      clearTimeout(timeoutId);
       if (!response.ok) {
         throw new Error(`Failed to fetch vault info: ${response.statusText}`);
       }
@@ -1187,10 +1221,9 @@ export const useSolanaVault = () => {
 
         console.log(`🔒 Processing lock set for game ${gameId}`);
 
-        const serverUrl =
-          localStorage.getItem('selectedServer') || 'localhost:8000';
-        const protocol = serverUrl.includes('localhost') ? 'http' : 'https';
-        const fullUrl = `${protocol}://${serverUrl}/api/build-claim-transaction`;
+        // 使用动态服务器URL，避免硬编码
+        const serverUrl = await ensureServerURL();
+        const fullUrl = `${serverUrl}/api/build-claim-transaction`;
 
         console.log(`📡 Requesting claim transaction for game ${gameId}...`);
         console.log(`🔗 Full request URL: ${fullUrl}`);
@@ -1200,17 +1233,23 @@ export const useSolanaVault = () => {
         });
 
         // Step 1: Request claim transaction from server
+        // 添加请求超时控制
+        const claimController = new AbortController();
+        const claimTimeoutId = setTimeout(() => claimController.abort(), 10000); // 10秒超时
+
         const response = await fetch(fullUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Accept: 'application/json',
           },
+          signal: claimController.signal,
           body: JSON.stringify({
             gameId,
             walletAddress: publicKey!.toString(),
           }),
         }).catch((fetchError) => {
+          clearTimeout(claimTimeoutId);
           console.error(`❌ Network fetch error:`, fetchError);
           if (
             fetchError.name === 'TypeError' &&
@@ -1223,6 +1262,8 @@ export const useSolanaVault = () => {
           throw new Error(`Network error: ${fetchError.message}`);
         });
 
+        clearTimeout(claimTimeoutId);
+        
         console.log(
           `📡 Response status: ${response.status} ${response.statusText}`,
         );
