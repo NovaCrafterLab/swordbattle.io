@@ -52,7 +52,7 @@ const getErrorMessage = (error: any): string => {
   if (error instanceof Error) {
     // Handle StructError specifically - 改进用户友好性
     if (error.name === 'StructError' || error.message.includes('StructError')) {
-      return '交易数据处理出现问题。请检查网络连接并重试，如果问题持续存在，请联系客服。';
+      return 'Transaction data processing issue. Please check your network connection and retry. If the problem persists, contact support.';
     }
 
     // Handle Transaction.from errors - 针对性错误处理
@@ -61,7 +61,7 @@ const getErrorMessage = (error: any): string => {
       error.message.includes('Invalid transaction') ||
       error.message.includes('Failed to decode')
     ) {
-      return '交易数据格式错误。这可能是临时的网络问题，请稍后重试。';
+      return 'Transaction data format error. This may be a temporary network issue, please retry later.';
     }
 
     // Common wallet errors
@@ -70,14 +70,14 @@ const getErrorMessage = (error: any): string => {
       error.message.includes('user rejected') ||
       error.message.includes('cancelled')
     ) {
-      return '交易已被用户取消';
+      return 'Transaction was cancelled by user';
     }
 
     if (
       error.message.includes('Insufficient funds') ||
       error.message.includes('insufficient funds')
     ) {
-      return '余额不足，请确保钱包中有足够的代币余额';
+      return 'Insufficient balance. Please ensure your wallet has enough tokens.';
     }
 
     if (
@@ -85,32 +85,32 @@ const getErrorMessage = (error: any): string => {
       error.message.includes('network') ||
       error.message.includes('connection')
     ) {
-      return '网络连接错误，请检查网络连接后重试';
+      return 'Network connection error. Please check your connection and retry.';
     }
 
     if (
       error.message.includes('timeout') ||
       error.message.includes('timed out')
     ) {
-      return '交易超时，请重试。如果问题持续存在，请检查网络连接。';
+      return 'Transaction timeout. Please retry. If the problem persists, check your network connection.';
     }
 
     if (error.message.includes('Transaction failed')) {
-      return `交易失败：${error.message}`;
+      return `Transaction failed: ${error.message}`;
     }
 
     if (error.message.includes('Expected the value to satisfy a union')) {
-      return '交易参数错误。请刷新页面后重试，如问题持续请联系客服。';
+      return 'Transaction parameter error. Please refresh the page and retry. If the problem persists, contact support.';
     }
 
     // Wallet connection errors
     if (error.message.includes('wallet') || error.message.includes('Wallet')) {
-      return '钱包连接出现问题，请重新连接钱包后重试';
+      return 'Wallet connection issue. Please reconnect your wallet and retry.';
     }
 
     // Server-side errors
     if (error.message.includes('Server') || error.message.includes('server')) {
-      return '服务器繁忙，请稍后重试';
+      return 'Server is busy, please retry later.';
     }
 
     return error.message;

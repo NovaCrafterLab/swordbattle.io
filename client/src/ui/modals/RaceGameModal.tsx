@@ -106,6 +106,13 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
   // Get entry fee from tier pricing (dynamic) - no fallback, must come from server
   const entryFeeAmount = tierPricing.data?.entranceFee;
 
+  // Enhanced user cancellation detection - used across multiple places
+  const isUserCancelled =
+    solanaVault.error &&
+    (solanaVault.error.message.includes('User rejected') ||
+      solanaVault.error.message.includes('user rejected') ||
+      solanaVault.error.message.includes('Transaction was cancelled'));
+
   // Helper function to safely format entry fee amount using smart formatting
   const formatEntryFee = (amount?: bigint) => {
     // 统一使用9位小数（SOL标准）
@@ -371,7 +378,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
   };
 
   /**
-   * 加入游戏 - 使用新的安全前端交易流程
+   * Join game - Enhanced with user-friendly cancellation handling
    */
   const handleJoinGame = async () => {
     if (!address) {
@@ -502,7 +509,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
-      // 🚨 紧急修复：在显示错误前检查交易是否实际成功，并验证票据状态
+      // 🚨 Enhanced error recovery: Check if transaction actually succeeded despite error
       if (solanaVault.currentTxHash) {
         console.warn(
           '⚠️ Error occurred but transaction hash exists, checking ticket status...',
@@ -513,7 +520,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             '🎫 Attempting ticket verification for error recovery in handleJoinGame...',
           );
 
-          // 等待一下让区块链处理
+          // Wait for blockchain processing
           await new Promise((resolve) => setTimeout(resolve, 1000));
 
           const gameIdNumber = gameState.gameId as number;
@@ -529,25 +536,29 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
           if (eligibility.canEnter && eligibility.hasTicket) {
             addToast(
               'success',
-              '✅ 交易已成功完成，票据验证通过，正在进入游戏...',
+              '✅ Transaction completed successfully! Entering game...',
               3000,
             );
 
-            // 交易成功且有有效票据，进入游戏
+            // Transaction successful with valid ticket, enter game
             setTimeout(() => {
               onJoinGame(address);
               onClose();
             }, 1000);
-            return; // 重要：不执行后续的错误处理
+            return; // Important: don't execute subsequent error handling
           } else if (eligibility.hasTicket) {
-            addToast('success', '✅ 交易成功，票据已获得！', 3000);
-            // 刷新数据以反映新的票据状态
+            addToast(
+              'success',
+              '✅ Transaction successful, ticket acquired!',
+              3000,
+            );
+            // Refresh data to reflect new ticket status
             await gameState.refreshGameData();
             return;
           } else {
             addToast(
               'info',
-              '⚠️ 交易可能成功但票据状态待确认，请稍后重试或联系客服',
+              '⚠️ Transaction may be successful but ticket status pending. Please retry later or contact support.',
               5000,
             );
           }
@@ -559,36 +570,43 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
         }
       }
 
-      // 🚨 改进错误消息：提供更具体和有用的错误信息
+      // 🚨 Enhanced error messaging: Provide specific and helpful error information
       let userFriendlyError = errorMessage;
 
-      // 根据不同的错误类型提供相应的解决方案
+      // Provide appropriate solutions based on different error types
       if (errorMessage.includes('交易提交完全失败')) {
         userFriendlyError =
-          '网络连接问题导致交易无法提交，请检查网络连接后重试';
+          'Network connection issue prevented transaction submission. Please check your connection and retry.';
       } else if (errorMessage.includes('无效的交易签名格式')) {
-        userFriendlyError = '交易格式错误，请刷新页面后重试';
+        userFriendlyError =
+          'Transaction format error. Please refresh the page and retry.';
       } else if (errorMessage.includes('Invalid transaction signature')) {
-        userFriendlyError = '交易未正确生成，可能是网络问题，请重试';
+        userFriendlyError =
+          'Transaction was not generated correctly, possibly due to network issues. Please retry.';
       } else if (errorMessage.includes('failed to get signature status')) {
         userFriendlyError =
-          '区块链网络繁忙，无法确认交易状态，请稍后查看交易记录';
+          'Blockchain network is busy, unable to confirm transaction status. Please check your transaction history later.';
       } else if (errorMessage.includes('WrongSize')) {
-        userFriendlyError = '网络数据格式错误，请刷新页面后重试';
+        userFriendlyError =
+          'Network data format error. Please refresh the page and retry.';
       } else if (errorMessage.includes('insufficient funds')) {
-        userFriendlyError = '账户余额不足，请充值后重试';
+        userFriendlyError =
+          'Insufficient account balance. Please add funds and retry.';
       } else if (
         errorMessage.includes('User rejected') ||
         errorMessage.includes('user rejected')
       ) {
-        userFriendlyError = '您取消了交易签名';
+        userFriendlyError =
+          'Transaction was cancelled. To join the game, you need to approve the transaction in your wallet.';
       } else if (errorMessage.includes('timeout')) {
-        userFriendlyError = '网络超时，请检查网络连接后重试';
+        userFriendlyError =
+          'Network timeout. Please check your connection and retry.';
       } else if (errorMessage.includes('fetch')) {
-        userFriendlyError = '网络连接失败，请检查网络后重试';
+        userFriendlyError =
+          'Network connection failed. Please check your network and retry.';
       }
 
-      addToast('error', `支付失败: ${userFriendlyError}`, 8000); // 延长显示时间便于用户阅读
+      addToast('error', `Payment failed: ${userFriendlyError}`, 8000); // Extended display time for better readability
       setTxStep('idle');
     } finally {
       setIsJoining(false);
@@ -628,11 +646,11 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
   }, [txStep, solanaVault.txStatus, isRefreshing]); // 添加 isRefreshing 防止重复
 
   /**
-   * 获取按钮状态和文本 - 优化设计
+   * Get action button with enhanced user cancellation handling
    */
   const getActionButton = () => {
     if (!isConnected) {
-      // 检查是否已安装钱包插件
+      // Check if wallet plugin is installed
       if (!walletStatus.isInstalled) {
         return (
           <button className="race-btn warning" onClick={handleConnectWallet}>
@@ -641,7 +659,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
         );
       }
 
-      // 如果已安装钱包，显示检测到的钱包信息
+      // If wallet is installed, show detected wallet information
       const walletInfo =
         walletStatus.detectedWallets.length > 0
           ? ` (${walletStatus.detectedWallets.join(', ')} detected)`
@@ -721,6 +739,27 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
       );
     }
 
+    // Special handling for user cancellation
+    if (isUserCancelled) {
+      return (
+        <button
+          className="race-btn warning"
+          onClick={async () => {
+            // Force state reset by re-triggering transaction state
+            setTxStep('idle');
+
+            // Small delay to ensure state is reset
+            await new Promise((resolve) => setTimeout(resolve, 100));
+
+            // Try to call the main join function again - this will reset internal states
+            handleJoinGame();
+          }}
+        >
+          Try Again - Approve in Wallet
+        </button>
+      );
+    }
+
     // Check if transaction is in progress
     const isTransactionInProgress =
       solanaVault.txStatus !== 'idle' || isJoining;
@@ -768,12 +807,12 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             onClose();
           }}
         >
-          进入游戏 (支付成功)
+          Enter Game (Payment Successful)
         </button>
       );
     }
 
-    // 处理交易错误但可能成功的情况
+    // Handle transaction error but possibly successful case
     if (solanaVault.error && solanaVault.currentTxHash) {
       return (
         <button
@@ -784,7 +823,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                 '🎫 Ticket verification from error button started...',
               );
 
-              // 使用票据验证代替交易状态恢复
+              // Use ticket verification instead of transaction status recovery
               const gameIdNumber = gameState.gameId as number;
               const eligibility =
                 await solanaVault.checkGameEntryEligibility(gameIdNumber);
@@ -799,21 +838,25 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                 onJoinGame(address);
                 onClose();
               } else if (eligibility.hasTicket) {
-                addToast('success', '✅ 票据验证通过！', 3000);
+                addToast('success', '✅ Ticket verification passed!', 3000);
                 await gameState.refreshGameData();
               } else {
-                addToast('info', '⚠️ 请检查交易状态或联系客服', 3000);
+                addToast(
+                  'info',
+                  '⚠️ Please check transaction status or contact support',
+                  3000,
+                );
               }
             } catch (error) {
               console.error(
                 '❌ Error button ticket verification failed:',
                 error,
               );
-              addToast('error', '无法验证票据状态', 3000);
+              addToast('error', 'Unable to verify ticket status', 3000);
             }
           }}
         >
-          验证票据状态
+          Verify Ticket Status
         </button>
       );
     }
@@ -1073,9 +1116,10 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   )}
                   {solanaVault.txStatus === 'verifying' && (
                     <div className="tx-step active">
-                      🎫 正在验证票据创建状态...
+                      🎫 Verifying ticket creation status...
                       <div className="verify-info">
-                        交易已提交成功，正在确认票据是否已创建完成
+                        Transaction submitted successfully, confirming ticket
+                        creation
                       </div>
                     </div>
                   )}
@@ -1104,21 +1148,24 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   )}
                 </div>
 
-                {/* Show transaction hash if available - 资金保护机制 */}
+                {/* Show transaction hash if available - Fund protection mechanism */}
                 {solanaVault.currentTxHash && (
                   <div className="tx-hash-info">
                     <div className="tx-success-notice">
                       <span className="success-icon">✅</span>
-                      <span className="success-text">交易已提交成功</span>
+                      <span className="success-text">
+                        Transaction submitted successfully
+                      </span>
                     </div>
                     <a
                       href={`https://solscan.io/tx/${solanaVault.currentTxHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="tx-hash-link"
-                      title={`交易哈希: ${solanaVault.currentTxHash}`}
+                      title={`Transaction hash: ${solanaVault.currentTxHash}`}
                     >
-                      查看交易详情 ({solanaVault.currentTxHash.slice(0, 8)}...)
+                      View transaction details (
+                      {solanaVault.currentTxHash.slice(0, 8)}...)
                     </a>
                   </div>
                 )}
@@ -1128,6 +1175,33 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
 
           {/* Right Column - Wallet Information */}
           <div className="wallet-info-column">
+            {/* Enhanced wallet interaction guidance */}
+            {isConnected && isUserCancelled && (
+              <div className="wallet-guidance">
+                <div className="guidance-header">
+                  <span className="guidance-icon">💡</span>
+                  <span className="guidance-title">
+                    Why Wallet Approval is Needed
+                  </span>
+                </div>
+                <div className="guidance-content">
+                  <p>To join the race, you need to:</p>
+                  <ol>
+                    <li>Approve the transaction in your wallet</li>
+                    <li>
+                      Pay the entry fee ({formatEntryFee(entryFeeAmount)}{' '}
+                      {getTokenDisplayInfo().symbol})
+                    </li>
+                    <li>Receive your game ticket</li>
+                  </ol>
+                  <p className="guidance-note">
+                    <strong>Tip:</strong> Your wallet will show a popup asking
+                    for confirmation. Click "Approve" or "Confirm" to proceed.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Wallet Detection Status - Show when not connected */}
             {!isConnected && (
               <div className="wallet-detection-status">
@@ -1230,7 +1304,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   )}
                 </div>
 
-                {/* 添加恢复选项 */}
+                {/* Add recovery options */}
                 <div className="error-actions">
                   {solanaVault.error && solanaVault.currentTxHash && (
                     <button
@@ -1241,7 +1315,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                             '🎫 Manual ticket verification started...',
                           );
 
-                          // 使用票据验证代替交易状态恢复
+                          // Use ticket verification instead of transaction status recovery
                           const gameIdNumber = gameState.gameId as number;
                           const eligibility =
                             await solanaVault.checkGameEntryEligibility(
@@ -1257,7 +1331,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                           if (eligibility.canEnter && eligibility.hasTicket) {
                             addToast(
                               'success',
-                              '✅ 票据验证通过，正在进入游戏...',
+                              '✅ Ticket verification passed, entering game...',
                               3000,
                             );
                             setTimeout(() => {
@@ -1265,12 +1339,16 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                               onClose();
                             }, 1000);
                           } else if (eligibility.hasTicket) {
-                            addToast('success', '✅ 票据验证通过！', 3000);
+                            addToast(
+                              'success',
+                              '✅ Ticket verification passed!',
+                              3000,
+                            );
                             await gameState.refreshGameData();
                           } else {
                             addToast(
                               'info',
-                              '⚠️ 未找到有效票据。交易可能仍在处理中，请稍后重试。',
+                              '⚠️ No valid ticket found. Transaction may still be processing, please retry later.',
                               5000,
                             );
                           }
@@ -1281,26 +1359,33 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                           );
                           addToast(
                             'error',
-                            '无法验证票据状态，请稍后重试或联系客服',
+                            'Unable to verify ticket status, please retry later or contact support',
                             3000,
                           );
                         }
                       }}
                     >
-                      检查票据状态
+                      Check Ticket Status
                     </button>
                   )}
 
                   {solanaVault.error && (
                     <button
                       className="error-retry-btn"
-                      onClick={() => {
-                        // Clear vault error and allow user to retry
-                        solanaVault.error = null;
+                      onClick={async () => {
+                        // Force state reset and retry transaction
                         setTxStep('idle');
+
+                        // Small delay to ensure state is reset
+                        await new Promise((resolve) =>
+                          setTimeout(resolve, 100),
+                        );
+
+                        // Retry the transaction
+                        handleJoinGame();
                       }}
                     >
-                      重试支付
+                      Try Again
                     </button>
                   )}
                 </div>
