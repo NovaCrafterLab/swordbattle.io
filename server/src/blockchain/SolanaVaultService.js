@@ -2,6 +2,7 @@ const { Connection, PublicKey, Keypair } = require('@solana/web3.js');
 const { getAssociatedTokenAddress } = require('@solana/spl-token');
 const Logger = require('../utils/Logger');
 const { getInstance: getRPCManager } = require('../utils/SolanaRPCManager');
+const RPCPoolConnectionProxy = require('../utils/RPCPoolConnectionProxy');
 
 // Import official VaultSDK with Anchor 0.31.1 support
 const path = require('path');
@@ -112,13 +113,24 @@ class SolanaVaultService {
         },
       };
 
+      // Create RPC Pool proxy connection for VaultSDK
+      // This ensures all VaultSDK operations use RPC Pool for load balancing and failover
+      const proxyConnection = new RPCPoolConnectionProxy(
+        this.rpcManager,
+        'confirmed',
+      );
+
+      // VaultSDK配置（注意：VaultSDK的内部日志无法直接控制）
+      // 如果需要过滤VaultSDK日志，建议在进程级别设置日志过滤器
       this.vaultSDK = new VaultSDK({
         programId: new PublicKey(this.config.programId),
-        connection: this.connection,
+        connection: proxyConnection,
         wallet: walletInterface,
+        // 注意：VaultSDK可能不支持logLevel配置，需要查看官方文档
       });
 
-      // VaultSDK initialized
+      // VaultSDK initialized with RPC Pool proxy
+      // 所有VaultSDK操作现在都使用RPC Pool进行负载均衡和故障转移
 
       this.isInitialized = true;
       Logger.status('✅ Solana服务正常启动');

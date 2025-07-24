@@ -70,12 +70,39 @@ class Game {
       apiEndpoint: config.apiEndpoint,
       solanaEnabled: config.solana.enabled,
       solanaRpcUrl: config.solana.rpcUrl,
+      // 🔧 添加RPC Pool配置诊断
+      rpcPoolEnabled: config.solana.rpcPool?.enabled || false,
+      rpcPoolKeysCount: config.solana.rpcPool?.keys?.length || 0,
+      rpcPoolBaseUrl: config.solana.rpcPool?.baseUrl || 'none',
       solanaTokenMint: config.solana.tokenMint,
       port: config.port,
       useSSL: config.useSSL,
       enableDatabaseSave: config.enableDatabaseSave,
       timestamp: new Date().toISOString(),
     });
+
+    // 🔧 RPC Pool使用状态验证
+    const rpcApiKeysPool = process.env.RPC_API_KEYS_POOL;
+    if (rpcApiKeysPool) {
+      const keys = rpcApiKeysPool
+        .split(',')
+        .map((key) => key.trim())
+        .filter((key) => key && key !== 'PLACEHOLDER_BASE58_PRIVATE_KEY');
+      console.log(`✅ RPC Pool configured with ${keys.length} API keys`);
+      console.log(`🔗 Current RPC URL: ${config.solana.rpcUrl}`);
+
+      if (config.solana.rpcUrl.includes('helius-rpc.com')) {
+        console.log(`✅ RPC Pool is being used correctly`);
+      } else {
+        console.warn(
+          `⚠️ RPC Pool configured but not being used. Using: ${config.solana.rpcUrl}`,
+        );
+      }
+    } else {
+      console.warn(
+        `⚠️ No RPC Pool configured, using default RPC: ${config.solana.rpcUrl}`,
+      );
+    }
 
     // 🔧 验证关键环境变量是否设置
     const criticalEnvVars = [
@@ -500,8 +527,19 @@ class Game {
         return;
       }
 
-      // Async verification of player ticket
-      this.verifyAndAddSolanaPlayer(client, data, name);
+      // 🔧 修复：使用Promise处理异步验证，确保钱包地址时序正确
+      this.verifyAndAddSolanaPlayer(client, data, name)
+        .then((player) => {
+          if (player) {
+            console.log(
+              `✅ Player ${player.name} verification and creation completed`,
+            );
+          }
+        })
+        .catch((error) => {
+          console.error(`❌ Player verification failed:`, error.message);
+          // 错误处理已在verifyAndAddSolanaPlayer中完成
+        });
       return; // Async processing, don't return player directly
     }
 
@@ -515,6 +553,12 @@ class Game {
   async verifyAndAddSolanaPlayer(client, data, name) {
     try {
       const walletAddress = data.walletAddress;
+
+      // 🔧 关键修复：立即设置钱包地址到client，确保在player创建前可用
+      client.walletAddress = walletAddress;
+      console.log(
+        `💾 钱包地址提前设置: ${walletAddress.slice(0, 8)}... -> client object`,
+      );
 
       // In RACE mode, use wallet address prefix as player name
       const racePlayerName = walletAddress.slice(0, 11); // 0x + first 9 chars = 11 total
@@ -561,8 +605,17 @@ class Game {
       );
       const player = this.createAndAddPlayer(client, data, racePlayerName);
 
-      // Save wallet address to client
-      client.walletAddress = walletAddress;
+      // 🔧 双重保险：再次确认钱包地址已设置
+      if (!client.walletAddress) {
+        console.error(
+          `🚨 CRITICAL: Wallet address lost after player creation for ${racePlayerName}`,
+        );
+        client.walletAddress = walletAddress; // 恢复钱包地址
+      }
+
+      console.log(
+        `💾 最终验证: Player ${player.name} (ID: ${player.id}) 钱包地址: ${client.walletAddress?.slice(0, 8)}...`,
+      );
 
       return player;
     } catch (error) {
@@ -610,6 +663,16 @@ class Game {
           ? client.walletAddress.length
           : 0,
         dataWalletAddress: data ? data.walletAddress : undefined,
+        // 🔧 添加详细的钱包地址来源分析
+        walletAddressSource: hasWalletInClient
+          ? 'client'
+          : hasWalletInData
+            ? 'data'
+            : 'none',
+        walletAddressMatch:
+          hasWalletInClient && hasWalletInData
+            ? client.walletAddress === data.walletAddress
+            : 'n/a',
         timestamp: new Date().toISOString(),
         serverType: process.env.SERVER_TYPE,
         isRaceServer: config.isRaceServer,
@@ -623,6 +686,18 @@ class Game {
       console.log(
         `💾 ✅ SUCCESS: Saved wallet address for player ${player.name} (ID: ${player.id}): ${client.walletAddress}`,
       );
+
+      // 🔧 立即验证保存是否成功
+      const savedAddress = this.playerWalletAddresses.get(player.id);
+      if (savedAddress === client.walletAddress) {
+        console.log(
+          `💾 ✅ VERIFIED: Wallet address correctly saved in persistent storage`,
+        );
+      } else {
+        console.error(`💾 ❌ ERROR: Wallet address save verification failed!`);
+        console.error(`   Expected: ${client.walletAddress}`);
+        console.error(`   Saved: ${savedAddress}`);
+      }
     } else {
       // 🚨 关键诊断：记录钱包地址丢失的详细信息
       console.error(
@@ -636,6 +711,8 @@ class Game {
         receivedDataFields: data ? Object.keys(data) : 'no data',
         isRaceServerMode: config.isRaceServer,
         serverEnvironment: config.environment.ENV,
+        // 🔧 新增：检查是否是异步时序问题
+        isAsyncVerificationPlayer: config.isRaceServer && config.solana.enabled,
       });
 
       // 🔧 尝试从data对象中恢复钱包地址
@@ -647,6 +724,10 @@ class Game {
         this.playerWalletAddresses.set(player.id, data.walletAddress);
         console.log(
           `💾 ✅ RECOVERED: Saved wallet address for player ${player.name} (ID: ${player.id}): ${data.walletAddress}`,
+        );
+      } else {
+        console.error(
+          `🚨 RECOVERY FAILED: No wallet address available in data object either`,
         );
       }
     }
