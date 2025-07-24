@@ -1209,6 +1209,11 @@ async function handleVaultInfoRequest(res, req, game) {
     // Get comprehensive game info including token details
     const gameInfo = await game.solanaVaultService.vaultSDK.getGameInfo(gameId);
 
+    // 添加奖池和玩家数量信息
+    const prizePool = gameInfo.vault.totalDeposit.toString();
+    const registeredCount = game.registeredPlayers.size;
+    const activeCount = game.players.size;
+
     if (!hasResponded) {
       hasResponded = true;
       clearTimeout(timeout);
@@ -1233,6 +1238,9 @@ async function handleVaultInfoRequest(res, req, game) {
             finalized: gameInfo.vault.finalized,
             withdrawEnabled: gameInfo.vault.withdrawEnabled,
           },
+          prizePool,
+          registeredCount,
+          activeCount,
           dynamicTokenRetrieval: true,
         }),
       );

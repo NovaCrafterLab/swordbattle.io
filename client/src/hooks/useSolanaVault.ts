@@ -909,24 +909,20 @@ export const useSolanaVault = () => {
         // 添加请求超时控制
         const syncController = new AbortController();
         const syncTimeoutId = setTimeout(() => syncController.abort(), 10000); // 10秒超时
-        
-        try {
 
-          const response = await fetch(
-            `${serverUrl}/api/player-joined`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              signal: syncController.signal,
-              body: JSON.stringify({
-                gameId,
-                playerAddress: publicKey!.toString(),
-                txHash: txSignature,
-                tier,
-                amount: amount.toString(),
-              }),
-            },
-          );
+        try {
+          const response = await fetch(`${serverUrl}/api/player-joined`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: syncController.signal,
+            body: JSON.stringify({
+              gameId,
+              playerAddress: publicKey!.toString(),
+              txHash: txSignature,
+              tier,
+              amount: amount.toString(),
+            }),
+          });
 
           clearTimeout(syncTimeoutId);
 
@@ -1050,7 +1046,7 @@ export const useSolanaVault = () => {
           `${serverUrl}/api/vault-info/${gameId}/${publicKey!.toString()}`,
           { signal: controller.signal },
         );
-        
+
         clearTimeout(timeoutId);
         if (!response.ok) return false;
 
@@ -1074,11 +1070,10 @@ export const useSolanaVault = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
 
-      const response = await fetch(
-        `${serverUrl}/api/vault-info/${gameId}`,
-        { signal: controller.signal },
-      );
-      
+      const response = await fetch(`${serverUrl}/api/vault-info/${gameId}`, {
+        signal: controller.signal,
+      });
+
       clearTimeout(timeoutId);
       if (!response.ok) {
         throw new Error(`Failed to fetch vault info: ${response.statusText}`);
@@ -1094,6 +1089,10 @@ export const useSolanaVault = () => {
         exists: true,
         tokenMint: result.tokenMint,
         gameStatus: result.gameStatus,
+        // 添加服务器新增的字段
+        prizePool: result.prizePool,
+        registeredCount: result.registeredCount,
+        activeCount: result.activeCount,
       };
     } catch (error) {
       console.error('Error fetching vault info:', error);
@@ -1286,7 +1285,7 @@ export const useSolanaVault = () => {
         });
 
         clearTimeout(claimTimeoutId);
-        
+
         console.log(
           `📡 Response status: ${response.status} ${response.statusText}`,
         );

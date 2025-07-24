@@ -98,6 +98,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
   >('idle');
   const [lastRefreshTime, setLastRefreshTime] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false); // 添加刷新状态标记
+  const [vaultInfo, setVaultInfo] = useState<any>(null); // 添加 vault info state
 
   // 使用 ref 存储稳定的刷新函数引用
   const refreshDataRef = useRef<() => Promise<void>>();
@@ -243,20 +244,38 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
     setIsRefreshing(true);
 
     try {
-      await Promise.allSettled([
+      const refreshPromises = [
         gameState.refreshGameData(),
         gameToken.refetch(),
         tierPricing.refetch(),
         ...(isConnected && address
           ? [playerData.refreshPlayerData(), dynamicBalance.refetch()]
           : []),
-      ]);
+      ];
+
+      // 添加 vault info 刷新
+      if (gameState.gameId) {
+        refreshPromises.push(
+          solanaVault
+            .getVaultInfo(gameState.gameId)
+            .then((info) => {
+              if (info) {
+                setVaultInfo(info);
+              }
+            })
+            .catch((error) => {
+              console.warn('Failed to fetch vault info:', error);
+            }),
+        );
+      }
+
+      await Promise.allSettled(refreshPromises);
     } catch (error) {
       // Silent failure - no console output
     } finally {
       setIsRefreshing(false);
     }
-  }, [lastRefreshTime, isRefreshing]); // 最小化依赖
+  }, [lastRefreshTime, isRefreshing, gameState.gameId, isConnected, address]); // 添加必要的依赖
 
   // 将稳定的刷新函数存储在 ref 中
   refreshDataRef.current = refreshData;
@@ -951,6 +970,16 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   <div className="stat-label">Prize Pool</div>
                   <div className="stat-value">
                     {(() => {
+                      // 优先使用 vaultInfo 中的真实奖池数据
+                      if (vaultInfo?.prizePool) {
+                        const prizePoolAmount = BigInt(vaultInfo.prizePool);
+                        if (prizePoolAmount === 0n) {
+                          return '0';
+                        }
+                        return formatDisplayAmount(prizePoolAmount, 9);
+                      }
+
+                      // 回退到本地计算
                       if (
                         entryFeeAmount !== undefined &&
                         entryFeeAmount !== null &&
@@ -979,10 +1008,26 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                   </div>
                   <div className="stat-label">Players</div>
                   <div className="stat-value">
-                    {typeof gameState.gameState.registeredCount === 'number' &&
-                    typeof gameState.gameState.playerCount === 'number'
-                      ? `${gameState.gameState.registeredCount}/${gameState.gameState.playerCount}`
-                      : 'Loading...'}
+                    {(() => {
+                      // 优先使用 vaultInfo 中的真实玩家数据
+                      if (
+                        vaultInfo?.registeredCount !== undefined &&
+                        vaultInfo?.activeCount !== undefined
+                      ) {
+                        return `${vaultInfo.registeredCount}/${vaultInfo.activeCount}`;
+                      }
+
+                      // 回退到 gameState 数据
+                      if (
+                        typeof gameState.gameState.registeredCount ===
+                          'number' &&
+                        typeof gameState.gameState.playerCount === 'number'
+                      ) {
+                        return `${gameState.gameState.registeredCount}/${gameState.gameState.playerCount}`;
+                      }
+
+                      return 'Loading...';
+                    })()}
                   </div>
                 </div>
 
