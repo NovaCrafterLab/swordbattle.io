@@ -1409,13 +1409,7 @@ class Game {
           `🔍 Player ${player.name} (ID: ${player.id}) analysis:`,
           debugInfo,
         );
-      } else {
-        // 🤖 机器人玩家不打印详细信息，只在总计中统计
-        console.log(
-          `🤖 Bot player ${player.name} (ID: ${player.id}): ${debugInfo.kills} kills, no wallet`,
-        );
       }
-
       if (player.removed) {
         excludedPlayers.push({ ...debugInfo, reason: 'Player removed' });
         console.log(`❌ Player ${player.name}: EXCLUDED - Player removed`);
@@ -1425,8 +1419,8 @@ class Game {
       const killReward = this.calculatePlayerKillRewards(player);
       const kills = killReward.kills;
 
-      // 🔥 核心逻辑：有击杀就应该有奖励
-      if (kills > 0) {
+      // 🔥 核心逻辑：记录所有参与者，有击杀的玩家获得可领取奖励
+      if (kills >= 0) {
         // 获取钱包地址 - 优先使用持久保存的地址，回退到client地址
         const walletAddress =
           this.playerWalletAddresses.get(player.id) ||
@@ -1469,7 +1463,6 @@ class Game {
           });
         }
       } else {
-        console.log(`⚪ Player ${player.name}: 0 kills, no reward`);
         excludedPlayers.push({
           ...debugInfo,
           reason: 'No kills',
@@ -1509,7 +1502,7 @@ class Game {
       }
     }
 
-    console.log(`🔍 REWARD COLLECTION SUMMARY:`);
+    console.log(`🔍 REWARD COLLECTION SUMMARY (All participants recorded):`);
     console.log(
       `   👥 Total players: ${totalPlayersProcessed} (${realPlayersCount} real users + ${botPlayersCount} bots)`,
     );
@@ -1517,7 +1510,7 @@ class Game {
       `   🎯 Players with kills: ${realPlayersWithKills} real users + ${botPlayersWithKills} bots`,
     );
     console.log(
-      `   💰 Valid rewards: ${validPlayers.length} (only real users get rewards)`,
+      `   💰 Valid rewards: ${validPlayers.length} (all participants recorded, only those with kills > 0 get claimable rewards)`,
     );
     console.log(`   ❌ Excluded players: ${excludedPlayers.length}`);
     console.log(`   🗡️ Total kills rewarded: ${totalKills}`);
@@ -1714,18 +1707,6 @@ class Game {
           console.error(
             `🚨 Emergency collection also failed - investigating player states...`,
           );
-
-          // 详细诊断每个玩家状态
-          for (const player of this.players) {
-            console.error(`🔍 Player ${player.name} diagnostic:`, {
-              id: player.id,
-              removed: player.removed,
-              kills: player.kills || 0,
-              hasClient: !!player.client,
-              clientWallet: player.client?.walletAddress,
-              savedWallet: this.playerWalletAddresses.get(player.id),
-            });
-          }
         }
       }
 
@@ -2852,6 +2833,9 @@ class Game {
     console.log(
       `💾 Saving ${killRewards.size} game records to database for game ${gameId}`,
     );
+    console.log(
+      `📊 Record types: All participants recorded, winners have kills > 0`,
+    );
 
     // 转换killRewards Map为API期望的格式
     const gameRecords = Array.from(killRewards.values()).map((reward) => ({
@@ -2861,10 +2845,17 @@ class Game {
       rewardAmount: reward.rewardSOL.toString(),
       hasClaimed: false,
       rank: 1, // TODO: 实现真实排名逻辑
-      isWinner: reward.kills > 0,
+      isWinner: reward.kills > 0, // 🔥 修复：只有有击杀的玩家才是获胜者
       gameEnded: true,
       gameEndedAt: new Date().toISOString(),
     }));
+
+    // 统计参与者和获胜者数量
+    const participantCount = gameRecords.length;
+    const winnerCount = gameRecords.filter((record) => record.isWinner).length;
+    console.log(
+      `👥 Participants: ${participantCount}, Winners: ${winnerCount}`,
+    );
 
     // 动态导入fetch (Node.js 18+兼容性)
     let fetch;
