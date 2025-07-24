@@ -242,10 +242,6 @@ class SolanaVaultService {
     }
 
     try {
-      Logger.server.info('🎮 创建新游戏', {
-        tier,
-      });
-
       // Validate tier configuration
       const tierConfig = this.getTierConfig(tier);
 
@@ -969,14 +965,6 @@ class SolanaVaultService {
     }
 
     const tierConfig = this.config.tiers[tier];
-
-    // Show tier configuration information
-    Logger.server.info('🎯 Tier配置', {
-      tier,
-      门票: tierConfig.entranceFee,
-      奖励: tierConfig.killReward,
-    });
-
     return tierConfig;
   }
 

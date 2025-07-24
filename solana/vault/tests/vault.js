@@ -158,10 +158,6 @@ describe('Game Vault', () => {
         vaultPda, // owner
         true, // allowOwnerOffCurve
       );
-      console.log(
-        '✅ Vault token account created:',
-        vaultTokenAccount.address.toString(),
-      );
     } catch (error) {
       console.log('Error creating vault token account:', error);
     }

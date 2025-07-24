@@ -2141,9 +2141,6 @@ function validateServerConfiguration() {
   }
 
   if (config.isRaceServer && config.solana.enabled) {
-    if (!config.solana.privateKey) {
-      issues.push('SOLANA_PRIVATE_KEY not configured for race server');
-    }
     if (!config.solana.programId) {
       issues.push('VAULT_PROGRAM_ID not configured for race server');
     }
@@ -2356,13 +2353,6 @@ async function processBuildBuyTicketTransaction(
     // Get user token account
     const { PublicKey } = require('@solana/web3.js');
     const { getAssociatedTokenAddress } = require('@solana/spl-token');
-
-    console.log('🔍 Debug info:');
-    console.log('   Token mint:', tokenMint);
-    console.log('   Wallet address:', walletAddress);
-    console.log('   Game ID:', gameId);
-    console.log('   Amount:', amount);
-    console.log('   Tier:', tier);
 
     const userTokenAccount = await getAssociatedTokenAddress(
       new PublicKey(tokenMint),

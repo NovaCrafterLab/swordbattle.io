@@ -121,22 +121,11 @@ export class VaultSDK {
       })
       .rpc();
 
-    // 🔧 临时修复：跳过vault token账户的预创建，让它在需要时自动创建
-    console.log(
-      `📝 Vault token account will be created automatically when needed for game ${params.gameId}`,
-    );
-    console.log(`🪙 Token mint: ${params.tokenMint.toString()}`);
-
     const vaultToken = await getAssociatedTokenAddress(
       params.tokenMint,
       vault,
       true,
     );
-    console.log(`🔗 Vault token address: ${vaultToken.toString()}`);
-    console.log(
-      `✅ Game vault initialization completed for game ${params.gameId}`,
-    );
-
     return tx;
   }
 
@@ -162,10 +151,6 @@ export class VaultSDK {
       true,
     );
 
-    // 🔧 修复：直接使用getOrCreateAssociatedTokenAccount，去掉getAccount检查
-    console.log(
-      `🔨 Ensuring vault token account exists for mint: ${(vaultAccount.tokenMint as PublicKey).toString()}`,
-    );
     console.log(`🔧 Debug info:`);
     console.log(`   Vault PDA: ${vault.toString()}`);
     console.log(
@@ -181,9 +166,6 @@ export class VaultSDK {
         vaultAccount.tokenMint as PublicKey,
         vault,
         true, // allowOwnerOffCurve
-      );
-      console.log(
-        `✅ Vault token account ready: ${vaultTokenAccount.address.toString()}`,
       );
     } catch (error) {
       console.error(`❌ Failed to create vault token account:`, error);
@@ -385,20 +367,10 @@ export class VaultSDK {
       })
       .rpc();
 
-    // 🔧 临时修复：跳过vault token账户的预创建，让它在需要时自动创建
-    console.log(
-      `📝 Vault token account will be created automatically when needed for game ${params.gameId} (tier: ${params.tier})`,
-    );
-    console.log(`🪙 Token mint: ${params.tokenMint.toString()}`);
-
     const vaultToken = await getAssociatedTokenAddress(
       params.tokenMint,
       vault,
       true,
-    );
-    console.log(`🔗 Vault token address: ${vaultToken.toString()}`);
-    console.log(
-      `✅ Game vault initialization completed for game ${params.gameId} (tier: ${params.tier})`,
     );
 
     return tx;
@@ -952,11 +924,6 @@ export class VaultSDK {
       try {
         // Get the next available game ID
         const nextGameId = await this.getNextGameId();
-
-        console.log(
-          `🎯 Attempt ${attempt}/${maxRetries}: Trying to create game ${nextGameId}`,
-        );
-
         // Try to initialize the vault for this game ID
         const txHash = await this.initializeGameVault({
           gameId: nextGameId,
@@ -988,7 +955,6 @@ export class VaultSDK {
         ) {
           // Wait a random amount between 1-3 seconds before retrying
           const delay = 1000 + Math.random() * 2000;
-          console.log(`⏳ Waiting ${delay.toFixed(0)}ms before retry...`);
           await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
         }
@@ -1077,10 +1043,6 @@ export class VaultSDK {
         console.log('✅ Vault token account exists:', vaultToken.toString());
       }
     } catch (error) {
-      console.log(
-        '⚠️ Error checking vault token account, will create ATA:',
-        error,
-      );
       needsVaultATACreation = true;
     }
 

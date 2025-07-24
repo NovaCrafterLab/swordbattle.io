@@ -56,11 +56,33 @@ module.exports = {
   // Solana configuration - replaces BSC blockchain
   solana: {
     enabled: true, // Re-enabled after fixing uWebSockets issues
-    rpcUrl:
-      process.env.SOLANA_RPC_URL ||
-      (isDev
-        ? 'https://api.devnet.solana.com'
-        : 'https://api.mainnet-beta.solana.com'),
+    // 🔧 RPC Pool配置 - 优先使用用户提供的RPC Pool
+    rpcUrl: (() => {
+      // 如果设置了RPC Pool，从中随机选择一个
+      const rpcKeysPool = process.env.RPC_API_KEYS_POOL;
+      if (rpcKeysPool) {
+        const keys = rpcKeysPool
+          .split(',')
+          .map((key) => key.trim())
+          .filter((key) => key && key !== 'PLACEHOLDER_BASE58_PRIVATE_KEY');
+        if (keys.length > 0) {
+          const randomKey = keys[Math.floor(Math.random() * keys.length)];
+          const rpcUrl = `https://devnet.helius-rpc.com/?api-key=${randomKey}`;
+          console.log(
+            `🔗 Using RPC Pool with ${keys.length} keys, selected: ${randomKey.slice(0, 8)}...`,
+          );
+          return rpcUrl;
+        }
+      }
+
+      // 回退到环境变量或默认RPC
+      return (
+        process.env.SOLANA_RPC_URL ||
+        (isDev
+          ? 'https://api.devnet.solana.com'
+          : 'https://api.mainnet-beta.solana.com')
+      );
+    })(),
     privateKey: process.env.SOLANA_PRIVATE_KEY, // Server wallet private key for vault operations
     programId:
       process.env.VAULT_PROGRAM_ID ||
@@ -68,6 +90,18 @@ module.exports = {
     tokenMint:
       process.env.SOLANA_TOKEN_MINT ||
       'So11111111111111111111111111111111111111112', // Token mint for rewards (default: SOL)
+    // RPC Pool configuration for load balancing
+    rpcPool: {
+      enabled: !!process.env.RPC_API_KEYS_POOL,
+      keys: process.env.RPC_API_KEYS_POOL
+        ? process.env.RPC_API_KEYS_POOL.split(',')
+            .map((key) => key.trim())
+            .filter((key) => key && key !== 'PLACEHOLDER_BASE58_PRIVATE_KEY')
+        : [],
+      baseUrl: isDev
+        ? 'https://devnet.helius-rpc.com'
+        : 'https://mainnet.helius-rpc.com',
+    },
     // killReward is deprecated - now using tier-based rewards
     environment: {
       isDev,

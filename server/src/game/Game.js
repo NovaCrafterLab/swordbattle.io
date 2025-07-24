@@ -59,6 +59,56 @@ class Game {
 
     // Solana vault service for blockchain operations
     this.solanaVaultService = null;
+
+    // 🚨 服务器环境配置诊断 - 启动时记录关键配置
+    console.log(`🔍 SERVER DIAGNOSIS - Game instance configuration:`, {
+      serverType: process.env.SERVER_TYPE,
+      isRaceServer: config.isRaceServer,
+      environment: config.environment.ENV,
+      isDev: config.environment.isDev,
+      isRelease: config.environment.isRelease,
+      apiEndpoint: config.apiEndpoint,
+      solanaEnabled: config.solana.enabled,
+      solanaRpcUrl: config.solana.rpcUrl,
+      solanaTokenMint: config.solana.tokenMint,
+      port: config.port,
+      useSSL: config.useSSL,
+      enableDatabaseSave: config.enableDatabaseSave,
+      timestamp: new Date().toISOString(),
+    });
+
+    // 🔧 验证关键环境变量是否设置
+    const criticalEnvVars = [
+      'SERVER_TYPE',
+      'API_ENDPOINT',
+      'SOLANA_RPC_URL',
+      'VAULT_PROGRAM_ID',
+    ];
+
+    const missingVars = [];
+    const presentVars = [];
+
+    criticalEnvVars.forEach((varName) => {
+      if (process.env[varName]) {
+        presentVars.push(varName);
+      } else {
+        missingVars.push(varName);
+      }
+    });
+
+    if (missingVars.length > 0) {
+      console.warn(
+        `⚠️ SERVER DIAGNOSIS - Missing environment variables:`,
+        missingVars,
+      );
+    }
+
+    if (presentVars.length > 0) {
+      console.log(
+        `✅ SERVER DIAGNOSIS - Present environment variables:`,
+        presentVars,
+      );
+    }
   }
 
   initialize() {
@@ -137,6 +187,28 @@ class Game {
   }
 
   processClientMessage(client, data) {
+    // 🚨 服务器环境WebSocket数据诊断
+    if (data && data.walletAddress) {
+      console.log(
+        `🔍 SERVER DIAGNOSIS - WebSocket data contains wallet address:`,
+        {
+          clientId: client.id || 'unknown',
+          walletAddress: data.walletAddress,
+          walletAddressLength: data.walletAddress.length,
+          dataKeys: Object.keys(data),
+          timestamp: new Date().toISOString(),
+        },
+      );
+
+      // 🔧 确保钱包地址被正确设置到client对象
+      if (!client.walletAddress && data.walletAddress) {
+        console.log(
+          `🔄 WEBSOCKET RECOVERY: Setting wallet address from message data`,
+        );
+        client.walletAddress = data.walletAddress;
+      }
+    }
+
     if (data.spectate && !client.spectator.isSpectating) {
       if (
         config.recaptchaSecretKey &&
@@ -522,12 +594,61 @@ class Game {
     client.player = player;
     player.client = client;
 
+    // 🚨 服务器环境钱包地址诊断 - 只记录有钱包地址的玩家详细信息
+    const hasWalletInClient = !!client.walletAddress;
+    const hasWalletInData = !!(data && data.walletAddress);
+
+    if (hasWalletInClient || hasWalletInData) {
+      // 只为真实用户打印详细诊断信息
+      console.log(`🔍 SERVER DIAGNOSIS - Real user connection:`, {
+        playerName: name,
+        playerId: player.id,
+        hasClient: !!client,
+        walletAddress: client.walletAddress,
+        walletAddressType: typeof client.walletAddress,
+        walletAddressLength: client.walletAddress
+          ? client.walletAddress.length
+          : 0,
+        dataWalletAddress: data ? data.walletAddress : undefined,
+        timestamp: new Date().toISOString(),
+        serverType: process.env.SERVER_TYPE,
+        isRaceServer: config.isRaceServer,
+        environment: config.environment.ENV,
+      });
+    }
+
     // 🔧 保存钱包地址到持久存储，防止游戏结束时丢失
     if (client.walletAddress) {
       this.playerWalletAddresses.set(player.id, client.walletAddress);
       console.log(
-        `💾 Saved wallet address for player ${player.name} (ID: ${player.id}): ${client.walletAddress}`,
+        `💾 ✅ SUCCESS: Saved wallet address for player ${player.name} (ID: ${player.id}): ${client.walletAddress}`,
       );
+    } else {
+      // 🚨 关键诊断：记录钱包地址丢失的详细信息
+      console.error(
+        `🚨 CRITICAL: No wallet address found for player ${player.name} (ID: ${player.id})`,
+      );
+      console.error(`🔍 Possible causes analysis:`, {
+        clientExists: !!client,
+        clientWalletAddress: client.walletAddress,
+        dataWalletAddress: data ? data.walletAddress : 'no data object',
+        clientSocketState: client.socket ? 'connected' : 'disconnected',
+        receivedDataFields: data ? Object.keys(data) : 'no data',
+        isRaceServerMode: config.isRaceServer,
+        serverEnvironment: config.environment.ENV,
+      });
+
+      // 🔧 尝试从data对象中恢复钱包地址
+      if (data && data.walletAddress) {
+        console.log(
+          `🔄 RECOVERY: Found wallet address in data object, copying to client`,
+        );
+        client.walletAddress = data.walletAddress;
+        this.playerWalletAddresses.set(player.id, data.walletAddress);
+        console.log(
+          `💾 ✅ RECOVERED: Saved wallet address for player ${player.name} (ID: ${player.id}): ${data.walletAddress}`,
+        );
+      }
     }
 
     if (client.account) {
@@ -1166,6 +1287,21 @@ class Game {
       `🔍 DEBUG: Game phase: ${this.gamePhase}, Game ID: ${this.solanaGameId}`,
     );
 
+    // 🚨 服务器环境诊断 - 详细分析钱包地址保存状态
+    console.log(`🔍 SERVER DIAGNOSIS - Wallet addresses saved:`, {
+      totalSaved: this.playerWalletAddresses.size,
+      savedAddresses: Array.from(this.playerWalletAddresses.entries()).map(
+        ([id, addr]) => ({
+          playerId: id,
+          address: addr ? `${addr.slice(0, 8)}...` : 'null',
+          addressLength: addr ? addr.length : 0,
+        }),
+      ),
+      activePlayers: this.players.size,
+      gamePhase: this.gamePhase,
+      timestamp: new Date().toISOString(),
+    });
+
     this.finalKillRewards.clear();
     let excludedPlayers = [];
     let validPlayers = [];
@@ -1184,10 +1320,20 @@ class Game {
         savedWalletAddress: this.playerWalletAddresses.get(player.id),
       };
 
-      console.log(
-        `🔍 Player ${player.name} (ID: ${player.id}) analysis:`,
-        debugInfo,
-      );
+      // 🔧 只显示具有钱包地址的玩家详细信息（真实用户，非机器人）
+      const hasWalletAddress =
+        debugInfo.clientWalletAddress || debugInfo.savedWalletAddress;
+      if (hasWalletAddress) {
+        console.log(
+          `🔍 Player ${player.name} (ID: ${player.id}) analysis:`,
+          debugInfo,
+        );
+      } else {
+        // 🤖 机器人玩家不打印详细信息，只在总计中统计
+        console.log(
+          `🤖 Bot player ${player.name} (ID: ${player.id}): ${debugInfo.kills} kills, no wallet`,
+        );
+      }
 
       if (player.removed) {
         excludedPlayers.push({ ...debugInfo, reason: 'Player removed' });
@@ -1250,7 +1396,7 @@ class Game {
       }
     }
 
-    // 🔍 详细统计信息
+    // 🔍 详细统计信息 - 分别统计真实用户和机器人
     const totalRewards = this.finalKillRewards.size;
     const totalKills = Array.from(this.finalKillRewards.values()).reduce(
       (sum, r) => sum + r.kills,
@@ -1261,27 +1407,40 @@ class Game {
       0,
     );
 
-    console.log(`🔍 REWARD COLLECTION SUMMARY:`);
-    console.log(`   Total players processed: ${totalPlayersProcessed}`);
-    console.log(`   Valid rewards: ${validPlayers.length}`);
-    console.log(`   Excluded players: ${excludedPlayers.length}`);
-    console.log(`   Total kills: ${totalKills}`);
-    console.log(`   Total LBG rewards: ${totalLBG.toFixed(6)}`);
+    // 统计真实用户和机器人数量
+    let realPlayersCount = 0;
+    let botPlayersCount = 0;
+    let realPlayersWithKills = 0;
+    let botPlayersWithKills = 0;
 
-    if (excludedPlayers.length > 0) {
-      console.log(`🔍 EXCLUDED PLAYERS DETAILS:`);
-      excludedPlayers.forEach((player, index) => {
-        console.log(`   ${index + 1}. ${player.playerName}: ${player.reason}`, {
-          kills: player.kills,
-          clientWallet: player.clientWalletAddress
-            ? `${player.clientWalletAddress.slice(0, 8)}...`
-            : 'none',
-          savedWallet: player.savedWalletAddress
-            ? `${player.savedWalletAddress.slice(0, 8)}...`
-            : 'none',
-        });
-      });
+    for (const player of this.players) {
+      const hasWalletAddress =
+        this.playerWalletAddresses.get(player.id) ||
+        player.client?.walletAddress;
+      const hasKills = (player.kills || 0) > 0;
+
+      if (hasWalletAddress) {
+        realPlayersCount++;
+        if (hasKills) realPlayersWithKills++;
+      } else {
+        botPlayersCount++;
+        if (hasKills) botPlayersWithKills++;
+      }
     }
+
+    console.log(`🔍 REWARD COLLECTION SUMMARY:`);
+    console.log(
+      `   👥 Total players: ${totalPlayersProcessed} (${realPlayersCount} real users + ${botPlayersCount} bots)`,
+    );
+    console.log(
+      `   🎯 Players with kills: ${realPlayersWithKills} real users + ${botPlayersWithKills} bots`,
+    );
+    console.log(
+      `   💰 Valid rewards: ${validPlayers.length} (only real users get rewards)`,
+    );
+    console.log(`   ❌ Excluded players: ${excludedPlayers.length}`);
+    console.log(`   🗡️ Total kills rewarded: ${totalKills}`);
+    console.log(`   🪙 Total LBG rewards: ${totalLBG.toFixed(6)}`);
 
     if (validPlayers.length > 0) {
       console.log(`🔍 VALID PLAYERS DETAILS:`);
@@ -1293,13 +1452,13 @@ class Game {
       });
     }
 
-    // 🔥 关键验证：如果有玩家但没有奖励，这是严重问题
-    if (totalPlayersProcessed > 0 && totalRewards === 0) {
+    // 🔥 关键验证：如果有真实用户但没有奖励，这是严重问题
+    if (realPlayersCount > 0 && totalRewards === 0) {
       console.error(
-        `🚨 CRITICAL ERROR: ${totalPlayersProcessed} players processed but 0 rewards generated!`,
+        `🚨 CRITICAL ERROR: ${realPlayersCount} real users processed but 0 rewards generated!`,
       );
       console.error(
-        `🚨 This violates the core logic: players with kills should get rewards`,
+        `🚨 This violates the core logic: real users with kills should get rewards`,
       );
 
       // 输出钱包地址保存状态
@@ -1312,6 +1471,14 @@ class Game {
           }),
         ),
       });
+    } else if (realPlayersCount === 0) {
+      console.log(
+        `ℹ️ No real users in this game, only ${botPlayersCount} bots. This is normal.`,
+      );
+    } else {
+      console.log(
+        `✅ Real user rewards calculation appears correct: ${totalRewards} rewards for ${realPlayersCount} users`,
+      );
     }
 
     Logger.game.info('Collected player kill rewards', {
