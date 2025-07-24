@@ -44,6 +44,9 @@ class Game {
     this.isGameCreationInProgress = false;
     this.gameTimeout = null;
 
+    // 钱包地址持久保存 - 防止在游戏结束时丢失
+    this.playerWalletAddresses = new Map(); // playerId -> walletAddress
+
     // 游戏最大持续时间 (30分钟)
     this.maxGameDuration = CYCLE_DATA.PERIOD_MS;
     this.pendingMassKill = false;
@@ -519,6 +522,14 @@ class Game {
     client.player = player;
     player.client = client;
 
+    // 🔧 保存钱包地址到持久存储，防止游戏结束时丢失
+    if (client.walletAddress) {
+      this.playerWalletAddresses.set(player.id, client.walletAddress);
+      console.log(
+        `💾 Saved wallet address for player ${player.name} (ID: ${player.id}): ${client.walletAddress}`,
+      );
+    }
+
     if (client.account) {
       const account = client.account;
       if (account.skins && account.skins.equipped) {
@@ -727,6 +738,12 @@ class Game {
       Logger.server.warn('Game creation already in progress');
       return;
     }
+
+    // 🔧 清理上一个游戏的钱包地址映射
+    this.playerWalletAddresses.clear();
+    console.log(
+      '💾 Cleared previous game wallet addresses for new game initialization',
+    );
 
     const maxRetries = 3;
     const currentAttempt = retryCount + 1;
@@ -1138,37 +1155,172 @@ class Game {
 
   /**
    * Collect player kill-based rewards for Solana
-   * Simplified from complex BSC score collection
+   * 🔧 修复版本：确保有击杀的玩家就能获得奖励
+   * 使用持久保存的钱包地址，防止游戏结束时地址丢失
    */
   collectPlayerKillRewards() {
+    console.log(
+      `🔍 DEBUG: Starting reward collection for ${this.players.size} players`,
+    );
+    console.log(
+      `🔍 DEBUG: Game phase: ${this.gamePhase}, Game ID: ${this.solanaGameId}`,
+    );
+
     this.finalKillRewards.clear();
+    let excludedPlayers = [];
+    let validPlayers = [];
+    let totalPlayersProcessed = 0;
 
     for (const player of this.players) {
-      if (player.removed) continue;
+      totalPlayersProcessed++;
+
+      const debugInfo = {
+        playerId: player.id,
+        playerName: player.name,
+        removed: player.removed,
+        kills: player.kills || 0,
+        hasClient: !!player.client,
+        clientWalletAddress: player.client?.walletAddress,
+        savedWalletAddress: this.playerWalletAddresses.get(player.id),
+      };
+
+      console.log(
+        `🔍 Player ${player.name} (ID: ${player.id}) analysis:`,
+        debugInfo,
+      );
+
+      if (player.removed) {
+        excludedPlayers.push({ ...debugInfo, reason: 'Player removed' });
+        console.log(`❌ Player ${player.name}: EXCLUDED - Player removed`);
+        continue;
+      }
 
       const killReward = this.calculatePlayerKillRewards(player);
+      const kills = killReward.kills;
 
-      // Only include players with kills and wallet addresses
-      if (killReward.kills > 0 && player.client?.walletAddress) {
-        const rewardData = {
-          playerId: player.id,
-          playerName: player.name,
-          walletAddress: player.client.walletAddress,
-          kills: killReward.kills,
-          rewardSOL: killReward.rewardSOL,
-          rewardLamports: killReward.rewardLamports,
-        };
+      // 🔥 核心逻辑：有击杀就应该有奖励
+      if (kills > 0) {
+        // 获取钱包地址 - 优先使用持久保存的地址，回退到client地址
+        const walletAddress =
+          this.playerWalletAddresses.get(player.id) ||
+          player.client?.walletAddress;
 
-        this.finalKillRewards.set(player.id, rewardData);
+        if (walletAddress) {
+          const rewardData = {
+            playerId: player.id,
+            playerName: player.name,
+            walletAddress: walletAddress,
+            kills: kills,
+            rewardSOL: killReward.rewardSOL,
+            rewardLamports: killReward.rewardLamports,
+          };
+
+          this.finalKillRewards.set(player.id, rewardData);
+          validPlayers.push({
+            ...debugInfo,
+            rewardData,
+            reason: 'Valid reward',
+          });
+          console.log(
+            `✅ Player ${player.name}: ${kills} kills = ${killReward.rewardSOL} LBG (wallet: ${walletAddress.slice(0, 8)}...)`,
+          );
+        } else {
+          // 🚨 这种情况不应该发生 - 记录严重错误
+          console.error(
+            `🚨 CRITICAL: Player ${player.name} has ${kills} kills but NO wallet address found!`,
+            {
+              playerId: player.id,
+              kills: kills,
+              clientWallet: player.client?.walletAddress,
+              savedWallet: this.playerWalletAddresses.get(player.id),
+              clientExists: !!player.client,
+            },
+          );
+          excludedPlayers.push({
+            ...debugInfo,
+            reason: 'No wallet address (CRITICAL ERROR)',
+          });
+        }
+      } else {
+        console.log(`⚪ Player ${player.name}: 0 kills, no reward`);
+        excludedPlayers.push({
+          ...debugInfo,
+          reason: 'No kills',
+        });
       }
+    }
+
+    // 🔍 详细统计信息
+    const totalRewards = this.finalKillRewards.size;
+    const totalKills = Array.from(this.finalKillRewards.values()).reduce(
+      (sum, r) => sum + r.kills,
+      0,
+    );
+    const totalLBG = Array.from(this.finalKillRewards.values()).reduce(
+      (sum, r) => sum + r.rewardSOL,
+      0,
+    );
+
+    console.log(`🔍 REWARD COLLECTION SUMMARY:`);
+    console.log(`   Total players processed: ${totalPlayersProcessed}`);
+    console.log(`   Valid rewards: ${validPlayers.length}`);
+    console.log(`   Excluded players: ${excludedPlayers.length}`);
+    console.log(`   Total kills: ${totalKills}`);
+    console.log(`   Total LBG rewards: ${totalLBG.toFixed(6)}`);
+
+    if (excludedPlayers.length > 0) {
+      console.log(`🔍 EXCLUDED PLAYERS DETAILS:`);
+      excludedPlayers.forEach((player, index) => {
+        console.log(`   ${index + 1}. ${player.playerName}: ${player.reason}`, {
+          kills: player.kills,
+          clientWallet: player.clientWalletAddress
+            ? `${player.clientWalletAddress.slice(0, 8)}...`
+            : 'none',
+          savedWallet: player.savedWalletAddress
+            ? `${player.savedWalletAddress.slice(0, 8)}...`
+            : 'none',
+        });
+      });
+    }
+
+    if (validPlayers.length > 0) {
+      console.log(`🔍 VALID PLAYERS DETAILS:`);
+      validPlayers.forEach((player, index) => {
+        const reward = player.rewardData;
+        console.log(
+          `   ${index + 1}. ${player.playerName}: ${reward.kills} kills = ${reward.rewardSOL} LBG`,
+        );
+      });
+    }
+
+    // 🔥 关键验证：如果有玩家但没有奖励，这是严重问题
+    if (totalPlayersProcessed > 0 && totalRewards === 0) {
+      console.error(
+        `🚨 CRITICAL ERROR: ${totalPlayersProcessed} players processed but 0 rewards generated!`,
+      );
+      console.error(
+        `🚨 This violates the core logic: players with kills should get rewards`,
+      );
+
+      // 输出钱包地址保存状态
+      console.error(`🚨 Wallet addresses saved:`, {
+        totalSaved: this.playerWalletAddresses.size,
+        addresses: Array.from(this.playerWalletAddresses.entries()).map(
+          ([id, addr]) => ({
+            playerId: id,
+            address: addr ? `${addr.slice(0, 8)}...` : 'null',
+          }),
+        ),
+      });
     }
 
     Logger.game.info('Collected player kill rewards', {
       gameId: this.solanaGameId,
       rewardCount: this.finalKillRewards.size,
-      totalTokenRewards: Array.from(this.finalKillRewards.values())
-        .reduce((sum, r) => sum + r.rewardSOL, 0)
-        .toFixed(6),
+      totalTokenRewards: totalLBG.toFixed(6),
+      playersProcessed: totalPlayersProcessed,
+      validRewards: validPlayers.length,
+      excludedPlayers: excludedPlayers.length,
     });
 
     return this.finalKillRewards;
@@ -1237,6 +1389,7 @@ class Game {
 
   /**
    * End Solana game - simplified version using kill-based rewards
+   * 🔧 修复版本：确保奖励收集在客户端清理之前完成
    */
   async endSolanaGame(reason = 'normal') {
     if (
@@ -1274,17 +1427,92 @@ class Game {
         `📢 Solana Game ${this.solanaGameId} ending (${reason}) - calculating kill-based rewards...`,
       );
 
-      // Collect kill-based rewards (much simpler than BSC)
+      // 🔥 关键：立即收集奖励，在任何清理操作之前
+      console.log(
+        `🔍 Starting reward collection with ${this.players.size} active players...`,
+      );
       const killRewards = this.collectPlayerKillRewards();
 
-      // Broadcast game end to all clients
-      this.broadcastSolanaGameEnd(reason, killRewards);
+      // 验证奖励收集结果
+      console.log(
+        `🔍 Initial reward collection completed: ${killRewards.size} rewards from ${this.players.size} players`,
+      );
 
-      // Finalize game with tier-based VaultSDK (single operation vs complex BSC flow)
+      if (this.players.size > 0 && killRewards.size === 0) {
+        console.error(
+          `🚨 CRITICAL ERROR: ${this.players.size} players but 0 rewards collected!`,
+        );
+        console.error(
+          `🚨 This violates our core logic: players with kills should get rewards`,
+        );
+
+        // 强制重新收集一次 - 紧急修复机制
+        console.log(`🔄 Attempting emergency reward collection...`);
+        console.log(`🔍 Emergency collection - Current game state:`, {
+          gamePhase: this.gamePhase,
+          playersSize: this.players.size,
+          walletAddressesSaved: this.playerWalletAddresses.size,
+          gameId: this.solanaGameId,
+        });
+
+        const emergencyRewards = this.collectPlayerKillRewards();
+        if (emergencyRewards.size > 0) {
+          console.log(
+            `✅ Emergency collection successful: ${emergencyRewards.size} rewards recovered`,
+          );
+          // 使用紧急收集的结果
+          Object.assign(killRewards, emergencyRewards);
+        } else {
+          console.error(
+            `🚨 Emergency collection also failed - investigating player states...`,
+          );
+
+          // 详细诊断每个玩家状态
+          for (const player of this.players) {
+            console.error(`🔍 Player ${player.name} diagnostic:`, {
+              id: player.id,
+              removed: player.removed,
+              kills: player.kills || 0,
+              hasClient: !!player.client,
+              clientWallet: player.client?.walletAddress,
+              savedWallet: this.playerWalletAddresses.get(player.id),
+            });
+          }
+        }
+      }
+
+      // 最终验证
+      const finalRewardCount = killRewards.size;
+      const finalTotalLBG = Array.from(killRewards.values()).reduce(
+        (sum, r) => sum + r.rewardSOL,
+        0,
+      );
+
+      console.log(`🎯 Final reward summary before blockchain submission:`, {
+        totalPlayers: this.players.size,
+        rewardsCollected: finalRewardCount,
+        totalLBG: finalTotalLBG.toFixed(6),
+        gameId: this.solanaGameId,
+        phase: this.gamePhase,
+      });
+
+      // 在finalize之前等待确保奖励数据稳定
+      if (finalRewardCount > 0) {
+        console.log(
+          `✅ ${finalRewardCount} rewards ready for blockchain finalization`,
+        );
+      } else {
+        console.warn(`⚠️ WARNING: 0 rewards will be submitted to blockchain`);
+      }
+
+      // Finalize game with tier-based VaultSDK (确保在区块链操作完成前不清理状态)
       await this.finalizeSolanaGameWithRewards(
         killRewards,
         this.gameTier || 'low',
       );
+
+      // 只有在区块链操作成功后才广播游戏结束和清理
+      this.broadcastSolanaGameEnd(reason, killRewards);
 
       // Set game as ended
       this.gamePhase = 'ended';

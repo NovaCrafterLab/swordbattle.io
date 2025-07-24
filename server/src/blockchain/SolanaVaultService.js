@@ -22,15 +22,12 @@ class SolanaVaultService {
     this.isInitialized = false;
     this.rpcManager = null;
 
-    Logger.server.info('Solana Vault Service initializing', {
-      rpcUrl: config.rpcUrl,
-      programId: config.programId,
-    });
+    // Service initializing - details logged on completion
   }
 
   async initialize() {
     try {
-      Logger.server.info('🔗 Initializing Solana vault service');
+      // Initializing Solana vault service
 
       // Initialize RPC manager for load balancing
       this.rpcManager = getRPCManager();
@@ -44,20 +41,14 @@ class SolanaVaultService {
           Buffer.from(this.config.privateKey, 'hex'),
         );
         this.wallet = Keypair.fromSecretKey(privateKeyBytes);
-        Logger.server.info(
-          '🔑 Wallet initialized:',
-          this.wallet.publicKey.toString(),
-        );
+        // Wallet initialized from config
       } else {
         // Fallback to id.json file in abis directory
         try {
           const idPath = path.resolve(__dirname, '../../abis/id.json');
           const privateKeyArray = require(idPath);
           this.wallet = Keypair.fromSecretKey(Uint8Array.from(privateKeyArray));
-          Logger.server.info(
-            '🔑 Wallet loaded from id.json:',
-            this.wallet.publicKey.toString(),
-          );
+          // Wallet loaded from id.json
         } catch (error) {
           throw new Error(
             'No Solana private key provided and id.json not found',
@@ -73,10 +64,7 @@ class SolanaVaultService {
       while (!connectionTested && retryCount < maxRetries) {
         try {
           const latestBlockhash = await this.connection.getLatestBlockhash();
-          Logger.server.info(
-            '✅ Solana connected, blockhash:',
-            latestBlockhash.blockhash.slice(0, 8) + '...',
-          );
+          // Solana connection verified
           connectionTested = true;
         } catch (error) {
           retryCount++;
@@ -92,9 +80,7 @@ class SolanaVaultService {
             // Mark current RPC as failed and switch to next one
             this.rpcManager.markCurrentRPCFailed();
             this.connection = this.rpcManager.getCurrentConnection('confirmed');
-            Logger.server.info('Switched to next RPC for retry', {
-              newRpc: this.rpcManager.getCurrentRPC(),
-            });
+            // Switched to backup RPC
           } else {
             throw new Error(
               `All RPC endpoints failed after ${maxRetries} attempts: ${error.message}`,
@@ -132,13 +118,10 @@ class SolanaVaultService {
         wallet: walletInterface,
       });
 
-      Logger.server.info(
-        '🔧 Real VaultSDK initialized with program:',
-        this.config.programId,
-      );
+      // VaultSDK initialized
 
       this.isInitialized = true;
-      Logger.status('🚀 Solana vault service ready');
+      Logger.status('✅ Solana服务正常启动');
     } catch (error) {
       Logger.server.error('Failed to initialize Solana vault service', {
         error: error.message,
@@ -259,26 +242,21 @@ class SolanaVaultService {
     }
 
     try {
-      Logger.server.info('🎮 Creating Solana game vault atomically with tier', {
+      Logger.server.info('🎮 创建新游戏', {
         tier,
-        message: 'Using atomic creation to prevent server conflicts',
       });
 
       // Validate tier configuration
       const tierConfig = this.getTierConfig(tier);
 
-      // Use configured token mint from environment variables
+      // Use configured token mint
       const tokenMintAddress = this.config.tokenMint;
-      Logger.server.info(`🔍 Using configured token mint: ${tokenMintAddress}`);
 
       let tokenMint;
       try {
         tokenMint = new PublicKey(tokenMintAddress);
-        Logger.server.info(`✅ Token mint validated: ${tokenMint.toString()}`);
       } catch (error) {
-        Logger.server.error(
-          `❌ Failed to create PublicKey from token mint: ${tokenMintAddress} - ${error.message}`,
-        );
+        Logger.server.error(`❌ 无效的token mint: ${error.message}`);
         throw error;
       }
 
@@ -290,7 +268,7 @@ class SolanaVaultService {
       });
 
       Logger.server.info(
-        `✅ Game vault created atomically on Solana - Game ID: ${result.gameId}, TX: ${result.txHash.slice(0, 8)}..., Token: ${tokenMint.toString()}`,
+        `✅ 游戏创建成功 - ID: ${result.gameId}, Tier: ${tier}`,
       );
 
       return {
@@ -463,17 +441,7 @@ class SolanaVaultService {
           );
         }
 
-        // Use VaultSDK to check if player has a ticket for this game
-        // Log RPC usage for debugging
-        Logger.server.debug(
-          '🔗 Calling VaultSDK.getUserTicketAccount via RPC Pool',
-          {
-            gameId,
-            playerAddress: trimmedAddress,
-            currentRPC: this.rpcManager?.getCurrentRPC(),
-            rpcStats: this.rpcManager?.getStats(),
-          },
-        );
+        // Checking player ticket
 
         const ticketAccount = await this.vaultSDK.getUserTicketAccount(
           gameId,
@@ -482,12 +450,7 @@ class SolanaVaultService {
 
         // Business logic: no ticket or withdrawn ticket
         if (!ticketAccount || ticketAccount.hasWithdrawn) {
-          Logger.server.debug('❌ Player has no valid ticket', {
-            gameId,
-            playerAddress: trimmedAddress,
-            hasTicketAccount: !!ticketAccount,
-            hasWithdrawn: ticketAccount?.hasWithdrawn || false,
-          });
+          // Player has no valid ticket
           return false; // This is expected behavior, not an error
         }
 
@@ -530,26 +493,9 @@ class SolanaVaultService {
             return false; // This is expected behavior for wrong-tier tickets
           }
 
-          Logger.server.debug('✅ Player has valid tier ticket', {
-            gameId,
-            playerAddress: trimmedAddress,
-            tier: expectedTier,
-            tierName: tierConfig.name,
-            ticketAmount: ticketAccount.amount,
-            tokenDecimals,
-          });
+          // Player has valid tier ticket
         } else {
-          Logger.server.debug(
-            '✅ Player has valid ticket (no tier validation)',
-            {
-              gameId,
-              playerAddress: trimmedAddress,
-              tierValidationEnabled: !!expectedTier,
-              strictPriceValidationEnabled:
-                !!this.config.security?.enableStrictPriceValidation,
-              ticketAmount: ticketAccount.amount,
-            },
-          );
+          // Player has valid ticket
         }
 
         // Success case
@@ -856,11 +802,34 @@ class SolanaVaultService {
             .toFixed(6),
         });
 
+        // 🔗 Log RPC Pool usage before VaultSDK operation
+        Logger.server.info(
+          '🔗 About to call VaultSDK.finalizeGame via RPC Pool',
+          {
+            gameId,
+            rewardCount: rewardEntries.length,
+            currentRPC: this.rpcManager?.getCurrentRPC(),
+            rpcStats: this.rpcManager?.getStats(),
+            operation: 'VaultSDK.finalizeGame',
+          },
+        );
+
         // Call VaultSDK to finalize the game with rewards
         const txHash = await this.vaultSDK.finalizeGame({
           gameId: parseInt(gameId),
           rewards: rewardEntries,
         });
+
+        // 🔗 Log successful VaultSDK operation via RPC Pool
+        Logger.server.info(
+          '✅ VaultSDK.finalizeGame completed successfully via RPC Pool',
+          {
+            gameId,
+            txHash: txHash.slice(0, 8) + '...',
+            rpcEndpoint: this.rpcManager?.getCurrentRPC(),
+            rewardsFinalized: rewardEntries.length,
+          },
+        );
 
         // Wait for transaction confirmation
         await this.waitForTransactionConfirmation(txHash);
@@ -1001,13 +970,11 @@ class SolanaVaultService {
 
     const tierConfig = this.config.tiers[tier];
 
-    // Add debug logging to verify tier configuration loading
-    Logger.server.debug('🎯 Tier configuration loaded', {
+    // Show tier configuration information
+    Logger.server.info('🎯 Tier配置', {
       tier,
-      entranceFee: tierConfig.entranceFee,
-      killReward: tierConfig.killReward,
-      tokenMint: this.config.tokenMint,
-      configSource: 'server config.js',
+      门票: tierConfig.entranceFee,
+      奖励: tierConfig.killReward,
     });
 
     return tierConfig;
