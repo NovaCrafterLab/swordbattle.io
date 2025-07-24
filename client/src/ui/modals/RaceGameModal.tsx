@@ -962,9 +962,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
             {gameState.isRaceServer && gameToken.data && (
               <div className="stats-grid">
                 <div className="stat-card">
-                  <div className="stat-icon prize">
-                    <TrophyIcon />
-                  </div>
                   <div className="stat-label">Prize Pool</div>
                   <div className="stat-value">
                     {(() => {
@@ -1001,9 +998,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                 </div>
 
                 <div className="stat-card">
-                  <div className="stat-icon users">
-                    <UsersIcon />
-                  </div>
                   <div className="stat-label">Players</div>
                   <div className="stat-value">
                     {(() => {
@@ -1030,9 +1024,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                 </div>
 
                 <div className="stat-card">
-                  <div className="stat-icon time">
-                    <ClockIcon />
-                  </div>
                   <div className="stat-label">Entry Fee</div>
                   <div className="stat-value">
                     {formatEntryFee(entryFeeAmount)}{' '}
@@ -1041,7 +1032,6 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
                 </div>
 
                 <div className="stat-card">
-                  <div className="stat-icon level">⚡</div>
                   <div className="stat-label">Game ID</div>
                   <div className="stat-value">
                     #{gameState.gameId || 'Loading...'}
