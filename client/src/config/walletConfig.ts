@@ -145,7 +145,7 @@ export class SolanaRPCManager {
   private readonly healthCheckInterval = 5 * 60 * 1000; // 5分钟
 
   constructor() {
-    // 不再需要固定的当前RPC索引，每次请求都随机选择
+    // 🎯 每次getCurrentRPC()调用都会返回随机RPC，实现真正的负载均衡
     this.currentRpcIndex = 0; // 仅用于兼容性，实际不使用
   }
 
@@ -157,7 +157,8 @@ export class SolanaRPCManager {
   }
 
   getCurrentRPC(): string {
-    return CURRENT_RPC_POOL[this.currentRpcIndex];
+    // 🔥 修复：每次调用都返回随机RPC，实现真正的负载均衡
+    return this.getRandomAvailableRPC();
   }
 
   getAvailableRPCs(): string[] {

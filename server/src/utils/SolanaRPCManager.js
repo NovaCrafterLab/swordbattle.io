@@ -65,8 +65,8 @@ class SolanaRPCManager {
       throw new Error('RPC pool is empty - no RPC endpoints available');
     }
 
-    // 不再需要固定的当前RPC索引，每次请求都随机选择
-    this.currentRpcIndex = 0; // 仅用于兼容性，实际不使用
+    // 🎯 每次getCurrentRPC()调用都会返回随机RPC，实现真正的负载均衡
+    this.currentRpcIndex = 0; // 仅用于switchToNextRPC()兼容性
     this.failedRpcs = new Set();
     this.lastHealthCheck = 0;
     this.healthCheckInterval = 5 * 60 * 1000; // 5分钟
@@ -82,7 +82,8 @@ class SolanaRPCManager {
   }
 
   getCurrentRPC() {
-    return CURRENT_RPC_POOL[this.currentRpcIndex];
+    // 🔥 修复：每次调用都返回随机RPC，实现真正的负载均衡
+    return this.getRandomAvailableRPC();
   }
 
   getAvailableRPCs() {
