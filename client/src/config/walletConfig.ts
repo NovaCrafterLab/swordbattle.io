@@ -2,6 +2,7 @@
 // 适配 Solana Devnet 与 Mainnet，预留程序ID与配置
 
 import { config } from '../config';
+import { Connection } from '@solana/web3.js';
 
 // 环境变量检查
 const ENV = process.env.REACT_APP_BUILD_ENV ?? 'development';
@@ -144,8 +145,8 @@ export class SolanaRPCManager {
   private readonly healthCheckInterval = 5 * 60 * 1000; // 5分钟
 
   constructor() {
-    // 随机选择初始RPC节点，避免所有客户端都使用同一个RPC
-    this.currentRpcIndex = Math.floor(Math.random() * CURRENT_RPC_POOL.length);
+    // 不再需要固定的当前RPC索引，每次请求都随机选择
+    this.currentRpcIndex = 0; // 仅用于兼容性，实际不使用
   }
 
   static getInstance(): SolanaRPCManager {
@@ -171,7 +172,7 @@ export class SolanaRPCManager {
   }
 
   /**
-   * 获取随机可用的RPC节点
+   * 获取随机可用的RPC节点 - 每次都返回新的随机节点
    */
   getRandomAvailableRPC(): string {
     const availableIndices = CURRENT_RPC_POOL.map((_, index) => index).filter(
@@ -179,17 +180,16 @@ export class SolanaRPCManager {
     );
 
     if (availableIndices.length === 0) {
-      console.warn('⚠️ 没有可用的RPC节点，重置失败列表');
+      console.warn('⚠️ 没有可用的RPC节点，重置失败列表并随机选择');
       this.failedRpcs.clear();
-      this.currentRpcIndex = Math.floor(
-        Math.random() * CURRENT_RPC_POOL.length,
-      );
-      return this.getCurrentRPC();
+      const randomIndex = Math.floor(Math.random() * CURRENT_RPC_POOL.length);
+      return CURRENT_RPC_POOL[randomIndex];
     }
 
+    // 每次都返回真正随机的RPC节点
     const randomIndex = Math.floor(Math.random() * availableIndices.length);
-    this.currentRpcIndex = availableIndices[randomIndex];
-    return this.getCurrentRPC();
+    const selectedIndex = availableIndices[randomIndex];
+    return CURRENT_RPC_POOL[selectedIndex];
   }
 
   private switchToNextRPC(): void {
@@ -262,17 +262,49 @@ export class SolanaRPCManager {
   }
 
   getStats() {
+    // 统计可用的Helius节点数量
+    const availableRpcs = this.getAvailableRPCs();
+    const heliusCount = availableRpcs.filter((rpc) =>
+      rpc.includes('helius-rpc.com'),
+    ).length;
+    const totalHeliusCount = CURRENT_RPC_POOL.filter((rpc) =>
+      rpc.includes('helius-rpc.com'),
+    ).length;
+
     return {
       total: CURRENT_RPC_POOL.length,
       available: CURRENT_RPC_POOL.length - this.failedRpcs.size,
       failed: this.failedRpcs.size,
-      current: this.getCurrentRPC(),
+      randomizedMode: true, // 标识当前使用随机模式
+      loadBalanced: true, // 标识负载均衡已启用
+      heliusAvailable: heliusCount,
+      heliusTotal: totalHeliusCount,
       failedRpcs: Array.from(this.failedRpcs).map((i) => CURRENT_RPC_POOL[i]),
       environment: SOLANA_ENVIRONMENT.networkName,
       heliusKeys: RPC_API_KEYS.length,
       cluster: SOLANA_ENVIRONMENT.cluster,
+      note: 'Every wallet interaction uses a new random RPC node for optimal load balancing',
     };
   }
+}
+
+// 创建新的Solana连接 - 使用随机负载均衡
+export function createSolanaConnection(
+  commitment: 'processed' | 'confirmed' | 'finalized' = 'confirmed',
+) {
+  const rpcManager = SolanaRPCManager.getInstance();
+  const randomRpc = rpcManager.getRandomAvailableRPC();
+
+  // 每次都创建新的连接，实现真正的负载均衡
+  const connection = new Connection(randomRpc, {
+    commitment,
+    confirmTransactionInitialTimeout: 30000,
+  });
+
+  console.log(
+    `🎯 Created new random Solana connection: ${randomRpc.split('/').pop()}`,
+  );
+  return connection;
 }
 
 // 导出向后兼容的环境信息（对接原有代码）

@@ -65,19 +65,19 @@ class SolanaRPCManager {
       throw new Error('RPC pool is empty - no RPC endpoints available');
     }
 
-    // 随机选择初始RPC节点，避免所有服务器都使用同一个RPC
-    this.currentRpcIndex = Math.floor(Math.random() * CURRENT_RPC_POOL.length);
+    // 不再需要固定的当前RPC索引，每次请求都随机选择
+    this.currentRpcIndex = 0; // 仅用于兼容性，实际不使用
     this.failedRpcs = new Set();
     this.lastHealthCheck = 0;
     this.healthCheckInterval = 5 * 60 * 1000; // 5分钟
-    this.connections = new Map(); // 缓存连接对象
+    this.connections = new Map(); // 保留连接缓存但优先使用随机节点
 
     Logger.server.info('Solana RPC Manager (Server) initialized', {
       environment: isDev ? 'devnet' : 'mainnet',
       poolSize: CURRENT_RPC_POOL.length,
       heliusKeys: RPC_API_KEYS.length,
-      initialRpcIndex: this.currentRpcIndex,
-      initialRpc: this.getCurrentRPC().split('/').pop(),
+      randomizedMode: true, // 标识已启用随机模式
+      loadBalancing: '每个请求都使用随机RPC节点',
     });
   }
 
@@ -90,46 +90,30 @@ class SolanaRPCManager {
   }
 
   /**
-   * 创建新的随机RPC连接
+   * 创建新的随机RPC连接 - 每次都使用新的随机节点
    */
   createRandomConnection(commitment = 'confirmed') {
+    // 每次都获取新的随机RPC节点
     const randomRpc = this.getRandomAvailableRPC();
-    const connectionKey = `${randomRpc}_${commitment}`;
 
-    // 复用连接对象以提高性能
-    if (!this.connections.has(connectionKey)) {
-      this.connections.set(
-        connectionKey,
-        new Connection(randomRpc, commitment),
-      );
-      Logger.server.debug('Created new RPC connection', {
-        rpc: randomRpc.split('/').pop(),
-        commitment,
-      });
-    }
+    // 为了真正的负载均衡，不使用连接缓存
+    const connection = new Connection(randomRpc, commitment);
 
-    return this.connections.get(connectionKey);
+    Logger.server.debug('Created new random RPC connection', {
+      rpc: randomRpc.split('/').pop(),
+      commitment,
+      loadBalanced: true,
+    });
+
+    return connection;
   }
 
   /**
-   * 获取当前默认连接
+   * 获取连接实例 - 使用随机负载均衡
    */
   getCurrentConnection(commitment = 'confirmed') {
-    const currentRpc = this.getCurrentRPC();
-    const connectionKey = `${currentRpc}_${commitment}`;
-
-    if (!this.connections.has(connectionKey)) {
-      this.connections.set(
-        connectionKey,
-        new Connection(currentRpc, commitment),
-      );
-      Logger.server.debug('Created default RPC connection', {
-        rpc: currentRpc.split('/').pop(),
-        commitment,
-      });
-    }
-
-    return this.connections.get(connectionKey);
+    // 为了真正的负载均衡，每次都返回新的随机连接
+    return this.createRandomConnection(commitment);
   }
 
   markCurrentRPCFailed() {
@@ -160,7 +144,7 @@ class SolanaRPCManager {
   }
 
   /**
-   * 获取随机可用的RPC节点
+   * 获取随机可用的RPC节点 - 每次都返回新的随机节点
    */
   getRandomAvailableRPC() {
     const availableIndices = CURRENT_RPC_POOL.map((_, index) => index).filter(
@@ -172,12 +156,11 @@ class SolanaRPCManager {
       this.failedRpcs.clear();
       // 清理所有连接缓存，重新开始
       this.connections.clear();
-      this.currentRpcIndex = Math.floor(
-        Math.random() * CURRENT_RPC_POOL.length,
-      );
-      return this.getCurrentRPC();
+      const randomIndex = Math.floor(Math.random() * CURRENT_RPC_POOL.length);
+      return CURRENT_RPC_POOL[randomIndex];
     }
 
+    // 每次都返回真正随机的RPC节点
     const randomIndex = Math.floor(Math.random() * availableIndices.length);
     const selectedIndex = availableIndices[randomIndex];
     return CURRENT_RPC_POOL[selectedIndex];
@@ -287,15 +270,28 @@ class SolanaRPCManager {
   }
 
   getStats() {
+    // 统计可用的Helius节点数量
+    const availableRpcs = this.getAvailableRPCs();
+    const heliusCount = availableRpcs.filter((rpc) =>
+      rpc.includes('helius-rpc.com'),
+    ).length;
+    const totalHeliusCount = CURRENT_RPC_POOL.filter((rpc) =>
+      rpc.includes('helius-rpc.com'),
+    ).length;
+
     return {
       total: CURRENT_RPC_POOL.length,
       available: CURRENT_RPC_POOL.length - this.failedRpcs.size,
       failed: this.failedRpcs.size,
-      current: this.getCurrentRPC(),
+      randomizedMode: true, // 标识当前使用随机模式
+      loadBalanced: true, // 标识负载均衡已启用
+      heliusAvailable: heliusCount,
+      heliusTotal: totalHeliusCount,
       failedRpcs: Array.from(this.failedRpcs).map((i) => CURRENT_RPC_POOL[i]),
       environment: isDev ? 'devnet' : 'mainnet',
       heliusKeys: RPC_API_KEYS.length,
       cachedConnections: this.connections.size,
+      note: 'Every request uses a new random RPC node for optimal load balancing',
     };
   }
 

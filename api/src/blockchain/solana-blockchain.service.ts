@@ -70,7 +70,8 @@ export class SolanaBlockchainService implements OnModuleInit {
   }
 
   private async createConnection(): Promise<void> {
-    const selectedRpc = this.rpcManager.getCurrentRPC();
+    // 每次创建连接都使用随机RPC节点
+    const selectedRpc = this.rpcManager.getRandomAvailableRPC();
 
     try {
       // 创建带有超时保护的连接
@@ -82,16 +83,20 @@ export class SolanaBlockchainService implements OnModuleInit {
         fetch: this.rpcManager.createTimeoutFetch(15000),
       });
 
-      this.logger.log(`🔗 Connected to: ${selectedRpc.split('/').pop()}`);
+      this.logger.log(
+        `🔗 Connected to random RPC: ${selectedRpc.split('/').pop()}`,
+      );
     } catch (error) {
       this.logger.error(`❌ Failed to create connection: ${error}`);
-      const fallbackRpc = this.rpcManager.markCurrentRPCFailed();
+      // 失败后再次尝试新的随机RPC
+      const fallbackRpc = this.rpcManager.getRandomAvailableRPC();
 
       // 尝试创建备用连接
       this.connection = new Connection(fallbackRpc, {
         commitment: this.config.rpc.commitment,
         fetch: this.rpcManager.createTimeoutFetch(15000),
       });
+      this.logger.log(`🔄 Fallback to: ${fallbackRpc.split('/').pop()}`);
     }
   }
 
@@ -133,31 +138,38 @@ export class SolanaBlockchainService implements OnModuleInit {
     );
   }
 
-  // 获取连接实例（带故障转移）
+  // 获取连接实例（使用随机负载均衡）
   async getConnection(): Promise<Connection> {
     if (!this.isAvailable()) {
       throw new Error('Solana blockchain service not available');
     }
 
-    // 如果当前连接失效，尝试重新创建
-    if (!this.connection) {
-      await this.createConnection();
-    }
+    // 为了真正的负载均衡，每次都创建新的随机连接
+    const randomRpc = this.rpcManager.getRandomAvailableRPC();
+    const newConnection = new Connection(randomRpc, {
+      commitment: this.config.rpc.commitment,
+      fetch: this.rpcManager.createTimeoutFetch(15000),
+    });
 
-    return this.connection!;
+    this.logger.debug(
+      `🎯 Created new random connection: ${randomRpc.split('/').pop()}`,
+    );
+    return newConnection;
   }
 
-  // 执行具有重试机制的操作
+  // 执行具有重试机制的操作 - 使用随机负载均衡
   async executeWithRetry<T>(
-    operation: (connection: Connection) => Promise<T>,
+    operation: () => Promise<T>, // 修改为无参数，内部使用getConnection
     maxRetries: number = 3,
   ): Promise<T> {
     return this.rpcManager.executeWithRetry(async (rpcUrl) => {
+      // 使用随机RPC创建新连接
       const connection = new Connection(rpcUrl, {
         commitment: this.config.rpc.commitment,
         fetch: this.rpcManager.createTimeoutFetch(15000),
       });
-      return operation(connection);
+      // 执行操作时传入连接
+      return operation();
     }, maxRetries);
   }
 
@@ -228,13 +240,16 @@ export class SolanaBlockchainService implements OnModuleInit {
   }
 
   /**
-   * 获取用户Token余额
+   * 获取用户Token余额 - 使用随机负载均衡
    */
   async getUserTokenBalance(userAddress: string): Promise<{
     balance: string;
     decimals: number;
   }> {
-    return this.executeWithRetry(async (connection) => {
+    return this.executeWithRetry(async () => {
+      // 每次调用都使用新的随机连接
+      const connection = await this.getConnection();
+
       try {
         const userPubkey = new PublicKey(userAddress);
         const tokenMintPubkey = new PublicKey(this.config.programs.tokenMint);

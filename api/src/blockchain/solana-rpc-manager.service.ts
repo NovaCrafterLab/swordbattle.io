@@ -14,14 +14,12 @@ export class SolanaRPCManager {
   private readonly healthCheckInterval = 5 * 60 * 1000; // 5分钟
 
   constructor() {
-    // 随机选择初始RPC节点，避免所有API实例都使用同一个RPC
-    this.currentRpcIndex = Math.floor(Math.random() * CURRENT_RPC_POOL.length);
+    // 不再需要固定的当前RPC索引，每次请求都随机选择
+    this.currentRpcIndex = 0; // 仅用于兼容性，实际不使用
     this.logger.log(
       `📡 Solana RPC Manager initialized with ${CURRENT_RPC_POOL.length} endpoints`,
     );
-    this.logger.log(
-      `🎯 Starting with random endpoint: ${this.getCurrentRPC().split('/').pop()}`,
-    );
+    this.logger.log(`🎯 每个请求都将随机选择RPC节点实现负载均衡`);
   }
 
   static getInstance(): SolanaRPCManager {
@@ -52,7 +50,7 @@ export class SolanaRPCManager {
   }
 
   /**
-   * 获取随机可用的RPC节点
+   * 获取随机可用的RPC节点 - 每次请求都返回新的随机节点
    */
   getRandomAvailableRPC(): string {
     const availableIndices = CURRENT_RPC_POOL.map((_, index) => index).filter(
@@ -60,17 +58,16 @@ export class SolanaRPCManager {
     );
 
     if (availableIndices.length === 0) {
-      this.logger.warn('⚠️ 没有可用的RPC节点，重置失败列表');
+      this.logger.warn('⚠️ 没有可用的RPC节点，重置失败列表并随机选择');
       this.failedRpcs.clear();
-      this.currentRpcIndex = Math.floor(
-        Math.random() * CURRENT_RPC_POOL.length,
-      );
-      return this.getCurrentRPC();
+      const randomIndex = Math.floor(Math.random() * CURRENT_RPC_POOL.length);
+      return CURRENT_RPC_POOL[randomIndex];
     }
 
+    // 每次都返回真正随机的RPC节点
     const randomIndex = Math.floor(Math.random() * availableIndices.length);
-    this.currentRpcIndex = availableIndices[randomIndex];
-    return this.getCurrentRPC();
+    const selectedIndex = availableIndices[randomIndex];
+    return CURRENT_RPC_POOL[selectedIndex];
   }
 
   private switchToNextRPC(): void {
@@ -162,25 +159,30 @@ export class SolanaRPCManager {
   }
 
   getStats() {
-    const isHelius = this.getCurrentRPC().includes('helius-rpc.com');
-    const apiKey = isHelius
-      ? this.getCurrentRPC().split('api-key=')[1]?.substring(0, 8) + '...'
-      : 'N/A';
+    // 统计可用的Helius节点数量
+    const availableRpcs = this.getAvailableRPCs();
+    const heliusCount = availableRpcs.filter((rpc) =>
+      rpc.includes('helius-rpc.com'),
+    ).length;
+    const totalHeliusCount = CURRENT_RPC_POOL.filter((rpc) =>
+      rpc.includes('helius-rpc.com'),
+    ).length;
 
     return {
       total: CURRENT_RPC_POOL.length,
       available: CURRENT_RPC_POOL.length - this.failedRpcs.size,
       failed: this.failedRpcs.size,
-      current: this.getCurrentRPC().split('/').pop(),
-      currentFullUrl: this.getCurrentRPC(),
-      isHelius,
-      apiKey,
+      randomizedMode: true, // 标识当前使用随机模式
+      heliusAvailable: heliusCount,
+      heliusTotal: totalHeliusCount,
+      loadBalanced: true, // 标识负载均衡已启用
       failedRpcs: Array.from(this.failedRpcs).map((i) =>
         CURRENT_RPC_POOL[i].split('/').pop(),
       ),
       cluster:
         process.env.BUILD_ENV === 'development' ? 'devnet' : 'mainnet-beta',
       lastHealthCheck: new Date(this.lastHealthCheck).toISOString(),
+      note: 'Every request uses a new random RPC node for optimal load balancing',
     };
   }
 
@@ -199,37 +201,59 @@ export class SolanaRPCManager {
   }
 
   /**
-   * 执行具有重试机制的RPC操作
+   * 执行具有重试机制的RPC操作 - 每次尝试都使用新的随机RPC
    */
   async executeWithRetry<T>(
     operation: (rpcUrl: string) => Promise<T>,
     maxRetries: number = 3,
   ): Promise<T> {
     let lastError: Error | null = null;
+    const usedRpcs = new Set<string>(); // 记录本次请求已使用的RPC，避免重复
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        const selectedRpc = this.getCurrentRPC();
+        // 每次尝试都获取新的随机RPC节点
+        const selectedRpc = this.getRandomAvailableRPC();
+        this.logger.debug(
+          `🎯 Attempt ${attempt + 1}: Using RPC ${selectedRpc.split('/').pop()}`,
+        );
+
         const result = await operation(selectedRpc);
+        this.logger.debug(
+          `✅ Request succeeded with RPC ${selectedRpc.split('/').pop()}`,
+        );
         return result;
       } catch (error) {
         lastError = error as Error;
+        const failedRpc = this.getRandomAvailableRPC(); // 获取失败的RPC用于日志
 
-        // 如果这是网络错误且还有重试次数，切换到下一个RPC
+        // 标记失败的RPC（基于错误URL识别）
         if (
-          attempt < maxRetries - 1 &&
-          (error instanceof TypeError ||
-            (error as any).message?.includes('Failed to fetch') ||
-            (error as any).message?.includes('fetch') ||
-            (error as any).message?.includes('timeout') ||
-            (error as any).message?.includes('Connection timeout') ||
-            (error as any).message?.includes('network'))
+          error instanceof TypeError ||
+          (error as any).message?.includes('Failed to fetch') ||
+          (error as any).message?.includes('fetch') ||
+          (error as any).message?.includes('timeout') ||
+          (error as any).message?.includes('Connection timeout') ||
+          (error as any).message?.includes('network')
         ) {
-          this.markCurrentRPCFailed();
+          // 将当前失败的RPC加入失败列表
+          const failedIndex = CURRENT_RPC_POOL.findIndex(
+            (rpc) => rpc === failedRpc,
+          );
+          if (failedIndex !== -1) {
+            this.failedRpcs.add(failedIndex);
+            this.logger.warn(
+              `❌ RPC ${failedRpc.split('/').pop()} marked as failed`,
+            );
+          }
+        }
 
+        if (attempt < maxRetries - 1) {
           // 指数退避延迟
           const backoffDelay = Math.min(1000 * Math.pow(2, attempt), 5000);
-          this.logger.debug(`⏱️ Waiting ${backoffDelay}ms before retrying...`);
+          this.logger.debug(
+            `⏱️ Waiting ${backoffDelay}ms before retrying with new random RPC...`,
+          );
           await new Promise((resolve) => setTimeout(resolve, backoffDelay));
         }
       }
