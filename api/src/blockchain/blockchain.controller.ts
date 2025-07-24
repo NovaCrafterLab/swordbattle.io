@@ -1,5 +1,5 @@
 // 区块链控制器
-// 提供区块链相关的API端点
+// 提供区块链相关的API端点 - 支持Solana和BSC服务
 
 import {
   Controller,
@@ -11,15 +11,16 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
-import { IsString, IsNumberString, IsEthereumAddress } from 'class-validator';
+import { IsString, IsNumberString } from 'class-validator';
 import { BlockchainService } from './blockchain.service';
+import { SolanaBlockchainService } from './solana-blockchain.service';
 
 // 数据传输对象
 export class SignScoreDto {
   @IsNumberString()
   gameId: string;
 
-  @IsEthereumAddress()
+  @IsString()
   playerAddress: string;
 
   @IsNumberString()
@@ -34,25 +35,71 @@ export class SignScoreDto {
 
 @Controller('blockchain')
 export class BlockchainController {
-  constructor(private readonly blockchainService: BlockchainService) {}
+  constructor(
+    private readonly blockchainService: BlockchainService,
+    private readonly solanaBlockchainService: SolanaBlockchainService,
+  ) {}
+
+  // 获取优先服务（Solana优先，BSC作为后备）
+  private getActiveService() {
+    if (this.solanaBlockchainService.isAvailable()) {
+      return this.solanaBlockchainService;
+    }
+    return this.blockchainService;
+  }
 
   // 获取区块链服务状态
   @Get('status')
   getStatus() {
     return {
-      available: this.blockchainService.isAvailable(),
-      config: this.blockchainService.getConfig(),
+      solana: {
+        available: this.solanaBlockchainService.isAvailable(),
+        config: this.solanaBlockchainService.getConfig(),
+      },
+      bsc: {
+        available: this.blockchainService.isAvailable(),
+        config: this.blockchainService.getConfig(),
+      },
+      activeService: this.solanaBlockchainService.isAvailable()
+        ? 'solana'
+        : 'bsc',
     };
+  }
+
+  // Solana专用状态端点
+  @Get('solana/status')
+  getSolanaStatus() {
+    return {
+      available: this.solanaBlockchainService.isAvailable(),
+      config: this.solanaBlockchainService.getConfig(),
+    };
+  }
+
+  // Solana专用测试端点
+  @Get('solana/test')
+  async testSolanaService() {
+    try {
+      const result = await this.solanaBlockchainService.testService();
+      return { success: true, data: result };
+    } catch (error) {
+      throw new HttpException(
+        { success: false, error: error.message },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   // 获取游戏信息
   @Get('games/:gameId')
   async getGameInfo(@Param('gameId') gameId: string) {
     try {
-      const gameInfo = await this.blockchainService.getGameInfo(
-        parseInt(gameId),
-      );
-      return { success: true, data: gameInfo };
+      const service = this.getActiveService();
+      const gameInfo = await service.getGameInfo(parseInt(gameId));
+      return {
+        success: true,
+        data: gameInfo,
+        service: this.solanaBlockchainService.isAvailable() ? 'solana' : 'bsc',
+      };
     } catch (error) {
       throw new HttpException(
         { success: false, error: error.message },
@@ -65,30 +112,19 @@ export class BlockchainController {
   @Get('games/:gameId/players')
   async getGamePlayers(@Param('gameId') gameId: string) {
     try {
-      const players = await this.blockchainService.getGamePlayers(
-        parseInt(gameId),
-      );
-      return { success: true, data: players };
+      const service = this.getActiveService();
+      const players = await service.getGamePlayers(parseInt(gameId));
+      return {
+        success: true,
+        data: players,
+        service: this.solanaBlockchainService.isAvailable() ? 'solana' : 'bsc',
+      };
     } catch (error) {
       throw new HttpException(
         { success: false, error: error.message },
         HttpStatus.BAD_REQUEST,
       );
     }
-  }
-
-  // 游戏分数现在通过GameAggregator的其他接口获取
-  @Get('games/:gameId/scores')
-  async getGameScores(@Param('gameId') gameId: string) {
-    // 返回空数组，因为现在分数通过其他方式获取
-    return { success: true, data: [] };
-  }
-
-  // 游戏排名现在通过GameAggregator的其他接口获取
-  @Get('games/:gameId/rankings')
-  async getGameRankings(@Param('gameId') gameId: string) {
-    // 返回空数组，因为现在排名通过其他方式获取
-    return { success: true, data: [] };
   }
 
   // 获取玩家信息
@@ -98,11 +134,16 @@ export class BlockchainController {
     @Param('playerAddress') playerAddress: string,
   ) {
     try {
-      const playerInfo = await this.blockchainService.getPlayerInfo(
+      const service = this.getActiveService();
+      const playerInfo = await service.getPlayerInfo(
         parseInt(gameId),
         playerAddress,
       );
-      return { success: true, data: playerInfo };
+      return {
+        success: true,
+        data: playerInfo,
+        service: this.solanaBlockchainService.isAvailable() ? 'solana' : 'bsc',
+      };
     } catch (error) {
       throw new HttpException(
         { success: false, error: error.message },
@@ -111,12 +152,124 @@ export class BlockchainController {
     }
   }
 
-  // 获取玩家nonce
+  // Solana专用：获取用户Token余额
+  @Get('solana/balance/:userAddress')
+  async getUserTokenBalance(@Param('userAddress') userAddress: string) {
+    try {
+      if (!this.solanaBlockchainService.isAvailable()) {
+        throw new Error('Solana service not available');
+      }
+
+      const balance =
+        await this.solanaBlockchainService.getUserTokenBalance(userAddress);
+      return { success: true, data: balance };
+    } catch (error) {
+      throw new HttpException(
+        { success: false, error: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  // Solana专用：获取Token信息
+  @Get('solana/token-info')
+  async getTokenInfo() {
+    try {
+      if (!this.solanaBlockchainService.isAvailable()) {
+        throw new Error('Solana service not available');
+      }
+
+      const tokenInfo = await this.solanaBlockchainService.getTokenInfo();
+      return { success: true, data: tokenInfo };
+    } catch (error) {
+      throw new HttpException(
+        { success: false, error: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  // Solana专用：检查用户票据
+  @Get('solana/games/:gameId/ticket/:userAddress')
+  async checkUserTicket(
+    @Param('gameId') gameId: string,
+    @Param('userAddress') userAddress: string,
+  ) {
+    try {
+      if (!this.solanaBlockchainService.isAvailable()) {
+        throw new Error('Solana service not available');
+      }
+
+      const ticketInfo = await this.solanaBlockchainService.hasUserTicket(
+        parseInt(gameId),
+        userAddress,
+      );
+      return { success: true, data: ticketInfo };
+    } catch (error) {
+      throw new HttpException(
+        { success: false, error: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  // Solana专用：获取游戏Vault信息
+  @Get('solana/games/:gameId/vault')
+  async getGameVaultInfo(@Param('gameId') gameId: string) {
+    try {
+      if (!this.solanaBlockchainService.isAvailable()) {
+        throw new Error('Solana service not available');
+      }
+
+      const vaultInfo = await this.solanaBlockchainService.getGameVaultInfo(
+        parseInt(gameId),
+      );
+      return { success: true, data: vaultInfo };
+    } catch (error) {
+      throw new HttpException(
+        { success: false, error: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  // ==================== 兼容BSC接口 ====================
+
+  // 游戏分数（BSC专用，Solana返回空）
+  @Get('games/:gameId/scores')
+  async getGameScores(@Param('gameId') gameId: string) {
+    if (this.solanaBlockchainService.isAvailable()) {
+      // Solana服务没有分数概念，返回空数组
+      return { success: true, data: [], service: 'solana' };
+    }
+
+    // BSC服务返回空数组（因为现在分数通过其他方式获取）
+    return { success: true, data: [], service: 'bsc' };
+  }
+
+  // 游戏排名（BSC专用，Solana返回空）
+  @Get('games/:gameId/rankings')
+  async getGameRankings(@Param('gameId') gameId: string) {
+    if (this.solanaBlockchainService.isAvailable()) {
+      // Solana服务没有排名概念，返回空数组
+      return { success: true, data: [], service: 'solana' };
+    }
+
+    // BSC服务返回空数组（因为现在排名通过其他方式获取）
+    return { success: true, data: [], service: 'bsc' };
+  }
+
+  // 获取玩家nonce（BSC专用）
   @Get('players/:playerAddress/nonce')
   async getPlayerNonce(@Param('playerAddress') playerAddress: string) {
     try {
+      if (this.solanaBlockchainService.isAvailable()) {
+        // Solana服务没有nonce概念，返回0
+        return { success: true, data: { nonce: 0 }, service: 'solana' };
+      }
+
       const nonce = await this.blockchainService.getPlayerNonce(playerAddress);
-      return { success: true, data: { nonce } };
+      return { success: true, data: { nonce }, service: 'bsc' };
     } catch (error) {
       throw new HttpException(
         { success: false, error: error.message },
@@ -129,8 +282,13 @@ export class BlockchainController {
   @Get('entry-fee')
   async getEntryFee() {
     try {
+      if (this.solanaBlockchainService.isAvailable()) {
+        // Solana服务返回默认入场费
+        return { success: true, data: { entryFee: '1' }, service: 'solana' };
+      }
+
       const entryFee = await this.blockchainService.getEntryFee();
-      return { success: true, data: { entryFee } };
+      return { success: true, data: { entryFee }, service: 'bsc' };
     } catch (error) {
       throw new HttpException(
         { success: false, error: error.message },
@@ -143,8 +301,13 @@ export class BlockchainController {
   @Get('game-counter')
   async getGameCounter() {
     try {
+      if (this.solanaBlockchainService.isAvailable()) {
+        // Solana服务返回模拟的游戏计数器
+        return { success: true, data: { counter: 1 }, service: 'solana' };
+      }
+
       const counter = await this.blockchainService.getGameCounter();
-      return { success: true, data: { counter } };
+      return { success: true, data: { counter }, service: 'bsc' };
     } catch (error) {
       throw new HttpException(
         { success: false, error: error.message },
@@ -153,27 +316,27 @@ export class BlockchainController {
     }
   }
 
-  // 签名分数提交
+  // 签名分数提交（BSC专用）
   @Post('sign-score')
   async signScoreSubmission(@Body() signScoreDto: SignScoreDto) {
     try {
-      console.log('Received sign-score request:', signScoreDto);
+      if (this.solanaBlockchainService.isAvailable()) {
+        // Solana服务不支持分数签名，返回模拟签名
+        return {
+          success: true,
+          data: { signature: 'solana_mock_signature' },
+          service: 'solana',
+          note: 'Solana service does not support score signing',
+        };
+      }
 
       const { gameId, playerAddress, kills, score, nonce } = signScoreDto;
 
-      // 直接转换字符串为整数
+      // 转换字符串为整数
       const gameIdNum = parseInt(gameId);
       const killsNum = parseInt(kills);
       const scoreNum = parseInt(score);
       const nonceNum = parseInt(nonce);
-
-      console.log('Parsed parameters:', {
-        gameIdNum,
-        killsNum,
-        scoreNum,
-        nonceNum,
-        playerAddress,
-      });
 
       // 验证转换结果
       if (
@@ -182,12 +345,6 @@ export class BlockchainController {
         isNaN(scoreNum) ||
         isNaN(nonceNum)
       ) {
-        console.error('Invalid numeric parameters:', {
-          gameIdNum,
-          killsNum,
-          scoreNum,
-          nonceNum,
-        });
         throw new Error(
           `Invalid numeric parameters: gameId=${gameIdNum}, kills=${killsNum}, score=${scoreNum}, nonce=${nonceNum}`,
         );
@@ -197,14 +354,6 @@ export class BlockchainController {
         throw new Error('Invalid player address');
       }
 
-      console.log('Calling blockchain service with:', {
-        gameIdNum,
-        playerAddress,
-        killsNum,
-        scoreNum,
-        nonceNum,
-      });
-
       const signature = await this.blockchainService.signScoreSubmission(
         gameIdNum,
         playerAddress,
@@ -213,10 +362,8 @@ export class BlockchainController {
         nonceNum,
       );
 
-      console.log('Signature generated successfully');
-      return { success: true, data: { signature } };
+      return { success: true, data: { signature }, service: 'bsc' };
     } catch (error) {
-      console.error('Error in sign-score endpoint:', error);
       throw new HttpException(
         { success: false, error: error.message },
         HttpStatus.BAD_REQUEST,
@@ -224,25 +371,36 @@ export class BlockchainController {
     }
   }
 
-  // 获取最新游戏列表（可选：用于前端显示）
+  // 获取最新游戏列表
   @Get('games')
   async getRecentGames(@Query('limit') limit?: string) {
     try {
       const maxGames = limit ? parseInt(limit) : 10;
-      const gameCounter = await this.blockchainService.getGameCounter();
+      const service = this.getActiveService();
 
+      if (this.solanaBlockchainService.isAvailable()) {
+        // Solana服务返回模拟游戏列表
+        const games = [];
+        for (let i = 1; i <= maxGames; i++) {
+          const gameInfo = await service.getGameInfo(i);
+          games.push({ gameId: i, ...gameInfo });
+        }
+        return { success: true, data: games, service: 'solana' };
+      }
+
+      // BSC服务逻辑
+      const gameCounter = await this.blockchainService.getGameCounter();
       const games = [];
       for (let i = gameCounter; i > 0 && games.length < maxGames; i--) {
         try {
           const gameInfo = await this.blockchainService.getGameInfo(i);
           games.push({ gameId: i, ...gameInfo });
         } catch (error) {
-          // 跳过有问题的游戏
           continue;
         }
       }
 
-      return { success: true, data: games };
+      return { success: true, data: games, service: 'bsc' };
     } catch (error) {
       throw new HttpException(
         { success: false, error: error.message },
@@ -259,6 +417,20 @@ export class BlockchainController {
   ) {
     try {
       const maxGames = limit ? parseInt(limit) : 20;
+
+      if (this.solanaBlockchainService.isAvailable()) {
+        // Solana服务返回空历史记录
+        return {
+          success: true,
+          data: {
+            playerAddress,
+            totalGames: 0,
+            games: [],
+          },
+          service: 'solana',
+        };
+      }
+
       const gameHistory = await this.blockchainService.getPlayerGameHistory(
         playerAddress,
         maxGames,
@@ -271,6 +443,7 @@ export class BlockchainController {
           totalGames: gameHistory.length,
           games: gameHistory,
         },
+        service: 'bsc',
       };
     } catch (error) {
       throw new HttpException(
