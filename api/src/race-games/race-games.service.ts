@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RaceGame } from './race-games.entity';
@@ -8,6 +8,7 @@ import {
   GetPlayerHistoryDTO,
 } from './race-games.dto';
 import { BlockchainService } from '../blockchain/blockchain.service';
+import { config } from '../config';
 
 @Injectable()
 export class RaceGamesService {
@@ -17,7 +18,7 @@ export class RaceGamesService {
     @InjectRepository(RaceGame)
     private readonly raceGameRepository: Repository<RaceGame>,
     private readonly blockchainService: BlockchainService,
-  ) {}
+  ) { }
 
   /**
    * 保存或更新比赛游戏数据
@@ -355,11 +356,16 @@ export class RaceGamesService {
         `Querying chain reward status for player ${playerAddress}, game ${gameId}`,
       );
 
+      const gameServerUrl = config.gameServerUrl;
+      if (!gameServerUrl) {
+        throw new InternalServerErrorException('Missing GAME_SERVER_URL in config');
+      }
+
+      const endpoint = `${gameServerUrl}/api/solana/player-reward-status/${gameId}/${playerAddress}`;
+
       // 调用游戏服务器的Solana查询端点
       try {
-        const serverResponse = await fetch(
-          `http://localhost:8000/api/solana/player-reward-status/${gameId}/${playerAddress}`,
-        );
+        const serverResponse = await fetch(endpoint);
 
         if (serverResponse.ok) {
           const serverData = await serverResponse.json();

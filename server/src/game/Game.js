@@ -512,12 +512,12 @@ class Game {
       }
     }
 
-    // Solana player verification (only in race server mode)
-    if (
-      config.isRaceServer &&
-      config.solana.enabled &&
-      this.solanaVaultService
-    ) {
+    if (config.isRaceServer && config.solana.enabled && this.solanaVaultService) {
+
+    if (data.walletAddress) {
+      console.log(`walletAddress: ${data.walletAddress}`);
+    }
+
       // Check if wallet address is provided
       if (!data.walletAddress) {
         console.log(

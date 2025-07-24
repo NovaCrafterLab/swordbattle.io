@@ -22,6 +22,8 @@ interface ConfigProps {
   clanWaitTime: number;
   clanLength: [number, number];
   defaultClanColor: string;
+
+  gameServerUrl: string;
 }
 
 export const config: ConfigProps = {
@@ -43,6 +45,8 @@ export const config: ConfigProps = {
   clanWaitTime: 1 * 24 * 60 * 60 * 1000, // 1 days
   clanLength: [1, 7],
   defaultClanColor: '#ffffff',
+
+  gameServerUrl: process.env.GAME_SERVER_URL || '',
 };
 
 // 调试信息：显示最终配置
