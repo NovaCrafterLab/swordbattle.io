@@ -11,7 +11,8 @@ console.log(
   'color:grey;font-size:10px',
 );
 
-const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
+// const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
+const isLocal = true;
 
 /* helper to inject script */
 function load(src, async = true) {

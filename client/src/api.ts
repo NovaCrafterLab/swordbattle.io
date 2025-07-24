@@ -138,6 +138,9 @@ function del(url: string, body?: any, cb?: (d: any) => void) {
 function postAsync<T = any>(url: string, body?: any): Promise<T> {
   return new Promise<T>((resolve) => post(url, body, resolve));
 }
+function getAsync<T = any>(url: string): Promise<T> {
+  return new Promise<T>((resolve) => get(url, resolve));
+}
 
 /** @deprecated use patch/put/del  */
 function method(url: string, opts: RequestInit, cb?: (d: any) => void) {
@@ -145,5 +148,5 @@ function method(url: string, opts: RequestInit, cb?: (d: any) => void) {
 }
 
 /* == exports == */
-export { endpoint, get, post, patch, put, del, method, postAsync };
-export default { endpoint, get, post, patch, put, del, method, postAsync };
+export { endpoint, get, post, patch, put, del, method, postAsync, getAsync };
+export default { endpoint, get, post, patch, put, del, method, postAsync, getAsync };

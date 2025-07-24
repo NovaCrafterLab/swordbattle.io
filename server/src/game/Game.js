@@ -69,10 +69,7 @@ class Game {
     if (this.pendingMassKill) {
       for (const player of this.players) {
         if (!player.removed && !player.isBot) {
-          player.remove(
-            'Game Ended - Server Restarting',
-            Types.DisconnectReason.Server,
-          );
+          player.remove('Race Finished', Types.DisconnectReason.Server);
         }
       }
       this.pendingMassKill = false;
