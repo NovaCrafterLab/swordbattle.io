@@ -248,9 +248,7 @@ const RaceGameModal: React.FC<RaceGameModalProps> = ({
         gameState.refreshGameData(),
         gameToken.refetch(),
         tierPricing.refetch(),
-        ...(isConnected && address
-          ? [playerData.refreshPlayerData(), dynamicBalance.refetch()]
-          : []),
+        ...(isConnected ? [playerData.refreshPlayerData()] : []),
       ];
 
       // 添加 vault info 刷新

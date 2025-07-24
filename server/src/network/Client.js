@@ -72,7 +72,10 @@ class Client {
 
     const packet = Protocol.encode(data);
     if (!this.isSocketClosed) {
-      this.socket.send(packet, { binary: true, compress: true });
+      // 🔧 修复：使用cork机制包装发送操作，消除uWS警告
+      this.socket.cork(() => {
+        this.socket.send(packet, { binary: true, compress: true });
+      });
     }
   }
 

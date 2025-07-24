@@ -178,7 +178,7 @@ export class VaultSDK {
         }
       }
       if (error && typeof error === 'object' && 'logs' in error) {
-        console.error(`   Transaction logs:`, (error as any).logs);
+        console.error(`Transaction logs:`, (error as any).logs);
       }
       throw new Error(
         `Failed to create vault token account: ${error instanceof Error ? error.message : String(error)}`,
