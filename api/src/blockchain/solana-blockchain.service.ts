@@ -240,15 +240,18 @@ export class SolanaBlockchainService implements OnModuleInit {
   }
 
   /**
-   * 获取用户Token余额 - 使用随机负载均衡
+   * 获取用户Token余额 - 使用负载均衡策略提高并发性能
    */
   async getUserTokenBalance(userAddress: string): Promise<{
     balance: string;
     decimals: number;
   }> {
-    return this.executeWithRetry(async () => {
-      // 每次调用都使用新的随机连接
-      const connection = await this.getConnection();
+    return this.rpcManager.executeWithLoadBalancing(async (rpcUrl) => {
+      // 使用负载均衡的随机RPC连接
+      const connection = new Connection(rpcUrl, {
+        commitment: this.config.rpc.commitment,
+        fetch: this.rpcManager.createTimeoutFetch(15000),
+      });
 
       try {
         const userPubkey = new PublicKey(userAddress);
