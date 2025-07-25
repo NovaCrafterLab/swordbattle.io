@@ -70,8 +70,8 @@ export class SolanaBlockchainService implements OnModuleInit {
   }
 
   private async createConnection(): Promise<void> {
-    // 每次创建连接都使用随机RPC节点
-    const selectedRpc = this.rpcManager.getRandomAvailableRPC();
+    // 使用时间窗口轮换策略的当前RPC节点
+    const selectedRpc = this.rpcManager.getCurrentRPC();
 
     try {
       // 创建带有超时保护的连接
@@ -88,8 +88,8 @@ export class SolanaBlockchainService implements OnModuleInit {
       );
     } catch (error) {
       this.logger.error(`❌ Failed to create connection: ${error}`);
-      // 失败后再次尝试新的随机RPC
-      const fallbackRpc = this.rpcManager.getRandomAvailableRPC();
+      // 标记当前RPC失败并切换到新的健康RPC
+      const fallbackRpc = this.rpcManager.markCurrentRPCFailed();
 
       // 尝试创建备用连接
       this.connection = new Connection(fallbackRpc, {
@@ -138,32 +138,32 @@ export class SolanaBlockchainService implements OnModuleInit {
     );
   }
 
-  // 获取连接实例（使用随机负载均衡）
+  // 获取连接实例（使用时间窗口轮换策略）
   async getConnection(): Promise<Connection> {
     if (!this.isAvailable()) {
       throw new Error('Solana blockchain service not available');
     }
 
-    // 为了真正的负载均衡，每次都创建新的随机连接
-    const randomRpc = this.rpcManager.getRandomAvailableRPC();
-    const newConnection = new Connection(randomRpc, {
+    // 使用时间窗口轮换策略的当前RPC
+    const currentRpc = this.rpcManager.getCurrentRPC();
+    const newConnection = new Connection(currentRpc, {
       commitment: this.config.rpc.commitment,
       fetch: this.rpcManager.createTimeoutFetch(15000),
     });
 
     this.logger.debug(
-      `🎯 Created new random connection: ${randomRpc.split('/').pop()}`,
+      `🎯 Created new time-window connection: ${currentRpc.split('/').pop()}`,
     );
     return newConnection;
   }
 
-  // 执行具有重试机制的操作 - 使用随机负载均衡
+  // 执行具有重试机制的操作 - 使用时间窗口轮换策略
   async executeWithRetry<T>(
     operation: () => Promise<T>, // 修改为无参数，内部使用getConnection
     maxRetries: number = 3,
   ): Promise<T> {
     return this.rpcManager.executeWithRetry(async (rpcUrl) => {
-      // 使用随机RPC创建新连接
+      // 使用时间窗口策略的当前RPC创建连接
       const connection = new Connection(rpcUrl, {
         commitment: this.config.rpc.commitment,
         fetch: this.rpcManager.createTimeoutFetch(15000),

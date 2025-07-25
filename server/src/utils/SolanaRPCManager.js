@@ -65,25 +65,130 @@ class SolanaRPCManager {
       throw new Error('RPC pool is empty - no RPC endpoints available');
     }
 
-    // 🎯 每次getCurrentRPC()调用都会返回随机RPC，实现真正的负载均衡
-    this.currentRpcIndex = 0; // 仅用于switchToNextRPC()兼容性
+    // 🎯 时间窗口轮换策略：10分钟保持同一RPC，减少WebSocket重连
+    this.currentRpcIndex = Math.floor(Math.random() * CURRENT_RPC_POOL.length);
+    this.currentRPC = CURRENT_RPC_POOL[this.currentRpcIndex];
+    this.lastRotation = Date.now();
+    this.rotationInterval = 10 * 60 * 1000; // 10分钟轮换间隔
+
     this.failedRpcs = new Set();
     this.lastHealthCheck = 0;
     this.healthCheckInterval = 5 * 60 * 1000; // 5分钟
-    this.connections = new Map(); // 保留连接缓存但优先使用随机节点
+    this.connections = new Map(); // 连接缓存用于复用
 
     Logger.server.info('Solana RPC Manager (Server) initialized', {
       environment: isDev ? 'devnet' : 'mainnet',
       poolSize: CURRENT_RPC_POOL.length,
       heliusKeys: RPC_API_KEYS.length,
-      randomizedMode: true, // 标识已启用随机模式
-      loadBalancing: '每个请求都使用随机RPC节点',
+      rotationMode: 'time-window', // 标识使用时间窗口模式
+      rotationInterval: '10 minutes',
+      currentRPC: this.currentRPC.split('/').pop(),
+      loadBalancing: '每10分钟轮换RPC节点，保持连接稳定性',
     });
   }
 
   getCurrentRPC() {
-    // 🔥 修复：每次调用都返回随机RPC，实现真正的负载均衡
-    return this.getRandomAvailableRPC();
+    const now = Date.now();
+
+    // 检查是否需要轮换RPC（时间到期或当前RPC失败）
+    if (this.shouldRotateRPC(now)) {
+      this.rotateToNextHealthyRPC();
+    }
+
+    return this.currentRPC;
+  }
+
+  /**
+   * 检查是否需要轮换RPC
+   */
+  shouldRotateRPC(now) {
+    // 时间到期需要轮换
+    if (now - this.lastRotation > this.rotationInterval) {
+      return true;
+    }
+
+    // 当前RPC失败需要立即轮换
+    if (this.failedRpcs.has(this.currentRpcIndex)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * 轮换到下一个健康的RPC
+   */
+  rotateToNextHealthyRPC() {
+    const previousRPC = this.currentRPC;
+    const previousIndex = this.currentRpcIndex;
+
+    // 获取新的健康RPC
+    const newRpcInfo = this.selectNextHealthyRPC();
+
+    if (newRpcInfo) {
+      this.currentRPC = newRpcInfo.rpc;
+      this.currentRpcIndex = newRpcInfo.index;
+      this.lastRotation = Date.now();
+
+      // 清理旧连接缓存
+      this.cleanupOldConnections(previousRPC);
+
+      Logger.server.info('🔄 RPC rotated (time-window strategy)', {
+        from: previousRPC.split('/').pop(),
+        to: this.currentRPC.split('/').pop(),
+        reason: this.failedRpcs.has(previousIndex) ? 'failure' : 'time-window',
+        availableCount: this.getAvailableRPCs().length,
+        nextRotationIn: `${Math.round(this.rotationInterval / 60000)} minutes`,
+      });
+    } else {
+      Logger.server.warn(
+        'No healthy RPC available for rotation, keeping current',
+      );
+    }
+  }
+
+  /**
+   * 选择下一个健康的RPC
+   */
+  selectNextHealthyRPC() {
+    const availableIndices = CURRENT_RPC_POOL.map((_, index) => index).filter(
+      (index) => !this.failedRpcs.has(index),
+    );
+
+    if (availableIndices.length === 0) {
+      Logger.server.warn(
+        'No healthy RPC nodes available, resetting failed list',
+      );
+      this.failedRpcs.clear();
+      // 重置后选择随机RPC
+      const randomIndex = Math.floor(Math.random() * CURRENT_RPC_POOL.length);
+      return {
+        rpc: CURRENT_RPC_POOL[randomIndex],
+        index: randomIndex,
+      };
+    }
+
+    // 优先选择不同于当前的RPC
+    const otherAvailableIndices = availableIndices.filter(
+      (index) => index !== this.currentRpcIndex,
+    );
+
+    let selectedIndex;
+    if (otherAvailableIndices.length > 0) {
+      // 从其他可用RPC中随机选择
+      const randomIdx = Math.floor(
+        Math.random() * otherAvailableIndices.length,
+      );
+      selectedIndex = otherAvailableIndices[randomIdx];
+    } else {
+      // 如果只有当前RPC可用，保持使用当前的
+      selectedIndex = this.currentRpcIndex;
+    }
+
+    return {
+      rpc: CURRENT_RPC_POOL[selectedIndex],
+      index: selectedIndex,
+    };
   }
 
   getAvailableRPCs() {
@@ -91,111 +196,93 @@ class SolanaRPCManager {
   }
 
   /**
-   * 创建新的随机RPC连接 - 每次都使用新的随机节点
+   * 创建当前RPC的连接实例 - 使用连接缓存复用
    */
-  createRandomConnection(commitment = 'confirmed') {
-    // 每次都获取新的随机RPC节点
-    const randomRpc = this.getRandomAvailableRPC();
+  createConnection(commitment = 'confirmed') {
+    const currentRpc = this.getCurrentRPC();
+    const connectionKey = `${currentRpc}-${commitment}`;
 
-    // 为了真正的负载均衡，不使用连接缓存
-    const connection = new Connection(randomRpc, commitment);
+    // 尝试复用现有连接
+    if (this.connections.has(connectionKey)) {
+      const existingConnection = this.connections.get(connectionKey);
+      Logger.server.debug('🔗 Reusing existing connection', {
+        rpc: currentRpc.split('/').pop(),
+        commitment,
+        cacheSize: this.connections.size,
+      });
+      return existingConnection;
+    }
 
-    Logger.server.debug('Created new random RPC connection', {
-      rpc: randomRpc.split('/').pop(),
+    // 创建新连接并缓存
+    const connection = new Connection(currentRpc, commitment);
+    this.connections.set(connectionKey, connection);
+
+    Logger.server.debug('🆕 Created new connection', {
+      rpc: currentRpc.split('/').pop(),
       commitment,
-      loadBalanced: true,
+      cacheSize: this.connections.size,
     });
 
     return connection;
   }
 
   /**
-   * 获取连接实例 - 使用随机负载均衡
+   * 获取连接实例 - 使用时间窗口策略的稳定连接
    */
   getCurrentConnection(commitment = 'confirmed') {
-    // 为了真正的负载均衡，每次都返回新的随机连接
-    return this.createRandomConnection(commitment);
+    return this.createConnection(commitment);
+  }
+
+  /**
+   * 清理旧RPC的连接缓存
+   */
+  cleanupOldConnections(oldRpc) {
+    const keysToDelete = [];
+
+    for (const [key, connection] of this.connections.entries()) {
+      if (key.startsWith(oldRpc)) {
+        keysToDelete.push(key);
+      }
+    }
+
+    keysToDelete.forEach((key) => {
+      this.connections.delete(key);
+    });
+
+    if (keysToDelete.length > 0) {
+      Logger.server.debug('🧹 Cleaned up old connections', {
+        oldRpc: oldRpc.split('/').pop(),
+        cleanedConnections: keysToDelete.length,
+        remainingConnections: this.connections.size,
+      });
+    }
   }
 
   markCurrentRPCFailed() {
-    const currentRpc = this.getCurrentRPC();
+    const currentRpc = this.currentRPC;
     Logger.server.warn('Marking current RPC as failed', {
       rpc: currentRpc.split('/').pop(),
       index: this.currentRpcIndex,
     });
 
+    // 标记当前RPC为失败
     this.failedRpcs.add(this.currentRpcIndex);
 
     // 清理失败RPC的连接缓存
-    const failedConnections = Array.from(this.connections.keys()).filter(
-      (key) => key.startsWith(currentRpc),
-    );
-    failedConnections.forEach((key) => this.connections.delete(key));
+    this.cleanupOldConnections(currentRpc);
 
-    this.switchToNextRPC();
-    const newRpc = this.getCurrentRPC();
+    // 立即轮换到新的健康RPC（故障时不等待时间窗口）
+    this.rotateToNextHealthyRPC();
+    const newRpc = this.currentRPC;
 
-    Logger.server.info('Switched to new RPC', {
+    Logger.server.info('🚨 Switched to new RPC due to failure', {
       from: currentRpc.split('/').pop(),
       to: newRpc.split('/').pop(),
       availableCount: this.getAvailableRPCs().length,
+      reason: 'RPC failure',
     });
 
     return newRpc;
-  }
-
-  /**
-   * 获取随机可用的RPC节点 - 每次都返回新的随机节点
-   */
-  getRandomAvailableRPC() {
-    const availableIndices = CURRENT_RPC_POOL.map((_, index) => index).filter(
-      (index) => !this.failedRpcs.has(index),
-    );
-
-    if (availableIndices.length === 0) {
-      Logger.server.warn('No available RPC nodes, resetting failed list');
-      this.failedRpcs.clear();
-      // 清理所有连接缓存，重新开始
-      this.connections.clear();
-      const randomIndex = Math.floor(Math.random() * CURRENT_RPC_POOL.length);
-      return CURRENT_RPC_POOL[randomIndex];
-    }
-
-    // 每次都返回真正随机的RPC节点
-    const randomIndex = Math.floor(Math.random() * availableIndices.length);
-    const selectedIndex = availableIndices[randomIndex];
-    return CURRENT_RPC_POOL[selectedIndex];
-  }
-
-  switchToNextRPC() {
-    const availableIndices = CURRENT_RPC_POOL.map((_, index) => index).filter(
-      (index) => !this.failedRpcs.has(index),
-    );
-
-    if (availableIndices.length === 0) {
-      Logger.server.warn('All RPC nodes failed, resetting failed list');
-      this.failedRpcs.clear();
-      this.connections.clear();
-      this.currentRpcIndex = Math.floor(
-        Math.random() * CURRENT_RPC_POOL.length,
-      );
-      return;
-    }
-
-    // 从可用节点中随机选择一个（排除当前节点）
-    const otherAvailableIndices = availableIndices.filter(
-      (index) => index !== this.currentRpcIndex,
-    );
-
-    if (otherAvailableIndices.length > 0) {
-      const randomIndex = Math.floor(
-        Math.random() * otherAvailableIndices.length,
-      );
-      this.currentRpcIndex = otherAvailableIndices[randomIndex];
-    } else {
-      // 如果只有当前节点可用，保持不变
-      this.currentRpcIndex = availableIndices[0];
-    }
   }
 
   async healthCheck() {
@@ -280,11 +367,22 @@ class SolanaRPCManager {
       rpc.includes('helius-rpc.com'),
     ).length;
 
+    const now = Date.now();
+    const timeSinceLastRotation = now - this.lastRotation;
+    const timeUntilNextRotation = Math.max(
+      0,
+      this.rotationInterval - timeSinceLastRotation,
+    );
+
     return {
       total: CURRENT_RPC_POOL.length,
       available: CURRENT_RPC_POOL.length - this.failedRpcs.size,
       failed: this.failedRpcs.size,
-      randomizedMode: true, // 标识当前使用随机模式
+      rotationMode: 'time-window', // 标识使用时间窗口模式
+      rotationInterval: `${Math.round(this.rotationInterval / 60000)} minutes`,
+      currentRPC: this.currentRPC.split('/').pop(),
+      timeSinceRotation: `${Math.round(timeSinceLastRotation / 60000)} minutes`,
+      nextRotationIn: `${Math.round(timeUntilNextRotation / 60000)} minutes`,
       loadBalanced: true, // 标识负载均衡已启用
       heliusAvailable: heliusCount,
       heliusTotal: totalHeliusCount,
@@ -292,7 +390,7 @@ class SolanaRPCManager {
       environment: isDev ? 'devnet' : 'mainnet',
       heliusKeys: RPC_API_KEYS.length,
       cachedConnections: this.connections.size,
-      note: 'Every request uses a new random RPC node for optimal load balancing',
+      note: 'Uses time-window rotation (10min) to balance stability and load distribution',
     };
   }
 
