@@ -56,8 +56,38 @@ module.exports = {
   // Solana configuration - replaces BSC blockchain
   solana: {
     enabled: true, // Re-enabled after fixing uWebSockets issues
+
+    // 🏗️ 混合RPC架构配置
+    // 专用节点用于持久稳定连接，Helius池用于负载均衡查询
+    dedicatedRpc: {
+      enabled: !!process.env.DEDICATED_RPC_URL,
+      url: process.env.DEDICATED_RPC_URL || 'http://66.248.206.158:8899',
+      description: 'Self-hosted RPC node for persistent stable connections',
+      useCases: [
+        'vaultSDK',
+        'gameCreation',
+        'rewardDistribution',
+        'ticketVerification',
+        'gameFinalization',
+        'transactionConfirmation',
+        'vaultAccountOperations',
+        'programAccountQueries',
+        'websocketConnections',
+        'longRunningOperations',
+        'criticalTransactions',
+      ],
+    },
+
     // 🔧 RPC Pool配置 - 优先使用用户提供的RPC Pool
     rpcUrl: (() => {
+      // 专用节点存在时，优先用于主要连接
+      if (process.env.DEDICATED_RPC_URL) {
+        console.log(
+          `🏗️ Using dedicated RPC node: ${process.env.DEDICATED_RPC_URL}`,
+        );
+        return process.env.DEDICATED_RPC_URL;
+      }
+
       // 如果设置了RPC Pool，从中随机选择一个
       const rpcKeysPool = process.env.RPC_API_KEYS_POOL;
       if (rpcKeysPool) {
@@ -67,7 +97,9 @@ module.exports = {
           .filter((key) => key && key !== 'PLACEHOLDER_BASE58_PRIVATE_KEY');
         if (keys.length > 0) {
           const randomKey = keys[Math.floor(Math.random() * keys.length)];
-          const rpcUrl = `https://devnet.helius-rpc.com/?api-key=${randomKey}`;
+          const rpcUrl = isDev
+            ? `https://devnet.helius-rpc.com/?api-key=${randomKey}`
+            : `https://mainnet.helius-rpc.com/?api-key=${randomKey}`;
           console.log(
             `🔗 Using RPC Pool with ${keys.length} keys, selected: ${randomKey.slice(0, 8)}...`,
           );

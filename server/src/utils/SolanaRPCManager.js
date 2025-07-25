@@ -191,6 +191,231 @@ class SolanaRPCManager {
     };
   }
 
+  /**
+   * 获取随机可用的RPC节点 - 用于负载均衡
+   */
+  getRandomAvailableRPC() {
+    const availableIndices = CURRENT_RPC_POOL.map((_, index) => index).filter(
+      (index) => !this.failedRpcs.has(index),
+    );
+
+    if (availableIndices.length === 0) {
+      Logger.server.warn(
+        'No healthy RPC nodes available, resetting failed list',
+      );
+      this.failedRpcs.clear();
+      // 重置后选择随机RPC
+      const randomIndex = Math.floor(Math.random() * CURRENT_RPC_POOL.length);
+      return CURRENT_RPC_POOL[randomIndex];
+    }
+
+    // 每次都返回真正随机的RPC节点，实现负载均衡
+    const randomIndex = Math.floor(Math.random() * availableIndices.length);
+    const selectedIndex = availableIndices[randomIndex];
+    return CURRENT_RPC_POOL[selectedIndex];
+  }
+
+  /**
+   * 创建负载均衡连接 - 用于短期操作（如票据验证）
+   */
+  createLoadBalancedConnection(commitment = 'confirmed') {
+    const randomRpc = this.getRandomAvailableRPC();
+    const connection = new Connection(randomRpc, commitment);
+
+    Logger.server.debug('🎲 Created load-balanced connection', {
+      rpc: randomRpc.split('/').pop(),
+      commitment,
+      operation: 'load-balanced',
+    });
+
+    return connection;
+  }
+
+  /**
+   * 创建专用RPC连接 - 用于持久稳定连接（如VaultSDK）
+   */
+  createDedicatedConnection(commitment = 'confirmed') {
+    const config = require('../config');
+
+    if (config.solana.dedicatedRpc.enabled) {
+      const dedicatedRpc = config.solana.dedicatedRpc.url;
+      const connection = new Connection(dedicatedRpc, commitment);
+
+      Logger.server.info('🏗️ Created dedicated RPC connection', {
+        rpc: dedicatedRpc,
+        commitment,
+        operation: 'dedicated-stable',
+        useCases: config.solana.dedicatedRpc.useCases,
+      });
+
+      return connection;
+    } else {
+      // 如果没有专用节点，回退到当前连接（时间窗口策略）
+      Logger.server.debug(
+        '🔄 No dedicated RPC available, using current connection',
+        {
+          fallbackRpc: this.getCurrentRPC().split('/').pop(),
+          commitment,
+        },
+      );
+
+      return this.getCurrentConnection(commitment);
+    }
+  }
+
+  /**
+   * 检查专用RPC节点是否可用
+   */
+  async testDedicatedRpcHealth() {
+    const config = require('../config');
+
+    if (!config.solana.dedicatedRpc.enabled) {
+      return { available: false, reason: 'Dedicated RPC not configured' };
+    }
+
+    try {
+      const response = await fetch(config.solana.dedicatedRpc.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'getHealth',
+          params: [],
+          id: 1,
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.result === 'ok') {
+          Logger.server.info('✅ Dedicated RPC health check passed', {
+            url: config.solana.dedicatedRpc.url,
+          });
+          return { available: true, status: 'healthy' };
+        }
+      }
+
+      throw new Error('Invalid health response');
+    } catch (error) {
+      Logger.server.warn('❌ Dedicated RPC health check failed', {
+        url: config.solana.dedicatedRpc.url,
+        error: error.message,
+      });
+      return { available: false, reason: error.message };
+    }
+  }
+
+  /**
+   * 智能RPC路由 - 根据操作类型选择最佳连接策略
+   * 🏗️ 持久连接操作优先使用专用节点，保证连接稳定性
+   */
+  async createSmartConnection(
+    operationType = 'general',
+    commitment = 'confirmed',
+  ) {
+    const config = require('../config');
+
+    // 判断是否应该使用专用连接
+    const shouldUseDedicated =
+      config.solana.dedicatedRpc.enabled &&
+      config.solana.dedicatedRpc.useCases.includes(operationType);
+
+    // 🏗️ 持久连接操作类别定义
+    const persistentConnectionOps = [
+      'vaultSDK',
+      'gameCreation',
+      'rewardDistribution',
+      'ticketVerification',
+      'gameFinalization',
+      'transactionConfirmation',
+      'vaultAccountOperations',
+      'programAccountQueries',
+      'websocketConnections',
+      'longRunningOperations',
+      'criticalTransactions',
+    ];
+
+    const isPersistentOperation =
+      persistentConnectionOps.includes(operationType);
+
+    if (shouldUseDedicated) {
+      // 先测试专用节点健康状态
+      const healthCheck = await this.testDedicatedRpcHealth();
+
+      if (healthCheck.available) {
+        Logger.server.info(
+          '🏗️ Using dedicated RPC for persistent stable operation',
+          {
+            operationType,
+            rpc: config.solana.dedicatedRpc.url,
+            commitment,
+            connectionType: 'dedicated-stable',
+          },
+        );
+        return this.createDedicatedConnection(commitment);
+      } else {
+        Logger.server.warn(
+          '⚠️ Dedicated RPC unavailable for persistent operation',
+          {
+            operationType,
+            reason: healthCheck.reason,
+            fallbackStrategy: isPersistentOperation
+              ? 'time-window'
+              : 'load-balanced',
+          },
+        );
+      }
+    }
+
+    // 🎯 持久连接操作回退策略：优先使用时间窗口策略保持稳定性
+    if (isPersistentOperation) {
+      Logger.server.info(
+        '🎯 Using time-window connection for persistent operation fallback',
+        {
+          operationType,
+          commitment,
+          connectionType: 'time-window-stable',
+          reason: shouldUseDedicated
+            ? 'dedicated-node-unavailable'
+            : 'dedicated-node-disabled',
+        },
+      );
+      return this.getCurrentConnection(commitment);
+    }
+
+    // 🎲 临时查询操作：使用负载均衡提升并发性能
+    if (
+      ['balance', 'accountInfo', 'statistics', 'queryOnly'].includes(
+        operationType,
+      )
+    ) {
+      Logger.server.debug(
+        '🎲 Using load-balanced connection for query operation',
+        {
+          operationType,
+          commitment,
+          connectionType: 'load-balanced',
+        },
+      );
+      return this.createLoadBalancedConnection(commitment);
+    }
+
+    // 🔄 默认操作：使用时间窗口策略
+    Logger.server.debug(
+      '🔄 Using time-window connection for default operation',
+      {
+        operationType,
+        commitment,
+        connectionType: 'time-window-default',
+      },
+    );
+    return this.getCurrentConnection(commitment);
+  }
+
+  /**
+   * 获取所有可用的RPC节点列表
+   */
   getAvailableRPCs() {
     return CURRENT_RPC_POOL.filter((_, index) => !this.failedRpcs.has(index));
   }
