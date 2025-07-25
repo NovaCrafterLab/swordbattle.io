@@ -2,10 +2,23 @@
  * Smart Connection Proxy
  *
  * 智能连接代理 - 根据操作类型自动选择最佳RPC连接策略
- * 专用节点优先，故障时自动切换到Helius池
+ * 🏗️ CRITICAL BUSINESS OPERATIONS: Force dedicated RPC only, no failover
  */
 
 const Logger = require('./Logger');
+
+// 🏗️ 定义关键业务操作类型 - 这些操作必须使用专用节点，禁用故障转移
+const CRITICAL_OPERATIONS = [
+  'vaultSDK',
+  'gameCreation',
+  'gameFinalization',
+  'rewardDistribution',
+  'ticketVerification',
+  'transactionConfirmation',
+  'vaultAccountOperations',
+  'programAccountQueries',
+  'criticalTransactions',
+];
 
 class SmartConnectionProxy {
   constructor(rpcManager, operationType = 'general', commitment = 'confirmed') {
@@ -14,6 +27,7 @@ class SmartConnectionProxy {
     this.commitment = commitment;
     this.currentConnection = null;
     this.connectionStrategy = 'unknown';
+    this.isCriticalOperation = CRITICAL_OPERATIONS.includes(operationType);
 
     // 初始化连接
     this._initializeConnection();
@@ -33,35 +47,59 @@ class SmartConnectionProxy {
   }
 
   /**
-   * 初始化连接 - 选择最佳策略
+   * 初始化连接 - 为关键业务强制使用专用节点
    */
   async _initializeConnection() {
     try {
-      this.currentConnection = await this.rpcManager.createSmartConnection(
-        this.operationType,
-        this.commitment,
-      );
-      this.connectionStrategy = 'smart-routed';
+      if (this.isCriticalOperation) {
+        // 🏗️ 关键业务操作：强制使用专用节点，禁用故障转移
+        this.currentConnection = this.rpcManager.createDedicatedConnection(
+          this.commitment,
+        );
+        this.connectionStrategy = 'dedicated-only';
 
-      Logger.server.debug('🏗️ Smart connection proxy initialized', {
-        operationType: this.operationType,
-        commitment: this.commitment,
-        strategy: this.connectionStrategy,
-      });
-    } catch (error) {
-      Logger.server.warn(
-        '❌ Smart connection initialization failed, using fallback',
-        {
+        Logger.server.info('🏗️ Critical operation using dedicated RPC only', {
           operationType: this.operationType,
-          error: error.message,
-        },
-      );
+          commitment: this.commitment,
+          strategy: this.connectionStrategy,
+          failoverDisabled: true,
+        });
+      } else {
+        // 非关键业务：使用智能连接策略
+        this.currentConnection = await this.rpcManager.createSmartConnection(
+          this.operationType,
+          this.commitment,
+        );
+        this.connectionStrategy = 'smart-routed';
 
-      // Fallback to Helius pool
-      this.currentConnection = this.rpcManager.getCurrentConnection(
-        this.commitment,
-      );
-      this.connectionStrategy = 'helius-fallback';
+        Logger.server.debug(
+          '🏗️ Non-critical operation using smart connection',
+          {
+            operationType: this.operationType,
+            commitment: this.commitment,
+            strategy: this.connectionStrategy,
+          },
+        );
+      }
+    } catch (error) {
+      Logger.server.warn('❌ Connection initialization failed', {
+        operationType: this.operationType,
+        isCritical: this.isCriticalOperation,
+        error: error.message,
+      });
+
+      if (this.isCriticalOperation) {
+        // 关键业务失败时不降级，直接抛出错误
+        throw new Error(
+          `Critical operation connection failed: ${error.message}`,
+        );
+      } else {
+        // 非关键业务失败时降级到Helius pool
+        this.currentConnection = this.rpcManager.getCurrentConnection(
+          this.commitment,
+        );
+        this.connectionStrategy = 'helius-fallback';
+      }
     }
   }
 
@@ -112,10 +150,18 @@ class SmartConnectionProxy {
   }
 
   /**
-   * 智能切换连接策略
+   * 智能切换连接策略 - 关键业务禁用故障转移
    */
   async _switchConnectionStrategy() {
     try {
+      if (this.isCriticalOperation) {
+        // 🏗️ 关键业务：禁用故障转移，直接抛出错误
+        throw new Error(
+          `Critical operation ${this.operationType} failed on dedicated RPC. Failover disabled for data accuracy.`,
+        );
+      }
+
+      // 非关键业务：保持原有故障转移逻辑
       if (this.connectionStrategy === 'smart-routed') {
         // 从智能路由切换到专用节点
         this.currentConnection = this.rpcManager.createDedicatedConnection(
@@ -142,10 +188,16 @@ class SmartConnectionProxy {
       Logger.server.error('❌ Failed to switch connection strategy', {
         currentStrategy: this.connectionStrategy,
         operationType: this.operationType,
+        isCritical: this.isCriticalOperation,
         error: error.message,
       });
 
-      // Last resort: basic Helius pool connection
+      if (this.isCriticalOperation) {
+        // 关键业务：重新抛出错误，不进行降级
+        throw error;
+      }
+
+      // 非关键业务：最后的降级策略
       this.currentConnection = this.rpcManager.getCurrentConnection(
         this.commitment,
       );
@@ -190,7 +242,10 @@ class SmartConnectionProxy {
           lastError = error;
 
           const isRetryableError = this._isRetryableError(error);
-          const shouldRetry = attempt < maxRetries - 1 && isRetryableError;
+          const shouldRetry =
+            attempt < maxRetries - 1 &&
+            isRetryableError &&
+            !this.isCriticalOperation;
 
           if (shouldRetry) {
             Logger.server.warn(
@@ -199,6 +254,7 @@ class SmartConnectionProxy {
                 attempt: attempt + 1,
                 maxRetries,
                 operationType: this.operationType,
+                isCritical: this.isCriticalOperation,
                 currentStrategy: this.connectionStrategy,
                 error: error.message,
               },
@@ -211,9 +267,11 @@ class SmartConnectionProxy {
               `❌ Smart Connection: ${methodName} failed after ${attempt + 1} attempts`,
               {
                 operationType: this.operationType,
+                isCritical: this.isCriticalOperation,
                 finalStrategy: this.connectionStrategy,
                 error: error.message,
                 isRetryable: isRetryableError,
+                failoverDisabled: this.isCriticalOperation,
               },
             );
             break;
@@ -222,7 +280,7 @@ class SmartConnectionProxy {
       }
 
       throw new Error(
-        `Smart Connection: ${methodName} failed after ${maxRetries} attempts with strategy switching: ${lastError?.message}`,
+        `Smart Connection: ${methodName} failed after ${maxRetries} attempts. ${this.isCriticalOperation ? 'Critical operation - failover disabled.' : 'Strategy switching enabled.'} Error: ${lastError?.message}`,
       );
     };
   }
@@ -280,6 +338,8 @@ class SmartConnectionProxy {
       operationType: this.operationType,
       commitment: this.commitment,
       strategy: this.connectionStrategy,
+      isCritical: this.isCriticalOperation,
+      failoverDisabled: this.isCriticalOperation,
       isConnected: !!this.currentConnection,
       timestamp: Date.now(),
     };

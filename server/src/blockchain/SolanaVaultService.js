@@ -34,11 +34,8 @@ class SolanaVaultService {
       // Initialize RPC manager for load balancing
       this.rpcManager = getRPCManager();
 
-      // 🏗️ 使用智能连接策略：VaultSDK优先使用专用节点
-      this.connection = await this.rpcManager.createSmartConnection(
-        'vaultSDK',
-        'confirmed',
-      );
+      // 🏗️ CRITICAL BUSINESS: Force dedicated RPC node for all VaultSDK operations
+      this.connection = this.rpcManager.createDedicatedConnection('confirmed');
 
       // Initialize wallet from private key
       if (this.config.privateKey) {
@@ -82,17 +79,16 @@ class SolanaVaultService {
           );
 
           if (retryCount < maxRetries) {
-            // Try different connection strategy on failure
+            // Try dedicated connection on failure (already using dedicated)
             if (retryCount === 1) {
-              // Second attempt: try dedicated if available
+              Logger.server.info(
+                '🔄 Already using dedicated connection, retrying',
+              );
+            } else {
+              // Last attempt: create fresh dedicated connection
               this.connection =
                 this.rpcManager.createDedicatedConnection('confirmed');
-              Logger.server.info('🔄 Retrying with dedicated connection');
-            } else {
-              // Third attempt: fallback to Helius pool
-              this.connection =
-                this.rpcManager.getCurrentConnection('confirmed');
-              Logger.server.info('🔄 Retrying with Helius pool connection');
+              Logger.server.info('🔄 Created fresh dedicated connection');
             }
           } else {
             throw new Error(
@@ -125,29 +121,23 @@ class SolanaVaultService {
         },
       };
 
-      // 🏗️ 为VaultSDK创建专用连接代理
-      // 优先使用专用节点，故障时自动切换到Helius池
-      const smartConnectionProxy = new SmartConnectionProxy(
-        this.rpcManager,
-        'vaultSDK',
-        'confirmed',
-      );
+      // 🏗️ 为VaultSDK创建专用连接 - 强制使用专用节点确保数据准确性
+      // 关键业务操作必须使用稳定可靠的自建RPC节点
+      const dedicatedConnection =
+        this.rpcManager.createDedicatedConnection('confirmed');
 
-      // VaultSDK配置使用智能连接代理
+      // VaultSDK配置使用专用连接
       this.vaultSDK = new VaultSDK({
         programId: new PublicKey(this.config.programId),
-        connection: smartConnectionProxy,
+        connection: dedicatedConnection,
         wallet: walletInterface,
       });
 
       Logger.server.info(
-        '🏗️ VaultSDK initialized with smart connection proxy',
+        '🏗️ VaultSDK initialized with dedicated RPC node only',
         {
-          dedicatedRpcEnabled: this.rpcManager.testDedicatedRpcHealth
-            ? true
-            : false,
-          fallbackToHelius: true,
-          operationType: 'vaultSDK',
+          dedicatedRpcUrl: process.env.DEDICATED_RPC_URL,
+          operationType: 'critical-business-only',
         },
       );
 
@@ -389,15 +379,10 @@ class SolanaVaultService {
 
   /**
    * Check if a player has bought a ticket for the game with tier validation
-   * Enhanced with load balancing option for concurrent verification scenarios
+   * 🏗️ CRITICAL BUSINESS: Always uses dedicated RPC node for data accuracy
    * Replaces BSC player registration verification
    */
-  async verifyPlayerTicket(
-    gameId,
-    playerAddress,
-    expectedTier = null,
-    useLoadBalancing = false,
-  ) {
+  async verifyPlayerTicket(gameId, playerAddress, expectedTier = null) {
     // Early validation - service initialization
     if (!this.isInitialized || !this.vaultSDK) {
       throw new Error('Solana vault service not initialized');
@@ -437,12 +422,12 @@ class SolanaVaultService {
     const retryDelays = [0, 1000, 2000]; // 0ms, 1s, 2s
     let lastError = null;
 
-    Logger.server.debug('🎫 Checking player ticket with enhanced validation', {
+    Logger.server.debug('🎫 Checking player ticket with dedicated RPC node', {
       gameId,
       playerAddress: trimmedAddress,
       expectedTier,
-      useLoadBalancing,
       retriesEnabled: true,
+      connection: 'dedicated-rpc-only',
     });
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -454,7 +439,7 @@ class SolanaVaultService {
               gameId,
               playerAddress: trimmedAddress,
               previousError: lastError?.message,
-              useLoadBalancing,
+              connection: 'dedicated-rpc-only',
             },
           );
 
@@ -477,37 +462,20 @@ class SolanaVaultService {
 
         let ticketAccount;
 
-        if (useLoadBalancing) {
-          // 🎲 Use load-balanced connection for concurrent verification
-          Logger.server.debug(
-            '🎲 Using load-balanced connection for ticket verification',
-            {
-              gameId,
-              playerAddress: trimmedAddress,
-              attempt: attempt + 1,
-            },
-          );
-
-          ticketAccount = await this.verifyTicketWithLoadBalancing(
+        // 🏗️ CRITICAL BUSINESS: Always use VaultSDK with dedicated RPC node
+        Logger.server.debug(
+          '🏗️ Using VaultSDK with dedicated RPC for critical ticket verification',
+          {
             gameId,
-            playerPubkey,
-          );
-        } else {
-          // 🎯 Use standard VaultSDK (time-window strategy)
-          Logger.server.debug(
-            '🎯 Using VaultSDK connection for ticket verification',
-            {
-              gameId,
-              playerAddress: trimmedAddress,
-              attempt: attempt + 1,
-            },
-          );
+            playerAddress: trimmedAddress,
+            attempt: attempt + 1,
+          },
+        );
 
-          ticketAccount = await this.vaultSDK.getUserTicketAccount(
-            gameId,
-            playerPubkey,
-          );
-        }
+        ticketAccount = await this.vaultSDK.getUserTicketAccount(
+          gameId,
+          playerPubkey,
+        );
 
         // Business logic: no ticket or withdrawn ticket
         if (!ticketAccount || ticketAccount.hasWithdrawn) {
@@ -567,7 +535,7 @@ class SolanaVaultService {
           playerAddress: trimmedAddress,
           tier: expectedTier,
           attempts: attempt + 1,
-          useLoadBalancing,
+          connection: 'dedicated-rpc-only',
         });
 
         return true;
@@ -608,7 +576,7 @@ class SolanaVaultService {
                   ? 'RPC'
                   : 'UNKNOWN',
             willRetry: attempt < maxRetries - 1 && !isInputValidationError,
-            useLoadBalancing,
+            connection: 'dedicated-rpc-only',
           },
         );
 
@@ -640,100 +608,10 @@ class SolanaVaultService {
       totalAttempts: maxRetries,
       finalError: lastError?.message,
       errorStack: lastError?.stack,
-      useLoadBalancing,
+      connection: 'dedicated-rpc-only',
     });
 
     throw finalError;
-  }
-
-  /**
-   * Verify ticket using load-balanced connection (for concurrent scenarios)
-   */
-  async verifyTicketWithLoadBalancing(gameId, playerPubkey) {
-    if (!this.rpcManager) {
-      throw new Error('RPC Manager not available for load balancing');
-    }
-
-    // Create load-balanced connection for this specific verification
-    const loadBalancedConnection =
-      this.rpcManager.createLoadBalancedConnection('confirmed');
-
-    Logger.server.debug(
-      '🎲 Created load-balanced connection for ticket verification',
-      {
-        gameId,
-        playerAddress: playerPubkey.toString(),
-        rpcEndpoint: 'load-balanced',
-      },
-    );
-
-    try {
-      // Direct RPC call to get user ticket account (bypassing VaultSDK for load balancing)
-      // This mimics what VaultSDK.getUserTicketAccount would do but with our load-balanced connection
-      const { getProgramAccounts } = require('@solana/web3.js');
-
-      // Get all ticket accounts for this game and user
-      const programId = new PublicKey(this.config.programId);
-      const accounts = await loadBalancedConnection.getProgramAccounts(
-        programId,
-        {
-          filters: [
-            {
-              memcmp: {
-                offset: 8, // Skip account discriminator
-                bytes: gameId.toString(), // Filter by game ID
-              },
-            },
-            {
-              memcmp: {
-                offset: 40, // Offset for user pubkey in ticket account
-                bytes: playerPubkey.toBase58(),
-              },
-            },
-          ],
-        },
-      );
-
-      if (accounts.length === 0) {
-        Logger.server.debug('🎫 No ticket account found (load-balanced)', {
-          gameId,
-          playerAddress: playerPubkey.toString(),
-        });
-        return null;
-      }
-
-      // Parse the first matching account (there should only be one per user per game)
-      const ticketAccountData = accounts[0].account.data;
-
-      // Simple parsing - this would need to match the actual VaultSDK ticket account structure
-      // For now, return a basic structure that matches VaultSDK expectations
-      const ticketAccount = {
-        amount: '1000000000', // 1 SOL in lamports (placeholder)
-        hasWithdrawn: false,
-        gameId: gameId,
-        user: playerPubkey,
-      };
-
-      Logger.server.debug('✅ Ticket account retrieved (load-balanced)', {
-        gameId,
-        playerAddress: playerPubkey.toString(),
-        hasAccount: true,
-      });
-
-      return ticketAccount;
-    } catch (error) {
-      Logger.server.warn('❌ Load-balanced ticket verification failed', {
-        gameId,
-        playerAddress: playerPubkey.toString(),
-        error: error.message,
-      });
-
-      // Fallback to VaultSDK if load-balanced approach fails
-      Logger.server.debug(
-        '🔄 Falling back to VaultSDK for ticket verification',
-      );
-      return await this.vaultSDK.getUserTicketAccount(gameId, playerPubkey);
-    }
   }
 
   /**
@@ -1057,23 +935,18 @@ class SolanaVaultService {
     if (!this.isInitialized || !this.rpcManager) return false;
 
     try {
-      // 🏗️ 连接测试应使用专用节点确保稳定性
-      const rpcConnection = await this.rpcManager.createSmartConnection(
-        'websocketConnections',
-        'confirmed',
-      );
+      // 🏗️ 连接测试必须使用专用节点确保稳定性
+      const rpcConnection =
+        this.rpcManager.createDedicatedConnection('confirmed');
 
       await rpcConnection.getLatestBlockhash();
 
       return true;
     } catch (error) {
-      Logger.server.error(
-        'Solana connection check failed via dedicated/stable RPC',
-        {
-          error: error.message,
-          rpcEndpoint: this.rpcManager?.getCurrentRPC(),
-        },
-      );
+      Logger.server.error('Solana connection check failed via dedicated RPC', {
+        error: error.message,
+        dedicatedRpcUrl: process.env.DEDICATED_RPC_URL,
+      });
       return false;
     }
   }
@@ -1089,15 +962,12 @@ class SolanaVaultService {
 
     try {
       // 🏗️ Token decimals查询使用专用节点，确保获取准确信息
-      const rpcConnection = await this.rpcManager.createSmartConnection(
-        'vaultAccountOperations',
-        'confirmed',
-      );
+      const rpcConnection =
+        this.rpcManager.createDedicatedConnection('confirmed');
       Logger.server.debug(
-        '🔗 Using dedicated/stable RPC connection for getTokenDecimals',
+        '🔗 Using dedicated RPC connection for getTokenDecimals',
         {
-          currentRPC: this.rpcManager.getCurrentRPC(),
-          stats: this.rpcManager.getStats(),
+          dedicatedRpcUrl: process.env.DEDICATED_RPC_URL,
         },
       );
 
@@ -1105,23 +975,20 @@ class SolanaVaultService {
       const tokenMint = new PublicKey(this.config.tokenMint);
       const mintInfo = await getMint(rpcConnection, tokenMint);
 
-      Logger.server.debug(
-        '🔍 Retrieved token decimals via dedicated/stable RPC',
-        {
-          tokenMint: tokenMint.toString(),
-          decimals: mintInfo.decimals,
-          rpcEndpoint: this.rpcManager.getCurrentRPC(),
-        },
-      );
+      Logger.server.debug('🔍 Retrieved token decimals via dedicated RPC', {
+        tokenMint: tokenMint.toString(),
+        decimals: mintInfo.decimals,
+        dedicatedRpcUrl: process.env.DEDICATED_RPC_URL,
+      });
 
       return mintInfo.decimals;
     } catch (error) {
       Logger.server.warn(
-        'Failed to get token decimals via dedicated/stable RPC, using default 9',
+        'Failed to get token decimals via dedicated RPC, using default 9',
         {
           tokenMint: this.config.tokenMint,
           error: error.message,
-          rpcEndpoint: this.rpcManager?.getCurrentRPC(),
+          dedicatedRpcUrl: process.env.DEDICATED_RPC_URL,
         },
       );
       // Fallback to 9 decimals (SOL standard) if unable to fetch
@@ -1265,26 +1132,24 @@ class SolanaVaultService {
     }
 
     Logger.server.debug(
-      '⏳ Waiting for transaction confirmation via dedicated/stable RPC',
+      '⏳ Waiting for transaction confirmation via dedicated RPC',
       {
         txHash: txHash.slice(0, 8) + '...',
         timeout: timeout / 1000 + 's',
-        initialRPC: this.rpcManager.getCurrentRPC(),
+        dedicatedRpcUrl: process.env.DEDICATED_RPC_URL,
       },
     );
 
     while (Date.now() - startTime < timeout) {
       try {
         // 🏗️ 交易确认使用专用节点，确保状态一致性
-        const rpcConnection = await this.rpcManager.createSmartConnection(
-          'transactionConfirmation',
-          'confirmed',
-        );
+        const rpcConnection =
+          this.rpcManager.createDedicatedConnection('confirmed');
         Logger.server.debug(
-          '🔗 Checking transaction status via dedicated/stable RPC',
+          '🔗 Checking transaction status via dedicated RPC',
           {
             txHash: txHash.slice(0, 8) + '...',
-            rpcEndpoint: this.rpcManager.getCurrentRPC(),
+            dedicatedRpcUrl: process.env.DEDICATED_RPC_URL,
           },
         );
 
@@ -1294,14 +1159,11 @@ class SolanaVaultService {
           status?.value?.confirmationStatus === 'confirmed' ||
           status?.value?.confirmationStatus === 'finalized'
         ) {
-          Logger.server.debug(
-            '✅ Transaction confirmed via dedicated/stable RPC',
-            {
-              txHash: txHash.slice(0, 8) + '...',
-              confirmationStatus: status.value.confirmationStatus,
-              rpcEndpoint: this.rpcManager.getCurrentRPC(),
-            },
-          );
+          Logger.server.debug('✅ Transaction confirmed via dedicated RPC', {
+            txHash: txHash.slice(0, 8) + '...',
+            confirmationStatus: status.value.confirmationStatus,
+            dedicatedRpcUrl: process.env.DEDICATED_RPC_URL,
+          });
           return true;
         }
 
@@ -1314,11 +1176,11 @@ class SolanaVaultService {
         await new Promise((resolve) => setTimeout(resolve, checkInterval));
       } catch (error) {
         Logger.server.warn(
-          'Error checking transaction status via dedicated/stable RPC',
+          'Error checking transaction status via dedicated RPC',
           {
             txHash: txHash.slice(0, 8) + '...',
             error: error.message,
-            rpcEndpoint: this.rpcManager?.getCurrentRPC(),
+            dedicatedRpcUrl: process.env.DEDICATED_RPC_URL,
           },
         );
         await new Promise((resolve) => setTimeout(resolve, checkInterval));
@@ -1384,26 +1246,21 @@ class SolanaVaultService {
         throw new Error('RPC Manager not initialized');
       }
 
-      const rpcConnection = await this.rpcManager.createSmartConnection(
-        'websocketConnections',
-        'confirmed',
-      );
-      Logger.server.debug('🔗 Testing connection via dedicated/stable RPC', {
-        rpcEndpoint: this.rpcManager.getCurrentRPC(),
+      const rpcConnection =
+        this.rpcManager.createDedicatedConnection('confirmed');
+      Logger.server.debug('🔗 Testing connection via dedicated RPC', {
+        dedicatedRpcUrl: process.env.DEDICATED_RPC_URL,
       });
 
       const latestBlockhash = await rpcConnection.getLatestBlockhash();
       results.connection = true;
-      Logger.server.debug(
-        '✅ Connection test passed via dedicated/stable RPC',
-        {
-          blockhash: latestBlockhash.blockhash.slice(0, 8) + '...',
-          rpcEndpoint: this.rpcManager.getCurrentRPC(),
-        },
-      );
+      Logger.server.debug('✅ Connection test passed via dedicated RPC', {
+        blockhash: latestBlockhash.blockhash.slice(0, 8) + '...',
+        dedicatedRpcUrl: process.env.DEDICATED_RPC_URL,
+      });
     } catch (error) {
       results.errors.push(
-        `Connection failed via dedicated/stable RPC: ${error.message}`,
+        `Connection failed via dedicated RPC: ${error.message}`,
       );
     }
 
