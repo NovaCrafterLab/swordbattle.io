@@ -56,6 +56,7 @@ class Player extends Entity {
 
     this.startTimestamp = Date.now();
     this.kills = 0;
+    this._killsMutex = false; // 🔒 原子性击杀计数保护
     this.biome = 0;
     this.inSafezone = true;
 
@@ -82,6 +83,39 @@ class Player extends Entity {
 
   get playtime() {
     return Math.round((Date.now() - this.startTimestamp) / 1000);
+  }
+
+  /**
+   * 🔒 原子性击杀计数增量方法
+   * 确保多个同时击杀不会导致计数错误
+   */
+  async incrementKillsAtomic() {
+    // 简单的互斥锁实现
+    while (this._killsMutex) {
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+
+    this._killsMutex = true;
+    try {
+      this.kills += 1;
+      const currentKills = this.kills;
+
+      // 记录击杀事件用于调试
+      if (this.client && !this.isBot) {
+        Logger.game.debug('Player kill count incremented atomically', {
+          playerId: this.id,
+          playerName: this.name,
+          newKillCount: currentKills,
+          walletAddress: this.client.walletAddress
+            ? `${this.client.walletAddress.slice(0, 8)}...`
+            : null,
+        });
+      }
+
+      return currentKills;
+    } finally {
+      this._killsMutex = false;
+    }
   }
 
   createState() {
