@@ -30,30 +30,6 @@ const setCors = (res) => {
   for (const [k, v] of Object.entries(CORS_HEADERS)) res.writeHeader(k, v);
 };
 
-// Cork utility function for optimized HTTP responses
-const sendCorkedResponse = (res, statusCode, contentType, body) => {
-  res.cork(() => {
-    if (statusCode && statusCode !== 200) {
-      res.writeStatus(statusCode);
-    }
-    if (contentType) {
-      res.writeHeader('Content-Type', contentType);
-    }
-    res.end(body || '');
-  });
-};
-
-const sendCorkedJSON = (res, data, statusCode = '200 OK') => {
-  res.cork(() => {
-    if (statusCode !== '200 OK') {
-      res.writeStatus(statusCode);
-    }
-    setCors(res);
-    res.writeHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify(data));
-  });
-};
-
 // == uWebSockets App ==
 const app = config.useSSL
   ? uws.SSLApp({
@@ -203,7 +179,8 @@ function registerPublicRoutes(app, game) {
     res.onAborted(() => {
       console.warn('Ping OPTIONS request aborted by client');
     });
-    sendCorkedResponse(res, null, null, '');
+    setCors(res);
+    res.end();
   });
   app.get('/ping', (res) => {
     let hasResponded = false;
@@ -228,10 +205,12 @@ function registerPublicRoutes(app, game) {
     }, 5000); // 5秒超时
 
     try {
+      setCors(res);
+
       if (!hasResponded) {
         hasResponded = true;
         clearTimeout(timeout);
-        sendCorkedResponse(res, null, 'text/plain', 'pong');
+        res.writeHeader('Content-Type', 'text/plain').end('pong');
       }
     } catch (error) {
       console.error('Error in ping request:', error);
@@ -252,7 +231,8 @@ function registerPublicRoutes(app, game) {
     res.onAborted(() => {
       console.warn('Serverinfo OPTIONS request aborted by client');
     });
-    sendCorkedResponse(res, null, null, '');
+    setCors(res);
+    res.end();
   });
   app.get('/serverinfo', (res) => {
     let hasResponded = false;
@@ -281,12 +261,16 @@ function registerPublicRoutes(app, game) {
     }, 5000); // 5秒超时
 
     try {
+      setCors(res);
+
       const serverInfo = buildServerInfo(game);
 
       if (!hasResponded) {
         hasResponded = true;
         clearTimeout(timeout);
-        sendCorkedJSON(res, serverInfo);
+        res
+          .writeHeader('Content-Type', 'application/json')
+          .end(JSON.stringify(serverInfo));
       }
     } catch (error) {
       console.error('Error in serverinfo request:', error);
@@ -314,7 +298,8 @@ function registerPublicRoutes(app, game) {
       res.onAborted(() => {
         console.warn('Vault-info OPTIONS request aborted by client');
       });
-      sendCorkedResponse(res, null, null, '');
+      setCors(res);
+      res.end();
     });
     app.get('/api/vault-info/:gameId', async (res, req) => {
       // Register abort handler FIRST
@@ -322,19 +307,20 @@ function registerPublicRoutes(app, game) {
         console.warn('Vault-info request aborted by client');
       });
 
+      setCors(res);
+      res.writeHeader('Content-Type', 'application/json');
+
       try {
         await handleVaultInfoRequest(res, req, game);
       } catch (error) {
         console.error('Error in vault-info endpoint:', error);
         try {
-          sendCorkedJSON(
-            res,
-            {
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
               success: false,
               error: 'Internal server error',
               details: error.message,
-            },
-            '500 Internal Server Error',
+            }),
           );
         } catch (resError) {
           console.error('Failed to send error response:', resError);
@@ -349,19 +335,20 @@ function registerPublicRoutes(app, game) {
         console.warn('Player ticket info request aborted by client');
       });
 
+      setCors(res);
+      res.writeHeader('Content-Type', 'application/json');
+
       try {
         await handlePlayerTicketRequest(res, req, game);
       } catch (error) {
         console.error('Error in vault-info player ticket endpoint:', error);
         try {
-          sendCorkedJSON(
-            res,
-            {
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
               success: false,
               error: 'Internal server error',
               details: error.message,
-            },
-            '500 Internal Server Error',
+            }),
           );
         } catch (resError) {
           console.error('Failed to send error response:', resError);
@@ -374,7 +361,8 @@ function registerPublicRoutes(app, game) {
       res.onAborted(() => {
         console.warn('Buy-ticket OPTIONS request aborted by client');
       });
-      sendCorkedResponse(res, null, null, '');
+      setCors(res);
+      res.end();
     });
     app.post('/api/buy-ticket', async (res, req) => {
       // Register abort handler FIRST
@@ -382,19 +370,20 @@ function registerPublicRoutes(app, game) {
         console.warn('Buy ticket request aborted by client');
       });
 
+      setCors(res);
+      res.writeHeader('Content-Type', 'application/json');
+
       try {
         await handleBuyTicketRequest(res, req, game);
       } catch (error) {
         console.error('Error in buy-ticket endpoint:', error);
         try {
-          sendCorkedJSON(
-            res,
-            {
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
               success: false,
               error: 'Internal server error',
               details: error.message,
-            },
-            '500 Internal Server Error',
+            }),
           );
         } catch (resError) {
           console.error('Failed to send error response:', resError);
@@ -409,7 +398,8 @@ function registerPublicRoutes(app, game) {
           'Build-buy-ticket-transaction OPTIONS request aborted by client',
         );
       });
-      sendCorkedResponse(res, null, null, '');
+      setCors(res);
+      res.end();
     });
     app.post('/api/build-buy-ticket-transaction', async (res, req) => {
       // Register abort handler FIRST
@@ -417,19 +407,20 @@ function registerPublicRoutes(app, game) {
         console.warn('Build buy ticket transaction request aborted by client');
       });
 
+      setCors(res);
+      res.writeHeader('Content-Type', 'application/json');
+
       try {
         await handleBuildBuyTicketTransactionRequest(res, req, game);
       } catch (error) {
         console.error('Error in build-buy-ticket-transaction endpoint:', error);
         try {
-          sendCorkedJSON(
-            res,
-            {
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
               success: false,
               error: 'Internal server error',
               details: error.message,
-            },
-            '500 Internal Server Error',
+            }),
           );
         } catch (resError) {
           console.error('Failed to send error response:', resError);
@@ -444,13 +435,17 @@ function registerPublicRoutes(app, game) {
           'Verify-buy-ticket-transaction OPTIONS request aborted by client',
         );
       });
-      sendCorkedResponse(res, null, null, '');
+      setCors(res);
+      res.end();
     });
     app.post('/api/verify-buy-ticket-transaction', async (res, req) => {
       // Register abort handler FIRST
       res.onAborted(() => {
         console.warn('Verify buy ticket transaction request aborted by client');
       });
+
+      setCors(res);
+      res.writeHeader('Content-Type', 'application/json');
 
       try {
         await handleVerifyBuyTicketTransactionRequest(res, req, game);
@@ -460,14 +455,12 @@ function registerPublicRoutes(app, game) {
           error,
         );
         try {
-          sendCorkedJSON(
-            res,
-            {
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
               success: false,
               error: 'Internal server error',
               details: error.message,
-            },
-            '500 Internal Server Error',
+            }),
           );
         } catch (resError) {
           console.error('Failed to send error response:', resError);
@@ -480,7 +473,8 @@ function registerPublicRoutes(app, game) {
       res.onAborted(() => {
         console.warn('Clear-rate-limit OPTIONS request aborted by client');
       });
-      sendCorkedResponse(res, null, null, '');
+      setCors(res);
+      res.end();
     });
     app.post('/api/clear-rate-limit', async (res, req) => {
       res.onAborted(() => {
@@ -644,18 +638,20 @@ function registerPublicRoutes(app, game) {
           if (!hasResponded) {
             hasResponded = true;
             clearTimeout(timeout);
-            sendCorkedJSON(res, {
-              success: true,
-              data: {
-                gameId,
-                playerAddress,
-                hasReward,
-                claimed: hasClaimed,
-                claimable,
-                rewardAmount,
-                timestamp: Date.now(),
-              },
-            });
+            res.end(
+              JSON.stringify({
+                success: true,
+                data: {
+                  gameId,
+                  playerAddress,
+                  hasReward,
+                  claimed: hasClaimed,
+                  claimable,
+                  rewardAmount,
+                  timestamp: Date.now(),
+                },
+              }),
+            );
           }
         } catch (error) {
           console.error(
@@ -665,13 +661,11 @@ function registerPublicRoutes(app, game) {
           if (!hasResponded) {
             hasResponded = true;
             clearTimeout(timeout);
-            sendCorkedJSON(
-              res,
-              {
+            res.writeStatus('500 Internal Server Error').end(
+              JSON.stringify({
                 success: false,
                 error: error.message,
-              },
-              '500 Internal Server Error',
+              }),
             );
           }
         }
@@ -685,19 +679,20 @@ function registerPublicRoutes(app, game) {
         console.warn('Current game token request aborted by client');
       });
 
+      setCors(res);
+      res.writeHeader('Content-Type', 'application/json');
+
       try {
         await handleCurrentGameTokenRequest(res, req, game);
       } catch (error) {
         console.error('Error in current-game-token endpoint:', error);
         try {
-          sendCorkedJSON(
-            res,
-            {
+          res.writeStatus('500 Internal Server Error').end(
+            JSON.stringify({
               success: false,
               error: 'Internal server error',
               details: error.message,
-            },
-            '500 Internal Server Error',
+            }),
           );
         } catch (resError) {
           console.error('Failed to send error response:', resError);
@@ -717,19 +712,20 @@ function registerAdminRoutes(app, game) {
       console.warn('Admin endgame request aborted by client');
     });
 
+    setCors(res);
+    res.writeHeader('Content-Type', 'application/json');
+
     try {
       await handleEndGameRequest(res, game);
     } catch (error) {
       console.error('Error in admin endgame endpoint:', error);
       try {
-        sendCorkedJSON(
-          res,
-          {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
             success: false,
             error: 'Internal server error',
             details: error.message,
-          },
-          '500 Internal Server Error',
+          }),
         );
       } catch (resError) {
         console.error('Failed to send error response:', resError);
@@ -744,19 +740,20 @@ function registerAdminRoutes(app, game) {
       console.warn('Admin restart request aborted by client');
     });
 
+    setCors(res);
+    res.writeHeader('Content-Type', 'application/json');
+
     try {
       await handleRestartRequest(res, req, game);
     } catch (error) {
       console.error('Error in admin restart endpoint:', error);
       try {
-        sendCorkedJSON(
-          res,
-          {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
             success: false,
             error: 'Internal server error',
             details: error.message,
-          },
-          '500 Internal Server Error',
+          }),
         );
       } catch (resError) {
         console.error('Failed to send error response:', resError);
@@ -771,19 +768,20 @@ function registerAdminRoutes(app, game) {
       console.warn('Admin solana-status request aborted by client');
     });
 
+    setCors(res);
+    res.writeHeader('Content-Type', 'application/json');
+
     try {
       await handleSolanaStatusRequest(res, game);
     } catch (error) {
       console.error('Error in admin solana-status endpoint:', error);
       try {
-        sendCorkedJSON(
-          res,
-          {
+        res.writeStatus('500 Internal Server Error').end(
+          JSON.stringify({
             success: false,
             error: 'Internal server error',
             details: error.message,
-          },
-          '500 Internal Server Error',
+          }),
         );
       } catch (resError) {
         console.error('Failed to send error response:', resError);
@@ -1142,11 +1140,13 @@ async function handleSolanaStatusRequest(res, game) {
     if (!hasResponded) {
       hasResponded = true;
       clearTimeout(timeout);
-      sendCorkedJSON(res, {
-        success: true,
-        connected: isConnected,
-        solanaStatus: status,
-      });
+      res.end(
+        JSON.stringify({
+          success: true,
+          connected: isConnected,
+          solanaStatus: status,
+        }),
+      );
     }
   } catch (error) {
     console.error('Error in Solana status request:', error);
@@ -1217,31 +1217,33 @@ async function handleVaultInfoRequest(res, req, game) {
     if (!hasResponded) {
       hasResponded = true;
       clearTimeout(timeout);
-      sendCorkedJSON(res, {
-        success: true,
-        gameId: gameId,
-        vault: gameInfo.vault,
-        tokenMint: gameInfo.tokenMint.toString(),
-        tokenInfo: {
-          address: gameInfo.tokenMint.toString(),
-          isSOL:
-            gameInfo.tokenMint.toString() ===
-            'So11111111111111111111111111111112',
-          isUSDC:
-            gameInfo.tokenMint.toString() ===
-            'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
-        },
-        gameStatus: {
-          isActive: gameInfo.isActive,
-          canBuyTickets: gameInfo.canBuyTickets,
-          finalized: gameInfo.vault.finalized,
-          withdrawEnabled: gameInfo.vault.withdrawEnabled,
-        },
-        prizePool,
-        registeredCount,
-        activeCount,
-        dynamicTokenRetrieval: true,
-      });
+      res.end(
+        JSON.stringify({
+          success: true,
+          gameId: gameId,
+          vault: gameInfo.vault,
+          tokenMint: gameInfo.tokenMint.toString(),
+          tokenInfo: {
+            address: gameInfo.tokenMint.toString(),
+            isSOL:
+              gameInfo.tokenMint.toString() ===
+              'So11111111111111111111111111111112',
+            isUSDC:
+              gameInfo.tokenMint.toString() ===
+              'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr',
+          },
+          gameStatus: {
+            isActive: gameInfo.isActive,
+            canBuyTickets: gameInfo.canBuyTickets,
+            finalized: gameInfo.vault.finalized,
+            withdrawEnabled: gameInfo.vault.withdrawEnabled,
+          },
+          prizePool,
+          registeredCount,
+          activeCount,
+          dynamicTokenRetrieval: true,
+        }),
+      );
     }
   } catch (error) {
     console.error('Error in vault info request:', error);
@@ -1329,11 +1331,13 @@ async function handlePlayerTicketRequest(res, req, game) {
     if (!hasResponded) {
       hasResponded = true;
       clearTimeout(timeout);
-      sendCorkedJSON(res, {
-        success: true,
-        ticket: ticket,
-        hasTicket: !!ticket,
-      });
+      res.end(
+        JSON.stringify({
+          success: true,
+          ticket: ticket,
+          hasTicket: !!ticket,
+        }),
+      );
     }
   } catch (error) {
     console.error('Error in player ticket request:', error);
@@ -2761,24 +2765,24 @@ async function handleClaimTransactionRequest(body, res, hasResponded, timeout) {
     if (!hasResponded) {
       hasResponded = true;
       clearTimeout(timeout);
-      sendCorkedJSON(res, {
-        success: true,
-        serializedTransaction,
-        message: 'Claim transaction built successfully',
-      });
+      res.writeStatus('200 OK').end(
+        JSON.stringify({
+          success: true,
+          serializedTransaction,
+          message: 'Claim transaction built successfully',
+        }),
+      );
     }
   } catch (error) {
     console.error('Error building claim transaction:', error);
     if (!hasResponded) {
       hasResponded = true;
       clearTimeout(timeout);
-      sendCorkedJSON(
-        res,
-        {
+      res.writeStatus('500 Internal Server Error').end(
+        JSON.stringify({
           success: false,
           error: 'Failed to build claim transaction: ' + error.message,
-        },
-        '500 Internal Server Error',
+        }),
       );
     }
   }

@@ -224,20 +224,9 @@ class Sword extends Entity {
 
     if (entity.type === Types.Entity.Player) {
       if (entity.removed) {
-        // 🔒 使用原子性击杀计数方法确保并发安全
-        this.player
-          .incrementKillsAtomic()
-          .then((newKillCount) => {
-            this.player.flags.set(Types.Flags.PlayerKill, entity.id);
-            entity.flags.set(Types.Flags.PlayerDeath, true);
-          })
-          .catch((error) => {
-            console.error('Failed to increment kills atomically:', error);
-            // 降级到直接赋值作为备用方案
-            this.player.kills += 1;
-            this.player.flags.set(Types.Flags.PlayerKill, entity.id);
-            entity.flags.set(Types.Flags.PlayerDeath, true);
-          });
+        this.player.kills += 1;
+        this.player.flags.set(Types.Flags.PlayerKill, entity.id);
+        entity.flags.set(Types.Flags.PlayerDeath, true);
       } else {
         entity.flags.set(Types.Flags.Damaged, entity.id);
         [...this.player.tamedEntities].forEach((wolf) => {
